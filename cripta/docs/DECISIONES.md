@@ -300,3 +300,84 @@ con semillas distintas y disponibilidad de la semilla.
 
 Total del proyecto: 24 pruebas, todas pasan.
 Comando: `python -m unittest discover -s tests -t . -v` desde `cripta/`.
+
+---
+
+## Actores, intervalos y cambios de velocidad
+
+**Estado:** implementado y probado con pruebas unitarias. No corresponde a un
+problema de §4; implementa las reglas de §2.2 y §2.3.
+
+### 1. Decisión: el `max(1, ...)` del intervalo es un requisito de terminación
+
+El intervalo de una acción es `max(1, costo * 100 // velocidad)` (§2.3). La
+división entera puede dar 0 cuando la velocidad es mucho mayor que el costo: con
+velocidad 10000 y una acción de costo 25, `2500 // 10000` es 0.
+
+Sin el `max(1, ...)`, ese actor quedaría programado para el mismo instante en que
+está actuando y volvería a actuar en ese instante indefinidamente, de modo que el
+reloj virtual no avanzaría nunca y el bucle principal no terminaría. El
+`max(1, ...)` garantiza que toda acción adelante el reloj al menos una unidad.
+
+Está cubierto por `test_interval_is_never_zero`.
+
+### 2. Decisión: el límite de vida vive en el setter
+
+`health` se expone como propiedad y su setter recorta el valor al rango
+`[0, max_health]`.
+
+El enunciado pide ese límite en dos lugares distintos del Apéndice B: la
+regeneración de un enemigo y la poción de curación. La alternativa era escribir
+el recorte en cada operación que modifica la vida, lo que repetiría la regla y
+dejaría abierta la posibilidad de olvidarla en una tercera operación futura, como
+un efecto nuevo. Con el recorte en el setter, la regla se cumple una sola vez y
+es imposible saltarla.
+
+La diferencia con el estilo de validación habitual es que aquí no se lanza
+`ValueError`: recortar es la regla del juego, no un error del programa. Donde sí
+se valida con `ValueError` es en `speed`, porque una velocidad de 0 haría fallar
+la división del intervalo, y en `max_health` y `actor_id`.
+
+### 3. Decisión: el actor calcula el reescalado, el motor reprograma
+
+`change_speed(current_time, new_speed)` aplica la fórmula de §2.3
+(`restante_nuevo = max(1, (tiempo_siguiente - t) * velocidad_anterior // velocidad_nueva)`),
+devuelve el instante reprogramado y recién entonces reemplaza la velocidad.
+
+Se resolvió en un único método porque la fórmula necesita las dos velocidades a
+la vez. Si el cambio de velocidad y el cálculo fueran dos pasos separados, bastaría
+invertir el orden para que el resultado quedara mal sin producir ningún error
+visible. `test_rescale_uses_the_previous_speed_not_the_new_one` detecta
+precisamente esa inversión.
+
+El método **no modifica** el evento pendiente ni toca la agenda. Devuelve el
+instante y el motor cancela el evento anterior e inserta uno nuevo con un número
+de secuencia nuevo, como exige §2.3 y como requiere la agenda para no romper su
+propiedad de orden.
+
+### 4. Decisión: los costos de las acciones no viven en el actor
+
+`Actor` solo convierte un costo en un intervalo según su velocidad. La tabla de
+costos de §2.3 es una propiedad de cada acción, no del actor, así que vive en el
+motor.
+
+### 5. Referencia al evento pendiente
+
+Cada actor guarda en `scheduled_event` la referencia a su evento programado. Como
+un actor tiene a lo sumo una acción pendiente a la vez, eso permite cancelarlo en
+O(1) cuando muere, sin recorrer la agenda, que es lo que exige §4.1.
+
+### 6. Complejidad
+
+Todas las operaciones son O(1) en tiempo y espacio.
+
+### 7. Pruebas realizadas
+
+`tests/test_actor.py`, 23 pruebas, todas pasan (Python 3.14.6), agrupadas en
+cuatro casos: intervalos, vida, validación y cambio de velocidad.
+
+Los intervalos se verifican contra los números del propio enunciado: velocidad
+150 con costo 100 da 66 (§2.4 y §2.13), y la secuencia del jugador de §2.13
+—moverse en 0, recoger en 100, equipar en 125— produce 100, 125 y 175.
+
+Total del proyecto: 47 pruebas, todas pasan.

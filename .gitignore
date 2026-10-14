@@ -7,3 +7,7 @@ env/
 
 .idea/
 .vscode/
+
+# Material de referencia del curso, no se sube al repositorio
+*.zip
+estructuras-de-datos-main/

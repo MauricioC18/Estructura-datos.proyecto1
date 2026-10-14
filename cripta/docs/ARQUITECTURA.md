@@ -201,6 +201,73 @@ Acuerdos que esta interfaz impone al resto del proyecto:
 * El historial reversible (`structures/history.py`) debe registrar el valor del reloj de cada acción del jugador, pero **no** el contador de secuencia. Sí debe registrar el `time` y el `sequence` de cada evento afectado.
 * Todo el azar del modelo pasa por `random_generator`. No se usa el generador global del módulo `random`.
 
+### Interfaz de `Actor` (implementada)
+
+Atributos y comportamiento comunes del jugador y de los enemigos. `Player` y `Enemy` heredarán de esta clase.
+
+| Miembro | Devuelve | Comportamiento |
+| --- | --- | --- |
+| `actor_id`, `name`, `room_id` | — | identificación y sala actual |
+| `health` | `int` | vida; el setter recorta siempre al rango `[0, max_health]` |
+| `max_health`, `attack`, `defense` | `int` | estadísticas |
+| `speed` | `int` | velocidad; el setter rechaza valores menores o iguales a cero |
+| `is_alive` | `bool` | `True` mientras la vida sea mayor que cero |
+| `scheduled_event` | `Event` o `None` | referencia al evento pendiente del actor |
+| `interval_for(cost)` | `int` | `max(1, cost * 100 // speed)` |
+| `next_time_after(current_time, cost)` | `int` | `current_time` más el intervalo |
+| `change_speed(current_time, new_speed)` | `int` o `None` | cambia la velocidad y devuelve el instante reprogramado |
+| `take_damage(amount)`, `heal(amount)` | — | modifican la vida respetando el recorte del setter |
+
+Acuerdos que esta interfaz impone al resto del modelo:
+
+* La tabla de costos de las acciones **no** vive en `Actor`. Es una propiedad de cada acción y la administra el motor; `Actor` solo convierte un costo en un intervalo según su velocidad.
+* `change_speed()` **no** modifica el evento pendiente ni la agenda. Devuelve el instante nuevo, y el motor debe cancelar el evento anterior e insertar uno nuevo con un número de secuencia nuevo.
+* El motor es responsable de mantener `scheduled_event` al día cada vez que programa o cancela la acción de un actor. De esa referencia depende poder cancelar en O(1) los eventos de un actor muerto.
+* La vida nunca necesita recortarse desde fuera: cualquier asignación a `health` ya queda dentro del rango válido.
+
+### Interfaz de `Game` (acordada, todavía no implementada)
+
+`model/game.py` es el único punto por el que el controlador habla con el modelo. La vista nunca toca las estructuras internas.
+
+**Cada llamada a una acción hace dos cosas:** ejecuta la acción del jugador y después procesa todos los eventos pendientes hasta que vuelva a tocarle decidir al jugador. El controlador no administra el reloj ni la agenda. Esto corresponde al "ciclo completo de eventos entre dos decisiones consecutivas del jugador" que §5.2 del enunciado exige resolver en menos de 20 ms.
+
+| Método | Costo | Depende de |
+| --- | --- | --- |
+| `wait()` | 100 | nada |
+| `attack(enemy_id)` | 100 | nada |
+| `move(direction)` | 100 | salas |
+| `open_door(direction)` | 50 | salas |
+| `pick_up(floor_index)` | 25 | inventario |
+| `drop()` | 25 | inventario |
+| `use_item()` | 50 | inventario |
+| `equip_item()` | 50 | inventario |
+| `inventory_next()`, `inventory_previous()` | 0 | inventario |
+| `rewind()` | 0 | historial reversible |
+
+`drop()`, `use_item()` y `equip_item()` actúan sobre el objeto que el cursor del inventario está mostrando, porque §4.5 pide poder soltar el objeto que se está viendo. Por eso no reciben índice y por eso la navegación del inventario es parte de la interfaz.
+
+`rewind()` no consume tiempo virtual y no cuenta como acción del jugador (§2.11).
+
+**Resultado de una acción.** Toda acción devuelve un `ActionResult` con `accepted` y `message`. Una acción rechazada no consume tiempo virtual, no modifica el estado y no consulta el generador aleatorio. Los casos de rechazo están en el Apéndice B del enunciado: recoger con el inventario lleno, abrir una puerta sin la llave correcta, moverse hacia una salida que no existe o está cerrada, atacar a un enemigo que no está en la sala.
+
+**Estado visible.** `visible_state()` devuelve una vista de solo lectura con lo que §10.2 exige mostrar: sala actual, salidas y su estado, enemigos con su id de instancia, objetos del suelo, estadísticas del jugador, efectos activos, resultado de la partida y los últimos 20 mensajes.
+
+Se devuelve como una clase `@dataclass`, no como un `dict`. No es que un `dict` de presentación incumpla §7, que prohíbe usarlo como índice o tabla de búsqueda, pero una clase con campos nombrados evita tener que explicarlo en la defensa y sigue el estilo de los ejemplos del curso.
+
+**Qué puede implementarse ya y qué no.** `wait()` y `attack()` no necesitan salas: §2.6 solo pide que atacante y objetivo estén en la misma sala, y `Actor` ya guarda `room_id`. El resto espera a que existan `Room` y el inventario.
+
+### Qué registra la bitácora de reproducción
+
+| Pregunta | Respuesta | Fundamento |
+| --- | --- | --- |
+| ¿Se registra el uso del pergamino? | Sí | §2.11 dice que no se registra "como acción del jugador **en el historial**", y ahí historial es el historial reversible de §4.6, no la bitácora de §4.11. Si la bitácora no lo registrara, reproducirla no daría la misma partida, y §4.11 exige reproducción fiel |
+| ¿Se registra la navegación del inventario? | Sí | `drop()`, `use_item()` y `equip_item()` actúan sobre el objeto que muestra el cursor, así que sin la navegación la reproducción elegiría otro objeto. Las vistas ordenadas de §4.5 no se registran, porque no alteran el orden real ni el estado |
+| ¿Se registran las acciones rechazadas? | No | No consumen tiempo, no cambian el estado y no consultan el generador aleatorio, de modo que omitirlas no cambia la partida reproducida |
+| ¿El retroceso restaura el estado del generador aleatorio? | No | Ver el apartado correspondiente del Documento de Decisiones. §2.6 exige que misma semilla y misma secuencia de acciones den la misma partida, y el uso del pergamino forma parte de esa secuencia, así que la reproducción sigue siendo fiel. Guardar el estado interno del generador en cada intervalo se acercaría a una copia de estado, que §2.11 prohíbe |
+| ¿Cómo se despachan los comandos sin `dict`? | Con `if`/`elif` | Es la opción que no hay que justificar en la defensa |
+
+**Importante: cargar una partida guardada es un caso distinto del retroceso.** Para continuar exactamente donde se quedó, el archivo de guardado sí debe conservar y restaurar el contador de secuencia y el estado del generador aleatorio, además de los eventos pendientes de la agenda. Que el retroceso no los necesite no significa que el guardado tampoco.
+
 ## 7. Reglas de implementación
 
 * No utilizar `dict` como índice, caché o tabla de búsqueda para resolver los problemas evaluados.
