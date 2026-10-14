@@ -131,7 +131,7 @@ class TestActorSpeedChange(unittest.TestCase):
 
     def setUp(self):
         self.actor = make_actor(speed=100)
-        self.actor.scheduled_event = Event(300, 7, "actor_action", "e-201")
+        self.actor.scheduled_event = Event(300, 7, "actor_action", self.actor)
 
     def test_speeding_up_brings_the_next_action_closer(self):
         rescheduled = self.actor.change_speed(250, 200)
@@ -145,7 +145,7 @@ class TestActorSpeedChange(unittest.TestCase):
         self.assertEqual(rescheduled, 350)
 
     def test_rescheduled_time_always_moves_forward(self):
-        self.actor.scheduled_event = Event(251, 8, "actor_action", "e-201")
+        self.actor.scheduled_event = Event(251, 8, "actor_action", self.actor)
 
         rescheduled = self.actor.change_speed(250, 10000)
 

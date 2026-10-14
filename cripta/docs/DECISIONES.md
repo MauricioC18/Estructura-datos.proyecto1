@@ -121,9 +121,11 @@ Lo único verificado hasta ahora son las pruebas unitarias de
   o una estructura que permita eliminar por posición.
 * **`__len__` no cuenta eventos activos.** Devuelve los eventos almacenados,
   incluidos los cancelados que aún no se descartaron. `is_empty()`, `peek()` y
-  `pop()` sí respetan la semántica de eventos activos. Si el motor llegara a
-  necesitar el número exacto de eventos activos, habría que mantener un contador
-  explícito.
+  `pop()` sí respetan la semántica de eventos activos. Para guardar la partida
+  existe `active_events()`, que recorre el montículo y devuelve los no
+  cancelados; cuesta O(n) y solo se llama al guardar, no en el bucle principal.
+  Si alguna vez hiciera falta el número de eventos activos dentro del bucle,
+  habría que mantener un contador explícito.
 * **La reprogramación no es una operación de la agenda.** Un cambio de velocidad
   (§2.3) no modifica el evento que ya está en el montículo, porque alterar su
   `time` rompería la propiedad de orden. El motor debe cancelar el evento anterior
@@ -131,7 +133,8 @@ Lo único verificado hasta ahora son las pruebas unitarias de
 
 ### 7. Pruebas realizadas
 
-`tests/test_event_queue.py`, 10 pruebas, todas pasan (Python 3.14.6):
+`tests/test_event_queue.py`, 18 pruebas, todas pasan (Python 3.14.6). Las diez
+primeras cubren el orden y la cancelación:
 
 | Prueba | Qué comprueba |
 | --- | --- |
@@ -147,6 +150,12 @@ Lo único verificado hasta ahora son las pruebas unitarias de
 | `test_interleaved_push_pop_keeps_order` | intercalar inserciones y extracciones mantiene el orden |
 
 Comando: `python -m unittest discover -s tests -t . -v` desde `cripta/`.
+
+Las ocho restantes cubren `active_events()` y los campos de carga de `Event`:
+que la lista excluye los cancelados, que volver a insertar esos eventos en una
+agenda nueva reconstruye el mismo orden de extracción, y que cada tipo de evento
+transporta sus datos (daño del veneno, sala y dirección del cierre de puerta,
+instancia de la trampa).
 
 ### 8. Decisiones abiertas de esta sección
 
@@ -261,6 +270,47 @@ desincronizarse.
 | Cambio de velocidad | ninguno; recalcula el tiempo de un evento programado | §2.3 |
 | Trampa al entrar a una sala | ninguno; se aplica en el instante actual | §2.10 |
 
+### 5b. Cargar una partida no es lo mismo que retroceder
+
+El apartado 3 concluye que el contador de secuencia no necesita restaurarse al
+usar un pergamino de retroceso. Eso **no** se extiende al guardado de §4.10.
+
+El retroceso deja la partida en marcha: los eventos restaurados conviven con los
+nuevos y, como solo se comparan entre sí, basta con que los nuevos sigan siendo
+mayores. Cargar una partida es distinto, porque el programa arranca de cero y
+debe continuar exactamente donde se quedó. Por eso el archivo de guardado sí debe
+conservar y restaurar el reloj, el contador de secuencia, el estado interno del
+generador aleatorio y los eventos activos de la agenda.
+
+`GameState.restore(clock, sequence_counter, random_state)` cubre los tres
+primeros y `EventQueue.active_events()` entrega los eventos a persistir. Está
+cubierto por `test_restore_in_the_middle_of_a_game_keeps_the_rolls_aligned`, que
+comprueba que los valores aleatorios posteriores a una carga coinciden con los
+que habría producido la partida sin guardar.
+
+### 5c. Los eventos apuntan al actor, no a su identificador
+
+`Event` guardaba `actor_id` y `target_id` como texto. Se cambió a referencias
+directas al objeto `Actor`.
+
+El motor necesita el actor cada vez que procesa un evento. Con solo el
+identificador habría que buscarlo, lo que cuesta O(n) por evento recorriendo la
+lista de actores; con decenas de miles de eventos eso compite contra el
+presupuesto de 20 ms de §5.2. La alternativa habitual sería un índice, pero §7
+prohíbe `dict` como tabla de búsqueda. La referencia directa elimina el problema
+en lugar de resolverlo: el acceso es O(1) y no hace falta ninguna estructura
+adicional.
+
+El identificador sigue disponible como `event.actor.actor_id`, que es lo que se
+escribe al serializar. Al cargar hay que resolver cada identificador contra la
+lista de actores, pero eso ocurre una sola vez y fuera del bucle principal.
+
+La clase se mantuvo plana, con campos opcionales por tipo de evento, en lugar de
+usar subclases o un objeto de datos anidado. El motivo es el guardado binario de
+§4.10: `struct` empaqueta registros de forma fija, y una clase plana se empaqueta
+directamente, mientras que una jerarquía obligaría a un formato con etiqueta de
+tipo.
+
 ### 6. Azar reproducible
 
 `GameState` contiene la instancia `random.Random(semilla)` que usa todo el
@@ -290,7 +340,7 @@ completo de eventos cuando exista `--bench`.
 
 ### 9. Pruebas realizadas
 
-`tests/test_game_state.py`, 14 pruebas, todas pasan (Python 3.14.6). Cubren:
+`tests/test_game_state.py`, 20 pruebas, todas pasan (Python 3.14.6). Cubren:
 reloj inicial en 0 y con valor cargado, reloj de solo lectura, numeración
 creciente desde 0, avance hacia adelante y al mismo instante, rechazo de
 retroceso en `advance_clock_to()`, retroceso correcto y rechazo de adelanto en
@@ -298,7 +348,7 @@ retroceso en `advance_clock_to()`, retroceso correcto y rechazo de adelanto en
 tras un retroceso, reproducibilidad del azar con la misma semilla, divergencia
 con semillas distintas y disponibilidad de la semilla.
 
-Total del proyecto: 24 pruebas, todas pasan.
+Total del proyecto: 61 pruebas, todas pasan.
 Comando: `python -m unittest discover -s tests -t . -v` desde `cripta/`.
 
 ---
@@ -380,4 +430,4 @@ Los intervalos se verifican contra los números del propio enunciado: velocidad
 150 con costo 100 da 66 (§2.4 y §2.13), y la secuencia del jugador de §2.13
 —moverse en 0, recoger en 100, equipar en 125— produce 100, 125 y 175.
 
-Total del proyecto: 47 pruebas, todas pasan.
+Total del proyecto: 61 pruebas, todas pasan.

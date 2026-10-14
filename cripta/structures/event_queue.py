@@ -39,6 +39,15 @@ class EventQueue:
     def cancel(self, event):
         event.cancelled = True
 
+    def active_events(self):
+        """Eventos no cancelados, para guardar la agenda en disco.
+
+        No los devuelve en orden de prioridad. Al cargarlos basta con volver a
+        insertarlos: cada evento conserva su tiempo y su numero de secuencia,
+        de modo que el monticulo reconstruye el mismo orden.
+        """
+        return [event for event in self._heap if not event.cancelled]
+
     def _sift_up(self, index):
         while index > 0:
             parent = (index - 1) // 2

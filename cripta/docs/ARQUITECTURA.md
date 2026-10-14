@@ -172,8 +172,25 @@ La agenda es un montículo binario mínimo. La justificación completa está en 
 | `peek()` | `Event` o `None` | siguiente evento activo, sin retirarlo |
 | `pop()` | `Event` o `None` | retira y devuelve el siguiente evento activo |
 | `cancel(event)` | — | marca el evento como cancelado |
+| `active_events()` | `list` | eventos no cancelados, para guardar la agenda en disco |
 | `is_empty()` | `bool` | `True` si no queda ningún evento activo |
 | `len(queue)` | `int` | eventos almacenados, incluidos los cancelados aún no descartados |
+
+### Interfaz de `Event` (implementada)
+
+| Campo | Para qué |
+| --- | --- |
+| `time`, `sequence` | prioridad en la agenda |
+| `event_type` | tipo que el motor interpreta |
+| `actor`, `target` | **referencias al objeto `Actor`**, no identificadores |
+| `amount` | daño del veneno, cantidad de regeneración, modificador de velocidad |
+| `room_id`, `direction` | cierre automático de una puerta |
+| `room_id`, `instance_id` | rearme de una trampa |
+| `cancelled` | marca de cancelación diferida |
+
+`Event` guarda la **referencia** al actor y no su identificador, porque el motor necesita el actor cada vez que procesa un evento y buscarlo por identificador costaría O(n) por evento. El identificador sigue disponible como `event.actor.actor_id`, que es lo que se escribe al serializar. Al cargar una partida hay que resolver cada identificador contra la lista de actores, pero eso ocurre una sola vez y no en el bucle principal.
+
+La clase es plana, con campos opcionales, en lugar de usar subclases por tipo de evento o un objeto de datos anidado. La razón es que el guardado binario de §4.10 empaqueta registros de forma fija con `struct`, y una clase plana se empaqueta directamente; una jerarquía obligaría a inventar un formato con etiqueta de tipo.
 
 Acuerdos que esta interfaz impone al resto del modelo:
 
@@ -189,6 +206,9 @@ Mantiene el estado temporal de la partida. La justificación está en el Documen
 | --- | --- | --- |
 | `clock` | `int` | reloj virtual, de solo lectura |
 | `next_sequence()` | `int` | siguiente número de secuencia; única fuente de la partida |
+| `sequence_counter` | `int` | número que recibirá el próximo evento, para guardarlo en disco |
+| `random_state()` | tupla | estado interno del generador, para guardarlo en disco |
+| `restore(clock, sequence_counter, random_state)` | — | devuelve el estado temporal al guardado en un archivo de partida |
 | `advance_clock_to(time)` | — | mueve el reloj; acepta el mismo instante y rechaza retroceder |
 | `rewind_clock_to(time)` | — | devuelve el reloj a un instante anterior; rechaza adelantar |
 | `random_generator` | `random.Random` | generador de azar del modelo, creado con la semilla |
@@ -200,6 +220,7 @@ Acuerdos que esta interfaz impone al resto del proyecto:
 * `rewind_clock_to()` lo usa exclusivamente el pergamino de retroceso. No calcula el instante de destino: lo recibe del historial reversible.
 * El historial reversible (`structures/history.py`) debe registrar el valor del reloj de cada acción del jugador, pero **no** el contador de secuencia. Sí debe registrar el `time` y el `sequence` de cada evento afectado.
 * Todo el azar del modelo pasa por `random_generator`. No se usa el generador global del módulo `random`.
+* `restore()` es para **cargar una partida guardada**, no para el pergamino de retroceso. Son dos casos distintos: el retroceso devuelve el reloj pero no necesita el contador de secuencia ni el estado del generador, mientras que cargar una partida debe continuar exactamente donde se quedó y sí los necesita. Quien implemente el guardado de §4.10 debe persistir los tres valores junto con los eventos activos de la agenda.
 
 ### Interfaz de `Actor` (implementada)
 

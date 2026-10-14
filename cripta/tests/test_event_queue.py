@@ -123,5 +123,90 @@ class TestEventQueue(unittest.TestCase):
         self.assertEqual(self.queue.pop().time, 300)
 
 
+class TestActiveEvents(unittest.TestCase):
+
+    def setUp(self):
+        self.queue = EventQueue()
+
+    def test_empty_queue_has_no_active_events(self):
+        self.assertEqual(self.queue.active_events(), [])
+
+    def test_active_events_returns_every_pending_event(self):
+        events = [Event(300, 1, "move"), Event(100, 2, "attack")]
+
+        for event in events:
+            self.queue.push(event)
+
+        active = self.queue.active_events()
+
+        self.assertEqual(len(active), 2)
+        self.assertCountEqual(active, events)
+
+    def test_active_events_excludes_cancelled_events(self):
+        kept = Event(100, 1, "move")
+        dropped = Event(200, 2, "poison_pulse")
+
+        self.queue.push(kept)
+        self.queue.push(dropped)
+        self.queue.cancel(dropped)
+
+        self.assertEqual(self.queue.active_events(), [kept])
+
+    def test_reinserting_the_active_events_restores_the_same_order(self):
+        original = EventQueue()
+        events = [
+            Event(300, 1, "move"),
+            Event(100, 2, "attack"),
+            Event(100, 3, "poison_pulse"),
+            Event(200, 4, "wait"),
+        ]
+
+        for event in events:
+            original.push(event)
+
+        restored = EventQueue()
+
+        for event in original.active_events():
+            restored.push(event)
+
+        extracted = []
+
+        while not restored.is_empty():
+            event = restored.pop()
+            extracted.append((event.time, event.sequence))
+
+        self.assertEqual(extracted, [(100, 2), (100, 3), (200, 4), (300, 1)])
+
+
+class TestEventPayload(unittest.TestCase):
+
+    def test_payload_fields_default_to_none(self):
+        event = Event(100, 1, "wait")
+
+        self.assertIsNone(event.actor)
+        self.assertIsNone(event.target)
+        self.assertIsNone(event.amount)
+        self.assertIsNone(event.room_id)
+        self.assertIsNone(event.direction)
+        self.assertIsNone(event.instance_id)
+        self.assertFalse(event.cancelled)
+
+    def test_poison_pulse_carries_its_damage(self):
+        event = Event(180, 9, "poison_pulse", amount=2)
+
+        self.assertEqual(event.amount, 2)
+
+    def test_door_close_carries_its_room_and_direction(self):
+        event = Event(500, 10, "door_close", room_id=2, direction="E")
+
+        self.assertEqual(event.room_id, 2)
+        self.assertEqual(event.direction, "E")
+
+    def test_trap_rearm_carries_its_instance(self):
+        event = Event(300, 11, "trap_rearm", room_id=2, instance_id="t-17")
+
+        self.assertEqual(event.instance_id, "t-17")
+
+
 if __name__ == "__main__":
     unittest.main()
