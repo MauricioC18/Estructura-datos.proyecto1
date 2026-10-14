@@ -24,16 +24,27 @@ cripta/
 ├── structures/
 │   ├── event_queue.py
 │   ├── inventory.py
-│   ├── cache.py
+│   ├── tabla_hash.py
+│   ├── funciones_hash.py
+│   ├── cache_catalogo.py
+│   ├── lista_sin_repetidos.py
+│   ├── grafo_salas.py
 │   ├── history.py
 │   ├── trail.py
 │   ├── circular_log.py
 │   └── sorting.py
 ├── adapters/
-│   ├── data_source.py
-│   ├── http_source.py
-│   ├── offline_source.py
-│   └── persistence.py
+│   ├── fuente_datos.py
+│   ├── fuente_http.py
+│   ├── fuente_offline.py
+│   ├── almacen_fichas.py
+│   └── almacen_cripta.py
+├── repository/
+│   ├── repositorio_cripta.py
+│   ├── gestor_catalogo.py
+│   └── gestor_contenido.py
+├── tools/
+├── datos_offline/
 ├── controller/
 │   └── game_controller.py
 ├── view/
@@ -78,7 +89,11 @@ Contiene las estructuras de datos implementadas para resolver los requisitos del
 
 * `event_queue.py`: agenda y administra los eventos del juego.
 * `inventory.py`: administra el inventario y sus operaciones.
-* `cache.py`: administra la caché y su política de desalojo.
+* `tabla_hash.py`: tabla hash propia con encadenamiento. Reemplaza a `dict` en todo el proyecto (§7); cualquier búsqueda por clave debería usarla.
+* `funciones_hash.py`: funciones hash deterministas para la tabla (crc32, y FNV-1a como alternativa medida).
+* `cache_catalogo.py`: caché del catálogo en memoria, con tope `--cache-size` y política LRU.
+* `lista_sin_repetidos.py`: lista en orden de llegada que ignora repetidos.
+* `grafo_salas.py`: grafo de salas como lista de adyacencia y recorrido en anchura (BFS) para la precarga.
 * `history.py`: registra los cambios necesarios para revertir acciones.
 * `trail.py`: administra el rastro del jugador.
 * `circular_log.py`: conserva los últimos 20 mensajes.
@@ -90,12 +105,27 @@ Cada estructura debe respetar las restricciones del enunciado y justificar sus d
 
 Permite obtener y almacenar datos sin acoplar el modelo a una implementación concreta.
 
-* `data_source.py`: define la interfaz común para consultar los datos.
-* `http_source.py`: implementa el acceso a la API.
-* `offline_source.py`: proporciona una fuente alternativa para el funcionamiento sin conexión.
-* `persistence.py`: administra el almacenamiento persistente que le corresponda según los acuerdos del grupo.
+* `fuente_datos.py`: define la interfaz común para consultar los datos (`FuenteDatos`), los errores y la cuenta del presupuesto de solicitudes.
+* `fuente_http.py`: implementa el acceso a la API (`FuenteHttp`).
+* `fuente_offline.py`: proporciona una fuente alternativa para el funcionamiento sin conexión (`FuenteOffline`), con el mismo contrato.
+* `almacen_fichas.py`: guarda en disco las fichas del catálogo, con un índice binario ordenado y validación por versión.
+* `almacen_cripta.py`: guarda en disco el esqueleto y el contenido de cada cripta, validados por versión.
+
+El guardado binario de una partida (§4.10) no forma parte de estos archivos y queda por asignar.
 
 El modelo debe utilizar interfaces comunes en lugar de depender directamente de HTTP o de archivos específicos.
+
+### Repository
+
+Une las fuentes, la caché y los almacenes en disco, y ofrece al controlador una sola entrada con nombres del juego. El modelo nunca lo importa.
+
+* `repositorio_cripta.py`: `RepositorioCripta`, el único punto de entrada del bloque 2 para el controlador.
+* `gestor_catalogo.py`: resuelve las fichas buscando en memoria, luego en disco y por último en el API, en lotes de 10.
+* `gestor_contenido.py`: mantiene el contenido de las salas y lo precarga por BFS.
+
+### Tools
+
+Herramientas de desarrollo que no forman parte de una partida: descarga de datos para el modo sin conexión, simulación de un recorrido usando solo el bloque 2 y ejecución de todas las verificaciones.
 
 ### Controller
 
@@ -307,6 +337,33 @@ Los valores de `behavior` son los que entrega el catálogo. El enunciado solo co
 | ¿Cómo se despachan los comandos sin `dict`? | Con `if`/`elif` | Es la opción que no hay que justificar en la defensa |
 
 **Importante: cargar una partida guardada es un caso distinto del retroceso.** Para continuar exactamente donde se quedó, el archivo de guardado sí debe conservar y restaurar el contador de secuencia y el estado del generador aleatorio, además de los eventos pendientes de la agenda. Que el retroceso no los necesite no significa que el guardado tampoco.
+
+### Interfaz de `RepositorioCripta` (implementada)
+
+Es el único punto de entrada del bloque 2 para el controlador. Une la fuente de datos (red o sin conexión), la precarga, el catálogo, la caché y las copias en disco. La guía completa, con un ejemplo de uso, el contrato de datos y los supuestos, está en `docs/BLOQUE_2_PARA_EL_GRUPO.md`.
+
+`RepositorioCripta(fuente, carpeta_cache, capacidad_cache, consultar_ids_en_uso)` recibe una `FuenteHttp` o una `FuenteOffline` según `--offline`, la carpeta de la caché en disco y el valor de `--cache-size`.
+
+| Método | Devuelve | Comportamiento |
+| --- | --- | --- |
+| `empezar_conteo_de_partida()` | — | reinicia la cuenta de solicitudes; se llama antes de listar las criptas, porque la lista también cuenta (§5.1) |
+| `listar_criptas()` | `list` | criptas publicadas, para que el jugador elija |
+| `iniciar_partida(id_cripta, versiones_requeridas=None)` | `DatosDePartida` | carga lo necesario y deja lista la sala inicial (§2.4) |
+| `preparar_entrada_a_sala(id_sala)` | entrada de contenido | se llama **antes** de confirmar que el jugador entra (§2.5); deja listas las fichas de todo lo que hay en la sala |
+| `despues_de_accion(id_sala_actual)` | — | precarga contenido y fichas alrededor del jugador; nunca falla por presupuesto |
+| `asegurar_fichas(ids)` | — | para objetos que aparecen durante la partida, como lo que suelta un enemigo |
+| `obtener_ficha(id)`, `contenido_de_sala(id)`, `sala_del_esqueleto(id)`, `vecinos_de_sala(id)` | datos del API | nunca usan la red |
+| `versiones_de_la_partida()` | tupla | `(id_cripta, version_cripta, version_catalogo)` para la cabecera del log de reproducción (§4.11) |
+| `reporte_de_red()` | `ReporteDeRed` | solicitudes, presupuesto, aciertos y fallos de caché (§5.1); `lineas_de_texto()` lo deja listo para mostrar |
+
+Acuerdos que esta interfaz impone al resto del proyecto:
+
+* El controlador es el único que usa `RepositorioCripta`. El modelo recibe objetos ya construidos y nunca ve HTTP, archivos ni la caché.
+* `consultar_ids_en_uso` es una función sin argumentos que el controlador arma con datos del modelo. Devuelve una `TablaHash` con los ids de tipo en uso: enemigos vivos, objetos del inventario y objetos y trampas de la sala actual. La caché no libera esas fichas (§4.4).
+* Si `preparar_entrada_a_sala()` lanza `PresupuestoAgotado`, el movimiento se rechaza sin consumir tiempo virtual, igual que las demás acciones imposibles del Apéndice B.
+* En la reproducción, `iniciar_partida()` recibe las versiones de la cabecera del log. Si la fuente tiene otras, lanza `VersionesIncompatibles` antes de cargar nada.
+* Los datos llegan tal como los envía el API. Convertirlos en objetos del modelo es trabajo de un traductor que todavía falta, porque depende de las clases de salas y de objetos.
+* Cada benchmark del bloque 2 expone `run()`, que devuelve `Measurement` con los mismos campos que `benchmark/scheduler_bench.py`. En la precarga, que cuenta solicitudes y no mide tiempo, `seconds` es `None`.
 
 ## 7. Reglas de implementación
 

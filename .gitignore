@@ -8,6 +8,11 @@ env/
 .idea/
 .vscode/
 
+# Archivos que generan el programa y las herramientas del bloque 2
+cache_cripta/
+resultados_verificacion.txt
+*.tmp
+
 # Material de referencia del curso, no se sube al repositorio
 *.zip
 estructuras-de-datos-main/

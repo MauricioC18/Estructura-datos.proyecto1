@@ -1,0 +1,79 @@
+Verificación del proyecto CRIPTA
+Fecha: 2026-10-13 21:08
+Python 3.13.14 en Windows AMD64
+
+========================================================================
+Pruebas unitarias: OK
+Comando: python -m unittest
+========================================================================
+.....................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 165 tests in 0.288s
+
+OK
+
+========================================================================
+Benchmark de la tabla hash: OK
+Comando: python -m bench.bench_tabla_hash
+========================================================================
+Python 3.13.14 en Windows AMD64
+
+Búsqueda con acierto (la clave existe), en nanosegundos por búsqueda
+     n |    TablaHash crc32 |   TablaHash FNV-1a | Lista ord.+binaria |             Lineal |  dict (referencia)
+---------------------------------------------------------------------------------------------------------------
+    25 |                163 |                793 |                229 |                283 |                 13
+   100 |                163 |                847 |                331 |                894 |                 13
+  1000 |                179 |                826 |                575 |               8526 |                 18
+ 10000 |                190 |                872 |                799 |              79577 |                 21
+
+Búsqueda con fallo (la clave no existe), en nanosegundos por búsqueda
+     n |    TablaHash crc32 |   TablaHash FNV-1a | Lista ord.+binaria |             Lineal |  dict (referencia)
+---------------------------------------------------------------------------------------------------------------
+    25 |                154 |                834 |                270 |                384 |                 18
+   100 |                156 |                876 |                359 |               1358 |                 16
+  1000 |                170 |                849 |                590 |              14845 |                 18
+ 10000 |                177 |                900 |                808 |             153218 |                 22
+
+========================================================================
+Benchmark de la caché del catálogo: OK
+Comando: python -m bench.bench_cache_catalogo
+========================================================================
+Python 3.13.14 en Windows AMD64
+
+Caché llena, en nanosegundos por operación
+capacidad |            alternativa | obtener (acierto) | agregar con desalojo
+-----------------------------------------------------------------------------
+       25 | Lista doble (decisión) |               285 |                  998
+       25 |         list de Python |               334 |                  682
+      100 | Lista doble (decisión) |               292 |                  994
+      100 |         list de Python |               535 |                  692
+     1000 | Lista doble (decisión) |               321 |                 1047
+     1000 |         list de Python |              3214 |                  829
+     5000 | Lista doble (decisión) |               315 |                 1060
+     5000 |         list de Python |             20968 |                 1367
+
+========================================================================
+Benchmark del almacén de fichas: OK
+Comando: python -m bench.bench_almacen_fichas
+========================================================================
+Python 3.13.14 en Windows AMD64
+
+Recuperar una ficha liberada de memoria
+fichas |              alternativa | µs por lectura | archivos | bytes en disco
+------------------------------------------------------------------------------
+    25 | AlmacenFichas (decisión) |           31.3 |        2 |           5769
+    25 |        un JSON por ficha |           44.2 |       25 |           5040
+    25 |             un solo JSON |           58.1 |        1 |           5090
+   100 | AlmacenFichas (decisión) |           31.6 |        2 |          23019
+   100 |        un JSON por ficha |           44.5 |      100 |          20190
+   100 |             un solo JSON |          116.3 |        1 |          20390
+  1000 | AlmacenFichas (decisión) |           32.0 |        2 |         230919
+  1000 |        un JSON por ficha |           44.8 |     1000 |         202890
+  1000 |             un solo JSON |          784.8 |        1 |         204890
+
+Solo la búsqueda binaria en el índice de AlmacenFichas
+    25 fichas: 0.29 µs por búsqueda
+   100 fichas: 0.36 µs por búsqueda
+  1000 fichas: 0.60 µs por búsqueda
+
+Resultado general: todo correcto
