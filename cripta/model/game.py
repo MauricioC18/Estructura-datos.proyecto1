@@ -1,5 +1,18 @@
 from dataclasses import dataclass
 
+from model.effects import (
+    ActiveEffect,
+    POISON,
+    POISON_DURATION,
+    POISON_PULSE,
+    POISON_PULSE_INTERVAL,
+    REGENERATION_INTERVAL,
+    REGENERATION_PULSE,
+    SPEED,
+    SPEED_END,
+    TORCH,
+    TORCH_END,
+)
 from model.enemy import Enemy
 from model.event import Event
 from structures.event_queue import EventQueue
@@ -36,6 +49,12 @@ class EnemyView:
 
 
 @dataclass
+class EffectView:
+    name: str
+    ends_at: int | None
+
+
+@dataclass
 class VisibleState:
     clock: int
     result: str
@@ -47,11 +66,13 @@ class VisibleState:
     speed: int
     room_id: int
     enemies: list
+    effects: list
+    torch_lit: bool
     messages: list
 
 
 class Game:
-    """Coordina el reloj, la agenda y los actores.
+    """Coordina el reloj, la agenda, los actores y los efectos temporales.
 
     Cada accion del jugador ejecuta la accion y despues procesa todos los
     eventos pendientes hasta que vuelva a tocarle decidir. El controlador no
@@ -59,14 +80,21 @@ class Game:
 
     Solo implementa esperar y atacar. Moverse, abrir puertas y las acciones de
     inventario esperan a que existan las salas y el inventario.
+
+    message_log se recibe desde fuera. Cualquier estructura con append() y que
+    se pueda recorrer sirve, de modo que la bitacora circular del proyecto
+    encaje sin modificar esta clase. Si no se pasa ninguna se usa una list, que
+    es provisional porque no cumple el limite de memoria de la seccion 4.8.
     """
 
-    def __init__(self, state, player, enemies=None):
+    def __init__(self, state, player, enemies=None, message_log=None):
         self.state = state
         self.player = player
         self.enemies = [] if enemies is None else list(enemies)
         self.events = EventQueue()
-        self.messages = []
+        self.messages = [] if message_log is None else message_log
+        self.effects = []
+        self.torch_lit = False
         self.result = IN_PROGRESS
 
         self._schedule(self.player, self.state.clock)
@@ -92,10 +120,80 @@ class Game:
         message = f"Atacas a {target.name} y le quitas {damage} de vida."
 
         if not target.is_alive:
-            self._remove_from_play(target)
+            self._check_death(target)
             message = f"{message} {target.name} muere."
 
         return self._player_acts(ATTACK_COST, message)
+
+    def apply_poison(self, target, damage):
+        """Programa de una vez todas las activaciones del veneno (seccion 2.10).
+
+        La duracion y el intervalo son fijos, de modo que al aplicarlo ya se
+        conocen los cinco instantes en que hara dano. Programarlos juntos deja
+        cada pulso sin estado propio y convierte el antidoto en la cancelacion
+        de unos eventos concretos.
+        """
+        events = []
+        end_time = self.state.clock + POISON_DURATION
+        pulse_time = self.state.clock + POISON_PULSE_INTERVAL
+
+        while pulse_time <= end_time:
+            events.append(
+                self._schedule_effect(POISON_PULSE, target, pulse_time, damage)
+            )
+            pulse_time += POISON_PULSE_INTERVAL
+
+        effect = ActiveEffect(POISON, target, events, end_time)
+        self.effects.append(effect)
+
+        return effect
+
+    def cancel_poison(self, target):
+        """Efecto del antidoto: impide las activaciones futuras del veneno."""
+        cancelled = False
+
+        for effect in self.effects:
+            if effect.name == POISON and effect.target is target:
+                if not effect.cancelled:
+                    self._cancel_effect(effect)
+                    cancelled = True
+
+        return cancelled
+
+    def apply_regeneration(self, target, amount):
+        """Un enemigo que declare regeneracion se cura cada 200 unidades.
+
+        No se registra como efecto cancelable: se detiene sola cuando el actor
+        muere, porque el bucle descarta los eventos de los actores sin vida, y
+        cada pulso programa el siguiente a partir del propio evento.
+        """
+        return self._schedule_effect(
+            REGENERATION_PULSE,
+            target,
+            self.state.clock + REGENERATION_INTERVAL,
+            amount,
+        )
+
+    def apply_speed_change(self, actor, new_speed, duration):
+        """Cambio temporal de velocidad, con reajuste al comenzar y al terminar."""
+        previous_speed = actor.speed
+        self.change_actor_speed(actor, new_speed)
+
+        end_time = self.state.clock + duration
+        event = self._schedule_effect(SPEED_END, actor, end_time, previous_speed)
+        effect = ActiveEffect(SPEED, actor, [event], end_time)
+        self.effects.append(effect)
+
+        return effect
+
+    def light_torch(self, duration):
+        self.torch_lit = True
+        end_time = self.state.clock + duration
+        event = self._schedule_effect(TORCH_END, self.player, end_time)
+        effect = ActiveEffect(TORCH, self.player, [event], end_time)
+        self.effects.append(effect)
+
+        return effect
 
     def change_actor_speed(self, actor, new_speed):
         """Aplica un cambio de velocidad y reprograma la accion pendiente.
@@ -123,6 +221,12 @@ class Game:
             if enemy.is_alive and enemy.room_id == self.player.room_id
         ]
 
+        effects = [
+            EffectView(effect.name, effect.ends_at)
+            for effect in self.effects
+            if effect.target is self.player and not effect.cancelled
+        ]
+
         return VisibleState(
             clock=self.state.clock,
             result=self.result,
@@ -134,6 +238,8 @@ class Game:
             speed=self.player.speed,
             room_id=self.player.room_id,
             enemies=enemies,
+            effects=effects,
+            torch_lit=self.torch_lit,
             messages=list(self.messages),
         )
 
@@ -144,6 +250,7 @@ class Game:
             self.player.next_time_after(self.state.clock, cost),
         )
         self._advance_to_player_turn()
+        self._forget_finished_effects()
 
         return ActionResult(True, message)
 
@@ -159,13 +266,35 @@ class Game:
 
             self.state.advance_clock_to(event.time)
 
-            if event.actor is not None:
-                event.actor.scheduled_event = None
+            if event.event_type != ACTOR_ACTION:
+                self._run_effect(event)
+                continue
+
+            event.actor.scheduled_event = None
 
             if event.actor is self.player:
                 return
 
             self._run_enemy_turn(event.actor)
+
+    def _run_effect(self, event):
+        if event.event_type == POISON_PULSE:
+            event.actor.take_damage(event.amount)
+            self._log(f"El veneno le quita {event.amount} de vida a {event.actor.name}.")
+            self._check_death(event.actor)
+        elif event.event_type == REGENERATION_PULSE:
+            event.actor.heal(event.amount)
+            self._schedule_effect(
+                REGENERATION_PULSE,
+                event.actor,
+                self.state.clock + REGENERATION_INTERVAL,
+                event.amount,
+            )
+        elif event.event_type == SPEED_END:
+            self.change_actor_speed(event.actor, event.amount)
+        elif event.event_type == TORCH_END:
+            self.torch_lit = False
+            self._log("La antorcha se apaga.")
 
     def _run_enemy_turn(self, enemy):
         action = enemy.decide_action(self.player)
@@ -174,10 +303,9 @@ class Game:
             damage = self._damage_from(enemy, self.player)
             self.player.take_damage(damage)
             self._log(f"{enemy.name} te ataca y te quita {damage} de vida.")
+            self._check_death(self.player)
 
-            if not self.player.is_alive:
-                self.result = DEFEAT
-                self._log("Has muerto.")
+            if self.result == DEFEAT:
                 return
 
             cost = ATTACK_COST
@@ -185,6 +313,17 @@ class Game:
             cost = WAIT_COST
 
         self._schedule(enemy, enemy.next_time_after(self.state.clock, cost))
+
+    def _check_death(self, actor):
+        if actor.is_alive:
+            return
+
+        if actor is self.player:
+            self.result = DEFEAT
+            self._log("Has muerto.")
+            return
+
+        self._remove_from_play(actor)
 
     def _damage_from(self, attacker, defender):
         roll = self.state.random_generator.randint(0, 4)
@@ -200,6 +339,32 @@ class Game:
         self.events.push(event)
 
         return event
+
+    def _schedule_effect(self, event_type, actor, time, amount=None):
+        event = Event(
+            time,
+            self.state.next_sequence(),
+            event_type,
+            actor,
+            amount=amount,
+        )
+        self.events.push(event)
+
+        return event
+
+    def _cancel_effect(self, effect):
+        for event in effect.events:
+            self.events.cancel(event)
+
+        effect.cancelled = True
+
+    def _forget_finished_effects(self):
+        self.effects = [
+            effect
+            for effect in self.effects
+            if not effect.cancelled
+            and (effect.ends_at is None or effect.ends_at > self.state.clock)
+        ]
 
     def _remove_from_play(self, actor):
         if actor.scheduled_event is not None:
@@ -226,6 +391,9 @@ class Game:
                 enemy,
                 enemy.next_time_after(self.state.clock, WAIT_COST),
             )
+
+            if enemy.regeneration > 0:
+                self.apply_regeneration(enemy, enemy.regeneration)
 
     def _by_ascending_id(self, enemies):
         """Orden de activacion de la seccion 2.4, por insercion.

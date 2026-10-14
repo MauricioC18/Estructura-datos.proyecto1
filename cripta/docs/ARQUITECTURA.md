@@ -70,7 +70,7 @@ Contiene las reglas y el estado del juego. No debe depender directamente de soli
 * `player.py`: contiene el comportamiento y los datos específicos del jugador.
 * `enemy.py`: contiene los comportamientos y características de los enemigos.
 * `room.py`: representa las salas, sus conexiones y los elementos que contienen.
-* `effects.py`: representa los efectos temporales y sus reglas.
+* `effects.py`: constantes de los efectos temporales y la clase `ActiveEffect`, que agrupa los eventos que un efecto todavía puede activar. Las reglas las aplica `game.py`, porque dependen de la agenda.
 
 ### Structures
 
@@ -113,7 +113,10 @@ La vista no debe implementar las reglas del juego ni modificar directamente las 
 
 ### Benchmark
 
-* `benchmark.py`: ejecuta las mediciones requeridas para evaluar las estructuras y operaciones del proyecto.
+* `benchmark.py`: ejecutor de la bandera `--bench`. Debe llamar a la función de medición que cada integrante expone para su módulo.
+* `scheduler_bench.py`: mediciones de la agenda de eventos y del ciclo del motor. Expone `run()`, que devuelve una lista de `Measurement` con nombre, segundos y detalle, y se puede correr suelto con `python -m benchmark.scheduler_bench` desde `cripta/`.
+
+`scheduler_bench.py` contiene además `UnsortedEventList`, la alternativa descartada en la sección 4.1 del Documento de Decisiones. Está implementada únicamente para medirla, como exige §8, y el motor no la usa.
 
 ### Main
 
@@ -281,6 +284,22 @@ Acuerdos que esta interfaz impone al resto del modelo:
 **Estado visible.** `visible_state()` devuelve una vista de solo lectura con lo que §10.2 exige mostrar: sala actual, salidas y su estado, enemigos con su id de instancia, objetos del suelo, estadísticas del jugador, efectos activos, resultado de la partida y los últimos 20 mensajes.
 
 Se devuelve como una clase `@dataclass`, no como un `dict`. No es que un `dict` de presentación incumpla §7, que prohíbe usarlo como índice o tabla de búsqueda, pero una clase con campos nombrados evita tener que explicarlo en la defensa y sigue el estilo de los ejemplos del curso.
+
+**Efectos temporales.** `Game` los aplica y los administra; `model/effects.py` solo aporta las constantes y la clase `ActiveEffect`, que guarda los eventos que un efecto todavía puede activar para poder cancelarlos todos de una vez.
+
+| Método | Qué hace |
+| --- | --- |
+| `apply_poison(target, damage)` | programa los cinco pulsos del veneno (§2.10) |
+| `cancel_poison(target)` | efecto del antídoto: impide las activaciones futuras |
+| `apply_regeneration(target, amount)` | cura cada 200 unidades mientras el actor viva |
+| `apply_speed_change(actor, new_speed, duration)` | cambio temporal, con reajuste al comenzar y al terminar |
+| `light_torch(duration)` | enciende la antorcha y programa su apagado |
+
+La regeneración se aplica sola a los enemigos que la declaren, al activarse. Las trampas y el cierre automático de puertas quedan pendientes de las salas.
+
+**La bitácora de mensajes se recibe desde fuera.** `Game(state, player, enemies, message_log=None)` acepta cualquier estructura que tenga `append(message)` y se pueda recorrer. Si no se le pasa ninguna usa una `list`, que es provisional porque no cumple el límite de memoria de §4.8.
+
+Ese es el contrato que debe satisfacer `structures/circular_log.py`: con esos dos métodos entra sin modificar una línea de `Game`. La prueba `test_any_structure_with_append_works` ya verifica el acoplamiento con una estructura de capacidad limitada.
 
 **Estado visible, campos actuales.** `VisibleState` trae por ahora `clock`, `result`, `player_name`, `health`, `max_health`, `attack`, `defense`, `speed`, `room_id`, `enemies` y `messages`. Cada enemigo se entrega como un `EnemyView` con `actor_id`, `name`, `health` y `max_health`, y solo aparecen los que están vivos en la sala del jugador. Faltan las salidas, los objetos del suelo y los efectos activos, que dependen de las salas y del inventario.
 

@@ -103,14 +103,44 @@ examinar los cientos de eventos pendientes.
 
 ### 5. Evidencia empírica
 
-**Pendiente.** Aún no se ha implementado el modo `--bench`, por lo que no existen
-mediciones propias. El enunciado exige que al menos una sección mida directamente
-la alternativa descartada; para esta sección se medirá la lista sin ordenar frente
-al montículo, con varios cientos de eventos simultáneos y decenas de miles de
-extracciones.
+Medido con `benchmark/scheduler_bench.py` en Python 3.14.6 sobre Windows 11. La
+alternativa descartada, la lista sin ordenar, está implementada en ese mismo
+archivo como `UnsortedEventList` y se mide directamente, como pide §8.
 
-Lo único verificado hasta ahora son las pruebas unitarias de
-`tests/test_event_queue.py`, que comprueban corrección, no rendimiento.
+La carga reproduce lo que hace el motor: se llena la agenda con una cantidad fija
+de eventos pendientes y después se repite el patrón de extraer el más próximo y
+programar el siguiente, de modo que el tamaño de la agenda se mantiene estable.
+
+**20 000 ciclos de extraer e insertar, variando los eventos pendientes:**
+
+| Eventos pendientes | Montículo | Lista sin ordenar | La lista tarda |
+| ---: | ---: | ---: | ---: |
+| 50 | 0.0560 s | 0.0661 s | 1.2 veces más |
+| 100 | 0.0641 s | 0.1215 s | 1.9 veces más |
+| 300 | 0.0781 s | 0.3438 s | 4.4 veces más |
+| 1 000 | 0.0912 s | 1.1588 s | 12.7 veces más |
+| 3 000 | 0.1032 s | 3.4197 s | 33.1 veces más |
+
+Lo importante de esta tabla no es ninguna fila por separado, sino cómo cambia cada
+columna. Al multiplicar por 60 los eventos pendientes, el montículo pasa de 0.0560
+a 0.1032 segundos, menos del doble, que es el crecimiento logarítmico esperado. La
+lista pasa de 0.0661 a 3.4197 segundos, unas 52 veces más, que es el crecimiento
+lineal esperado.
+
+**Conclusión honesta sobre la alternativa descartada.** Con 50 eventos pendientes
+la lista sin ordenar sería perfectamente suficiente: la diferencia es de una
+décima. La decisión no se justifica a esa escala, sino a la que el enunciado
+plantea. §4.1 dice que en las pruebas puede haber varios cientos de eventos
+simultáneos, y ahí la brecha ya es de 4.4 veces; §9 advierte que la cripta de la
+revisión puede tener más salas, actores y efectos simultáneos que las usadas
+durante el desarrollo, y en esa dirección la lista se degrada sin techo mientras
+el montículo apenas se mueve.
+
+**Medición con 300 eventos y 50 000 extracciones**, que es el escenario que
+describe §4.1: montículo 0.1290 s, lista sin ordenar 0.8524 s, 6.6 veces más.
+
+Las mediciones corresponden a una sola corrida por configuración y sirven para
+comparar órdenes de magnitud, no para distinguir diferencias pequeñas.
 
 ### 6. Límites conocidos
 
@@ -348,7 +378,7 @@ retroceso en `advance_clock_to()`, retroceso correcto y rechazo de adelanto en
 tras un retroceso, reproducibilidad del azar con la misma semilla, divergencia
 con semillas distintas y disponibilidad de la semilla.
 
-Total del proyecto: 87 pruebas, todas pasan.
+Total del proyecto: 111 pruebas, todas pasan.
 Comando: `python -m unittest discover -s tests -t . -v` desde `cripta/`.
 
 ---
@@ -453,8 +483,26 @@ existe. Debe reemplazarse por ese módulo cuando esté disponible.
 
 ### 9. Evidencia empírica
 
-**Pendiente.** El presupuesto de 20 ms de §5.2 se medirá sobre este bucle cuando
-exista `--bench`.
+Medido con `benchmark/scheduler_bench.py` en Python 3.14.6 sobre Windows 11.
+
+§5.2 fija un presupuesto de 20 ms para resolver un ciclo completo de eventos entre
+dos decisiones consecutivas del jugador, excluyendo red y renderizado. La medición
+monta una partida con 20 enemigos en la sala del jugador, todos más rápidos que él
+y con regeneración activa, más un veneno y una antorcha en curso, y ejecuta 2 000
+decisiones del jugador.
+
+| Medición | Resultado |
+| --- | --- |
+| 2 000 ciclos completos | 0.3409 s |
+| Por ciclo | **0.1705 ms** |
+| Presupuesto de §5.2 | 20 ms |
+
+El ciclo usa alrededor del 0.9 % del presupuesto, de modo que queda margen
+suficiente para el movimiento, las puertas, las trampas y los comportamientos de
+enemigos que todavía faltan.
+
+Hay que volver a medir cuando esas partes existan, porque el escenario actual no
+incluye la decisión de un rastreador, que es la más costosa de §2.8.
 
 ### 10. Pruebas realizadas
 
@@ -469,7 +517,109 @@ que una acción rechazada no mueve el reloj ni consulta el generador aleatorio, 
 que dos partidas con la misma semilla y las mismas acciones producen los mismos
 mensajes.
 
-Total del proyecto: 87 pruebas, todas pasan.
+Total del proyecto: 111 pruebas, todas pasan.
+
+---
+
+## Efectos temporales
+
+**Estado:** implementados veneno, regeneración, cambio de velocidad y antorcha,
+los cuatro de §2.10 que no dependen de las salas. Las trampas y el cierre
+automático de puertas quedan pendientes.
+
+### 1. Decisión: el veneno programa todas sus activaciones de una vez
+
+§2.10 fija el veneno en un pulso cada 80 unidades durante 400. Esos dos números
+son constantes, así que al aplicarlo ya se conocen sus cinco instantes: 80, 160,
+240, 320 y 400. El motor los programa todos juntos.
+
+La alternativa era que cada pulso programara el siguiente. Para decidir si queda
+otro, el pulso necesita saber cuándo termina el efecto, y ese dato no cabe en el
+evento, de modo que haría falta un objeto de efecto con estado propio y una forma
+de localizarlo al procesar cada pulso. Programarlos todos elimina las dos cosas:
+cada pulso solo aplica el daño que trae el propio evento.
+
+Además vuelve trivial el antídoto. §2.10 dice que cancelar un efecto impide sus
+activaciones futuras, y aquí esas activaciones son unos eventos concretos que ya
+están identificados, así que cancelarlas es marcarlos.
+
+El costo son cinco entradas en el montículo en vez de una. Frente a los varios
+cientos de eventos simultáneos que menciona §4.1, y con la inserción en O(log n)
+medida arriba, no es significativo.
+
+**Interpretación declarada:** el pulso del instante 400 sí se aplica. El enunciado
+dice que el veneno "dura 400 unidades desde su aplicación" y no aclara si la
+activación que cae justo en el límite ocurre. Se decidió incluirla, de modo que
+un veneno completo hace cinco pulsos. Está fijado en
+`test_poison_lasts_four_hundred_units_and_no_more`.
+
+### 2. Decisión: la regeneración no se registra como efecto cancelable
+
+La regeneración no tiene duración: §2.10 dice que el enemigo recupera la cantidad
+indicada cada 200 unidades, sin más. No se puede programar por adelantado, así
+que cada pulso programa el siguiente.
+
+No hace falta guardarla en la lista de efectos activos, porque nada la cancela: se
+detiene sola cuando el enemigo muere, ya que el bucle descarta los eventos de los
+actores sin vida. Y tampoco se muestra en la interfaz, porque es una característica
+de los enemigos y no un efecto sobre el jugador.
+
+Cada pulso reprograma el siguiente leyendo la cantidad del propio evento, sin
+consultar ningún estado externo. El límite de `vida_max` lo garantiza el setter de
+`health`, según lo ya razonado.
+
+### 3. Decisión: el cambio de velocidad lo aplica el motor, no el efecto
+
+§2.10 exige reajustar la próxima acción al comenzar y al terminar el efecto. Ese
+reajuste cancela un evento e inserta otro, que es trabajo de la agenda, de modo
+que no puede vivir dentro de un objeto de efecto sin que el modelo de efectos
+dependa del motor.
+
+`apply_speed_change()` cambia la velocidad llamando a `change_actor_speed()`, que
+ya hace el reescalado de §2.3, y programa un evento de fin que lleva la velocidad
+anterior en su campo `amount`. Al dispararse, el motor llama otra vez a
+`change_actor_speed()` con ese valor, de modo que el reajuste del final usa
+exactamente el mismo camino que el del comienzo.
+
+### 4. Decisión: los eventos de efecto se distinguen por su tipo
+
+El bucle del motor reparte según `event_type` con una cadena de `if`/`elif`, sin
+tabla de despacho. §7 prohíbe `dict` como tabla de búsqueda, y con cinco tipos de
+evento una cadena de condiciones es más clara que cualquier alternativa y no hay
+que justificarla.
+
+### 5. Límites conocidos
+
+* **Trampas y cierre de puertas** dependen de las salas y no están.
+* **La antorcha solo se enciende y se apaga.** Lo que ilumina es asunto de la
+  vista; el modelo únicamente informa si está encendida.
+* **Un segundo veneno sobre el mismo actor** se acumula: se programan los pulsos
+  de ambos y el antídoto cancela los dos. El enunciado no dice qué debe ocurrir en
+  ese caso, así que esta es una interpretación, no una regla verificada.
+
+### 6. Complejidad
+
+| Operación | Costo |
+| --- | --- |
+| Aplicar veneno | O(p log n), con p igual a 5 pulsos |
+| Cancelar veneno con un antídoto | O(e + p) sobre los efectos activos |
+| Pulso de veneno o de regeneración | O(log n) |
+| Comenzar o terminar un cambio de velocidad | O(log n) |
+
+### 7. Pruebas realizadas
+
+`tests/test_effects.py`, 24 pruebas, todas pasan (Python 3.14.6). Cubren los casos
+del Apéndice B que corresponden a efectos: un antídoto aplicado antes del siguiente
+pulso evita todo el daño posterior, la vida regenerada nunca supera `vida_max`, y
+la regeneración se detiene cuando el enemigo muere. También que el veneno hace
+exactamente cinco pulsos y ni uno más, que la velocidad vuelve a su valor anterior
+al terminar el efecto, que terminar el efecto reprograma la acción pendiente con
+una secuencia nueva, y que una partida con varios efectos en curso sigue siendo
+reproducible con la misma semilla.
+
+Incluye además las dos pruebas de la bitácora inyectada, que comprueban que `Game`
+usa la estructura que recibe y que cualquier estructura con `append()` y recorrible
+funciona, incluida una con límite de capacidad.
 
 ---
 
@@ -550,4 +700,4 @@ Los intervalos se verifican contra los números del propio enunciado: velocidad
 150 con costo 100 da 66 (§2.4 y §2.13), y la secuencia del jugador de §2.13
 —moverse en 0, recoger en 100, equipar en 125— produce 100, 125 y 175.
 
-Total del proyecto: 87 pruebas, todas pasan.
+Total del proyecto: 111 pruebas, todas pasan.
