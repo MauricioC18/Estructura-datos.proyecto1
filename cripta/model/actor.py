@@ -77,6 +77,14 @@ class Actor:
     def is_alive(self):
         return self._health > 0
 
+    @property
+    def effective_attack(self):
+        return self.attack
+
+    @property
+    def effective_defense(self):
+        return self.defense
+
     def interval_for(self, cost):
         return max(1, cost * self.SPEED_REFERENCE // self._speed)
 

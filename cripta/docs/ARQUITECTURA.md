@@ -246,7 +246,14 @@ Acuerdos que esta interfaz impone al resto del modelo:
 * El motor es responsable de mantener `scheduled_event` al día cada vez que programa o cancela la acción de un actor. De esa referencia depende poder cancelar en O(1) los eventos de un actor muerto.
 * La vida nunca necesita recortarse desde fuera: cualquier asignación a `health` ya queda dentro del rango válido.
 
-### Interfaz de `Game` (acordada, todavía no implementada)
+### Interfaz de `Game` (implementada en parte)
+
+**Lo que ya funciona:** `wait()`, `attack(enemy_id)`, `visible_state()`, `change_actor_speed(actor, new_speed)` y el bucle de eventos completo, con el combate de §2.6 y el azar reproducible. El resto de los métodos de la tabla siguen pendientes de las salas y del inventario.
+
+`Game` se construye con un `GameState`, el `Player` y la lista de enemigos, y ya dentro del constructor programa la primera acción del jugador en el instante 0, activa los enemigos de la sala inicial según §2.4 y deja la partida esperando la primera decisión.
+
+`GameState` guarda el estado temporal —reloj, contador de secuencia y generador aleatorio—, que es lo que hay que persistir para reanudar una partida. `Game` guarda los actores, la agenda y el resultado.
+
 
 `model/game.py` es el único punto por el que el controlador habla con el modelo. La vista nunca toca las estructuras internas.
 
@@ -275,7 +282,19 @@ Acuerdos que esta interfaz impone al resto del modelo:
 
 Se devuelve como una clase `@dataclass`, no como un `dict`. No es que un `dict` de presentación incumpla §7, que prohíbe usarlo como índice o tabla de búsqueda, pero una clase con campos nombrados evita tener que explicarlo en la defensa y sigue el estilo de los ejemplos del curso.
 
-**Qué puede implementarse ya y qué no.** `wait()` y `attack()` no necesitan salas: §2.6 solo pide que atacante y objetivo estén en la misma sala, y `Actor` ya guarda `room_id`. El resto espera a que existan `Room` y el inventario.
+**Estado visible, campos actuales.** `VisibleState` trae por ahora `clock`, `result`, `player_name`, `health`, `max_health`, `attack`, `defense`, `speed`, `room_id`, `enemies` y `messages`. Cada enemigo se entrega como un `EnemyView` con `actor_id`, `name`, `health` y `max_health`, y solo aparecen los que están vivos en la sala del jugador. Faltan las salidas, los objetos del suelo y los efectos activos, que dependen de las salas y del inventario.
+
+`messages` es hoy una `list` que crece sin límite. §4.8 exige memoria constante y que agregar un mensaje no desplace los 19 anteriores, de modo que debe sustituirse por `structures/circular_log.py` cuando exista.
+
+### Interfaces de `Player` y `Enemy` (implementadas)
+
+Ambas heredan de `Actor`.
+
+`Player` agrega `equipped_weapon`, `equipped_armor` e `inventory`, y sobrescribe `effective_attack` y `effective_defense` sumando los bonos del equipo (§2.7). El arma y la armadura se tratan por duck typing: basta con que el objeto tenga `attack_bonus` o `defense_bonus`, así que el catálogo puede entregar lo que quiera mientras respete esos nombres. `inventory` se asigna desde fuera, para que la estructura de inventario encaje sin modificar `Player`.
+
+`Enemy` agrega `behavior`, `drops`, `regeneration` e `is_active`, y expone `decide_action(player)`, que devuelve `Enemy.ATTACK` o `Enemy.WAIT` según §2.8. Compartir sala con el jugador tiene prioridad sobre el comportamiento. El guardián está completo; el errante y el rastreador esperan hasta que existan las salas y el rastro.
+
+Los valores de `behavior` son los que entrega el catálogo. El enunciado solo confirma `"rastreador"` en su ejemplo, así que los nombres del guardián y del errante deben verificarse contra el servicio real antes de confiar en ellos.
 
 ### Qué registra la bitácora de reproducción
 

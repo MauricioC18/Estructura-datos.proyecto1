@@ -348,8 +348,128 @@ retroceso en `advance_clock_to()`, retroceso correcto y rechazo de adelanto en
 tras un retroceso, reproducibilidad del azar con la misma semilla, divergencia
 con semillas distintas y disponibilidad de la semilla.
 
-Total del proyecto: 61 pruebas, todas pasan.
+Total del proyecto: 87 pruebas, todas pasan.
 Comando: `python -m unittest discover -s tests -t . -v` desde `cripta/`.
+
+---
+
+## El bucle del motor
+
+**Estado:** implementado y probado para esperar y atacar. Moverse, abrir puertas
+y las acciones de inventario esperan a que existan las salas y el inventario.
+
+### 1. Decisión: una acción del jugador equivale a un ciclo completo de eventos
+
+Cada método de acción de `Game` ejecuta la acción y después procesa todos los
+eventos pendientes hasta que vuelva a tocarle decidir al jugador. El controlador
+no administra el reloj ni la agenda.
+
+La alternativa era exponer el bucle al controlador, con un método que avanzara un
+evento por llamada. Se descartó porque obligaría a la vista a conocer el
+funcionamiento del reloj, y porque §5.2 define el presupuesto de rendimiento
+precisamente sobre "un ciclo completo de eventos entre dos decisiones consecutivas
+del jugador". Con esta forma, ese ciclo es exactamente una llamada y se puede
+medir sin instrumentar nada.
+
+### 2. Decisión: el actor olvida su evento en cuanto se ejecuta
+
+Cada actor guarda en `scheduled_event` la referencia a su acción pendiente. Al
+sacar un evento de la agenda y ejecutarlo, el motor pone esa referencia en `None`
+antes de programar la siguiente.
+
+Sin eso, un actor seguiría apuntando a un evento ya consumido. Si en ese momento
+un efecto le cambiara la velocidad, `change_speed()` creería que tiene una acción
+pendiente, cancelaría un evento que ya no está en la agenda y programaría una
+acción nueva. Al terminar su turno se programaría otra, de modo que el actor
+quedaría con dos acciones pendientes y actuaría el doble de veces, sin que nada
+produjera un error. Está cubierto por
+`test_the_player_has_no_pending_event_during_their_turn`.
+
+### 3. Decisión: los eventos de un actor muerto se filtran por dos caminos
+
+Al morir un actor, el motor cancela su evento pendiente. Además, el bucle descarta
+cualquier evento cuyo actor ya no esté vivo antes de ejecutarlo.
+
+Parece redundante y no lo es: la cancelación cubre el caso normal, pero un actor
+puede morir por una vía que no pase por el motor, como un pulso de veneno que lo
+deja en cero. El filtro del bucle garantiza la regla de §2.6 —un actor muerto deja
+de ejecutar eventos futuros— sin depender de que todas las causas de muerte
+recuerden cancelar.
+
+Un evento descartado no adelanta el reloj, porque no ocurrió nada.
+
+### 4. Decisión: `GameState` guarda el tiempo, `Game` guarda la partida
+
+`GameState` mantiene el reloj, el contador de secuencia y el generador aleatorio,
+que es exactamente lo que hay que guardar y restaurar para reanudar una partida.
+`Game` mantiene los actores, la agenda y el resultado.
+
+El corte está puesto ahí porque `GameState.restore()` ya es la interfaz que usa el
+guardado de §4.10, y mezclar los actores dentro habría obligado a cambiarla otra
+vez.
+
+### 5. Decisión: el ataque efectivo se resuelve por polimorfismo
+
+`Actor` expone `effective_attack` y `effective_defense` devolviendo el valor base,
+y `Player` los sobrescribe sumando los bonos del arma y la armadura equipadas
+(§2.7). Así la fórmula de daño es la misma para todos y el motor no pregunta de
+qué tipo es cada actor.
+
+El equipo se trata por duck typing: cualquier objeto con `attack_bonus` o
+`defense_bonus` sirve. Eso permite probar el combate con equipo sin depender del
+catálogo.
+
+### 6. Orden de activación de enemigos simultáneos
+
+§2.4 exige activarlos en orden ascendente de identificador de instancia. Como los
+identificadores son texto, se comparan como texto completo, según lo ya razonado
+en la sección 4.1. El orden se arma con una inserción simple, porque §4.9 prohíbe
+`sorted()` y `list.sort()` y el módulo de ordenamiento del proyecto todavía no
+existe. Debe reemplazarse por ese módulo cuando esté disponible.
+
+### 7. Límites conocidos
+
+* **La bitácora de mensajes es una `list` que crece.** §4.8 exige memoria constante
+  y que agregar un mensaje no desplace los 19 anteriores. Esa estructura
+  corresponde a `structures/circular_log.py` y todavía no existe, así que la lista
+  es provisional y debe sustituirse.
+* **El errante y el rastreador esperan.** Sin salas no pueden examinar salidas ni
+  rastros. Esperar es lo que §2.8 indica cuando no hay ninguna opción disponible,
+  de modo que el comportamiento actual no es incorrecto, pero está incompleto.
+* **Los valores de `behavior`.** El enunciado solo confirma `"rastreador"` en su
+  ejemplo de catálogo. Los nombres del guardián y del errante deben verificarse
+  contra el servicio real.
+* **Los objetos que suelta un enemigo al morir** (§2.6) no se colocan en ningún
+  lado, porque no existe el suelo de la sala.
+
+### 8. Complejidad
+
+| Operación | Costo |
+| --- | --- |
+| Procesar un evento | O(log n) por la extracción de la agenda |
+| Buscar el enemigo objetivo de un ataque | O(e) sobre los enemigos, una vez por acción del jugador y no por evento |
+| Programar la acción de un actor | O(log n) |
+| Cancelar la acción de un actor | O(1) |
+
+### 9. Evidencia empírica
+
+**Pendiente.** El presupuesto de 20 ms de §5.2 se medirá sobre este bucle cuando
+exista `--bench`.
+
+### 10. Pruebas realizadas
+
+`tests/test_game.py`, 26 pruebas, todas pasan (Python 3.14.6), en siete grupos:
+bucle, combate, acciones rechazadas, determinismo, activación de enemigos, cambio
+de velocidad y estado visible.
+
+Los tiempos se verifican contra el ejemplo de §2.13: un enemigo de velocidad 150
+activado en 0 queda programado para 66 y actúa una vez antes de la siguiente
+decisión del jugador; uno de velocidad 250 actúa dos veces. También se comprueba
+que una acción rechazada no mueve el reloj ni consulta el generador aleatorio, y
+que dos partidas con la misma semilla y las mismas acciones producen los mismos
+mensajes.
+
+Total del proyecto: 87 pruebas, todas pasan.
 
 ---
 
@@ -430,4 +550,4 @@ Los intervalos se verifican contra los números del propio enunciado: velocidad
 150 con costo 100 da 66 (§2.4 y §2.13), y la secuencia del jugador de §2.13
 —moverse en 0, recoger en 100, equipar en 125— produce 100, 125 y 175.
 
-Total del proyecto: 61 pruebas, todas pasan.
+Total del proyecto: 87 pruebas, todas pasan.
