@@ -257,6 +257,10 @@ Acuerdos que esta interfaz impone al resto del modelo:
 
 `GameState` guarda el estado temporal —reloj, contador de secuencia y generador aleatorio—, que es lo que hay que persistir para reanudar una partida. `Game` guarda los actores, la agenda y el resultado.
 
+**Contadores de la partida.** `Game` expone `player_actions`, `enemies_defeated` y `events_processed`. Los dos primeros son los que §2.12 pide para la tabla de puntajes, junto con el tiempo final del reloj, que está en `state.clock`. `player_actions` solo cuenta las acciones aceptadas, porque el enunciado define "acción del jugador" como una que consume tiempo virtual: una acción rechazada no cuenta y el pergamino de retroceso tampoco.
+
+**La agenda también se puede inyectar.** `Game(state, player, enemies, message_log, event_queue)` acepta una `EventQueue` desde fuera, igual que la bitácora. Se usa en las mediciones, con una subclase que lleva contadores, para no instrumentar la estructura de producción. Si no se pasa ninguna, `Game` crea la suya.
+
 
 `model/game.py` es el único punto por el que el controlador habla con el modelo. La vista nunca toca las estructuras internas.
 
@@ -278,6 +282,8 @@ Acuerdos que esta interfaz impone al resto del modelo:
 `drop()`, `use_item()` y `equip_item()` actúan sobre el objeto que el cursor del inventario está mostrando, porque §4.5 pide poder soltar el objeto que se está viendo. Por eso no reciben índice y por eso la navegación del inventario es parte de la interfaz.
 
 `rewind()` no consume tiempo virtual y no cuenta como acción del jugador (§2.11).
+
+**La partida terminada rechaza todo.** `Game.is_over` es `True` cuando el resultado ya no es "en curso". Toda acción pública lo revisa como primera línea, antes de validar cualquier otra cosa, y devuelve un `ActionResult` rechazado sin tocar nada. Las acciones que falten deben seguir el mismo patrón.
 
 **Resultado de una acción.** Toda acción devuelve un `ActionResult` con `accepted` y `message`. Una acción rechazada no consume tiempo virtual, no modifica el estado y no consulta el generador aleatorio. Los casos de rechazo están en el Apéndice B del enunciado: recoger con el inventario lleno, abrir una puerta sin la llave correcta, moverse hacia una salida que no existe o está cerrada, atacar a un enemigo que no está en la sala.
 

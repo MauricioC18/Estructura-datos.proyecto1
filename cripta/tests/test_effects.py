@@ -307,5 +307,108 @@ class TestInjectedMessageLog(unittest.TestCase):
         self.assertEqual(len(game.visible_state().messages), 2)
 
 
+
+class TestStackedSpeedEffects(unittest.TestCase):
+
+    def test_a_second_potion_replaces_the_first_one(self):
+        game = make_game()
+
+        game.apply_speed_change(game.player, 200, 300)
+        game.wait()
+        game.apply_speed_change(game.player, 300, 300)
+
+        self.assertEqual(game.player.speed, 300)
+        self.assertEqual(
+            [effect.name for effect in game.visible_state().effects],
+            ["velocidad"],
+        )
+
+    def test_the_speed_returns_to_the_original_after_two_potions(self):
+        game = make_game()
+
+        game.apply_speed_change(game.player, 200, 300)
+        game.wait()
+        game.apply_speed_change(game.player, 300, 300)
+
+        for _ in range(15):
+            game.wait()
+
+        self.assertEqual(game.player.speed, 100)
+
+    def test_the_speed_returns_to_the_original_after_three_potions(self):
+        game = make_game()
+
+        for new_speed in (150, 250, 50):
+            game.apply_speed_change(game.player, new_speed, 400)
+            game.wait()
+
+        for _ in range(20):
+            game.wait()
+
+        self.assertEqual(game.player.speed, 100)
+
+    def test_no_speed_effect_survives_the_replacement(self):
+        game = make_game()
+
+        game.apply_speed_change(game.player, 200, 300)
+        game.wait()
+        game.apply_speed_change(game.player, 300, 300)
+
+        for _ in range(15):
+            game.wait()
+
+        self.assertEqual(game.visible_state().effects, [])
+
+
+class TestAFinishedGame(unittest.TestCase):
+
+    def defeated_game(self):
+        player = make_player(max_health=3, defense=0)
+        game = make_game(
+            player=player,
+            enemies=[make_enemy(room_id=1, speed=250)],
+        )
+        game.enemies[0].attack = 50
+
+        while not game.is_over:
+            game.wait()
+
+        return game
+
+    def test_the_game_reports_that_it_is_over(self):
+        game = self.defeated_game()
+
+        self.assertTrue(game.is_over)
+        self.assertEqual(game.result, DEFEAT)
+
+    def test_waiting_after_losing_is_rejected(self):
+        game = self.defeated_game()
+
+        self.assertFalse(game.wait().accepted)
+
+    def test_attacking_after_losing_is_rejected(self):
+        game = self.defeated_game()
+
+        self.assertFalse(game.attack("e-201").accepted)
+
+    def test_a_finished_game_does_not_count_more_actions(self):
+        game = self.defeated_game()
+        actions = game.player_actions
+
+        game.wait()
+        game.attack("e-201")
+
+        self.assertEqual(game.player_actions, actions)
+
+    def test_a_finished_game_does_not_schedule_more_events(self):
+        game = self.defeated_game()
+        pending = len(game.events)
+
+        game.wait()
+        game.wait()
+
+        self.assertEqual(len(game.events), pending)
+
+
 if __name__ == "__main__":
     unittest.main()

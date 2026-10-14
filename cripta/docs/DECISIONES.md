@@ -26,16 +26,26 @@ dos ocurren en el mismo instante, gana la que se programó primero.
 
 Eso suena simple hasta que uno mira con qué frecuencia pasa.
 
-| Operación | Cuándo ocurre | Cuántas veces |
-| --- | --- | --- |
-| Sacar el evento más próximo | una vez por evento procesado | decenas de miles por partida |
-| Meter un evento | cada vez que un actor actúa y programa su siguiente acción, o cuando arranca un efecto | casi una por cada evento que sale |
-| Cancelar un evento | muere un actor, un antídoto corta el veneno, cambia una velocidad | poco seguido |
+Las cifras que siguen están **medidas**, no estimadas. Salen de correr partidas
+completas con una agenda instrumentada, con `benchmark/scheduler_bench.py`. El detalle
+de cada escenario está en el apartado de evidencia.
 
-La primera fila es la que manda. El propio enunciado avisa que en las pruebas puede
-haber varios cientos de eventos esperando y que esa operación se ejecuta decenas de
-miles de veces, así que lo que cueste sacar el mínimo es, en la práctica, lo que
-cuesta el juego entero.
+| Operación | Cuándo ocurre | Medido por partida |
+| --- | --- | ---: |
+| Sacar el evento más próximo | una vez por evento procesado | 11 081 con 5 enemigos, 189 310 con 500 |
+| Meter un evento | cuando un actor actúa y programa su siguiente acción, o cuando arranca un efecto | 1.00 por cada extracción |
+| Cancelar un evento | muere un actor, un antídoto corta el veneno, cambia una velocidad | 750 contra 189 310 eventos, una cada 252 |
+
+Dos cosas saltan de esa tabla.
+
+La primera fila es la que manda: en una partida con 500 enemigos se sacan casi 190 000
+eventos. Lo que cueste sacar el mínimo es, en la práctica, lo que cuesta el juego
+entero.
+
+Y la segunda fila es la que condiciona la elección, porque **se inserta exactamente tan
+seguido como se extrae**. La proporción medida es 1.00 en los tres escenarios, y tiene
+sentido: cada actor que actúa programa de inmediato su siguiente acción. Eso descarta
+cualquier estructura que abarate una de las dos operaciones encareciendo la otra.
 
 Hay una exigencia extra que no se puede perder de vista: sacar el siguiente evento
 no puede obligar a revisar todos los que están esperando. El enunciado lo dice con
@@ -156,6 +166,45 @@ techo mientras el montículo casi no se mueve.
 En el escenario puntual que describe §4.1, con 300 eventos y 50 000 extracciones:
 montículo 0.1290 s contra 0.8524 s de la lista, 6.6 veces.
 
+### Frecuencia medida de las operaciones
+
+§8 pide indicar con qué frecuencia medida se ejecuta cada operación, así que corrimos
+partidas completas con una agenda instrumentada, `CountingEventQueue`, que es una
+subclase de `EventQueue` y vive en el archivo de mediciones. Se hizo así, y no
+poniéndole contadores a `EventQueue`, para no sumar trabajo en el camino que el juego
+recorre decenas de miles de veces, que es justamente el que se está midiendo. `Game`
+recibe la agenda desde fuera, de modo que la partida medida es idéntica a una normal
+salvo por los contadores.
+
+| | 5 enemigos | 50 enemigos | 500 enemigos, con combate |
+| --- | ---: | ---: | ---: |
+| Decisiones del jugador | 1 000 | 1 000 | 500 |
+| Eventos procesados | 11 081 | 101 756 | 189 310 |
+| Eventos por decisión | 11.1 | 101.8 | 378.6 |
+| Inserciones | 11 092 | 101 857 | 190 010 |
+| Extracciones | 11 081 | 101 756 | 189 310 |
+| Inserciones por extracción | 1.00 | 1.00 | 1.00 |
+| Cancelaciones | 0 | 0 | 750 |
+| Tamaño máximo de la agenda | 17 | 107 | 506 |
+
+Tres conclusiones.
+
+La cantidad de eventos por decisión del jugador crece en proporción directa con los
+enemigos activos, porque cada uno programa una acción cada vez que actúa. Con 50
+enemigos ya son 102 eventos entre dos decisiones, de modo que la estimación de "varios
+cientos de eventos simultáneos" de §4.1 corresponde a una cripta con unas pocas decenas
+de enemigos activos a la vez, que no es nada raro.
+
+La proporción de 1.00 inserciones por extracción se mantiene en los tres escenarios.
+Esa es la medición que respalda el descarte de la lista ordenada: no sirve abaratar la
+extracción si se paga en la inserción, porque ocurren la misma cantidad de veces.
+
+Las cancelaciones son raras. En los dos primeros escenarios no hay ninguna, porque
+nadie muere. En el tercero, donde el jugador mata 500 enemigos y además corta 50
+venenos con antídoto, hay 750 cancelaciones contra 189 310 eventos procesados: una cada
+252. Eso respalda lo que se dice más abajo sobre el costo en memoria de la eliminación
+diferida.
+
 Cada configuración se corrió una sola vez. Los números sirven para comparar órdenes
 de magnitud, no para discutir diferencias de centésimas.
 
@@ -163,9 +212,11 @@ de magnitud, no para discutir diferencias de centésimas.
 
 Si alguna vez se cancelaran muchísimos eventos y esos eventos quedaran enterrados en
 el fondo del montículo, estaríamos ocupando memoria con cosas que nunca se van a
-ejecutar. Hoy no pasa, porque las cancelaciones son pocas, pero si llegara a pasar
-habría que reconstruir el montículo cada tanto o usar una estructura que permita
-borrar por posición.
+ejecutar. Hoy no pasa: en la partida con combate medimos 750 cancelaciones contra
+189 310 eventos procesados, y de esas 700 se descartaron al llegar a la raíz, de modo
+que en todo momento había a lo sumo unas pocas decenas de eventos muertos adentro. Si
+el escenario cambiara, habría que reconstruir el montículo cada tanto o usar una
+estructura que permita borrar por posición.
 
 Ojo con `len()`: devuelve cuántos eventos hay guardados, incluidos los cancelados que
 todavía no salieron. Los que sí respetan la idea de "eventos vivos" son `is_empty()`,
@@ -458,6 +509,35 @@ actor que tiene enfrente.
 El equipo se trata por duck typing: sirve cualquier objeto que tenga `attack_bonus` o
 `defense_bonus`. Eso nos dejó probar el combate con equipo sin esperar al catálogo.
 
+### Una partida terminada no acepta más acciones
+
+Otro hallazgo de la revisión. Después de que el jugador moría, `wait()` y `attack()`
+seguían aceptándose: sumaban a `player_actions`, metían eventos en la agenda y
+devolvían `accepted` en verdadero. El reloj no avanzaba, porque el bucle revisa el
+resultado antes de procesar, así que desde afuera no se notaba nada hasta que la tabla
+de puntajes de §2.12 reportaba más acciones de las que el jugador ejecutó.
+
+Ahora `Game` expone `is_over` y cada acción pública lo revisa antes de hacer nada. Si la
+partida terminó, devuelve un `ActionResult` rechazado y no toca ningún estado.
+
+Las acciones que falten deben seguir ese mismo patrón: revisar `is_over` como primera
+línea, antes de validar cualquier otra cosa.
+
+### Los contadores de la partida
+
+`Game` lleva tres contadores: `player_actions`, `enemies_defeated` y
+`events_processed`.
+
+Los dos primeros los pide §2.12, que exige registrar en la tabla de puntajes las
+acciones ejecutadas por el jugador y los enemigos derrotados. El tercero sirve para las
+mediciones de frecuencia.
+
+Una aclaración sobre `player_actions`, porque el enunciado es preciso con el término:
+"acción del jugador" es una acción que consume tiempo virtual. Por eso el contador
+sube únicamente cuando la acción se acepta. Una acción rechazada no cuenta, y el
+pergamino de retroceso tampoco, porque §2.11 dice expresamente que no se registra como
+acción del jugador.
+
 ### Orden de activación de enemigos
 
 §2.4 pide activarlos en orden ascendente de identificador. Como son texto, los
@@ -517,9 +597,9 @@ decisión de un rastreador, que es la más cara de §2.8.
 
 ### Pruebas
 
-`tests/test_game.py`, 26 pruebas, todas pasan. Están agrupadas en bucle, combate,
-acciones rechazadas, determinismo, activación de enemigos, cambio de velocidad y
-estado visible.
+`tests/test_game.py`, 31 pruebas, todas pasan. Están agrupadas en bucle, combate,
+acciones rechazadas, determinismo, activación de enemigos, cambio de velocidad, estado
+visible y contadores.
 
 Los tiempos se verifican contra el ejemplo de §2.13 del enunciado: un enemigo de
 velocidad 150 activado en cero queda programado para 66 y alcanza a actuar una vez
@@ -590,6 +670,30 @@ en el campo `amount`. Cuando ese evento se dispara, el motor vuelve a llamar a
 `change_actor_speed()` con ese valor. El reajuste del final usa exactamente el mismo
 camino que el del comienzo, que es la mejor garantía de que los dos hagan lo mismo.
 
+### Un efecto de velocidad reemplaza al anterior
+
+Esto salió de una revisión, no del diseño inicial, y vale contarlo porque el error era
+invisible.
+
+La primera versión permitía encimar efectos. Una poción subía al jugador de 100 a 200 y
+anotaba "restaurar a 100". Una segunda lo subía de 200 a 300 y anotaba "restaurar a
+200". Cuando terminaba la primera lo bajaba a 100, aunque la segunda siguiera activa, y
+cuando terminaba la segunda lo subía a 200. El jugador quedaba en 200 de forma
+permanente, sin ningún efecto activo, y sin que nada lanzara una excepción.
+
+Ahora aplicar un efecto de velocidad termina primero el anterior sobre ese mismo actor:
+le devuelve la velocidad original y cancela su evento de fin. Recién entonces aplica el
+nuevo, de modo que lo que el nuevo anota restaurar es siempre la velocidad base.
+
+Devolver la velocidad y volver a cambiarla no descuadra el reescalado. Si al actor le
+faltaba `r` unidades y pasa de la velocidad `v` a la original `o` y de ahí a la nueva
+`n`, el resultado es `r * v / o * o / n`, que es lo mismo que un único reescalado de
+`v` a `n`.
+
+Esta es una interpretación declarada: el enunciado no dice qué pasa con dos efectos de
+velocidad simultáneos. Elegimos reemplazar porque es lo que §2.7 establece para efectos
+del mismo tipo, cuando dice que equipar otra arma sustituye a la anterior.
+
 ### Cómo se reparten los eventos de efecto
 
 El bucle mira `event_type` y reparte con una cadena de `if`/`elif`. Sin tabla de
@@ -607,6 +711,13 @@ Y si a un mismo actor le cae un segundo veneno, los efectos se acumulan: se prog
 los pulsos de los dos y el antídoto cancela ambos. El enunciado no dice qué debería
 pasar ahí, así que esto es una interpretación nuestra y no una regla verificada.
 
+Queda una asimetría a propósito: dos venenos se acumulan, pero dos efectos de velocidad
+se reemplazan. La razón es que acumular veneno solo hace más daño, que es un resultado
+plausible y sin consecuencias más allá del propio efecto, mientras que acumular
+velocidad corrompía la velocidad base del actor de forma permanente, como se explica
+arriba. Donde el enunciado no decide, elegimos la interpretación que no deja el estado
+del juego en un valor incorrecto.
+
 ### Complejidad
 
 | Operación | Costo |
@@ -618,7 +729,7 @@ pasar ahí, así que esto es una interpretación nuestra y no una regla verifica
 
 ### Pruebas
 
-`tests/test_effects.py`, 24 pruebas, todas pasan.
+`tests/test_effects.py`, 33 pruebas, todas pasan.
 
 Cubren los casos del Apéndice B que tienen que ver con efectos: que un antídoto
 aplicado antes del siguiente pulso evita todo el daño posterior, que la vida regenerada
@@ -632,6 +743,11 @@ efectos encima sigue siendo reproducible con la misma semilla.
 Van ahí también las dos pruebas de la bitácora inyectada, que comprueban que `Game` usa
 la estructura que le pasan y que funciona con cualquier cosa que tenga `append()` y se
 pueda recorrer, incluida una con límite de capacidad.
+
+Las nueve últimas son las que fijan los dos errores que encontró la revisión: que un
+segundo y un tercer efecto de velocidad no dejen al actor con una velocidad permanente
+equivocada, y que una partida terminada rechace las acciones sin contarlas ni programar
+eventos.
 
 ---
 
@@ -715,9 +831,9 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_event_queue.py` | 18 |
 | `tests/test_game_state.py` | 20 |
 | `tests/test_actor.py` | 23 |
-| `tests/test_game.py` | 26 |
-| `tests/test_effects.py` | 24 |
-| **Total** | **111** |
+| `tests/test_game.py` | 31 |
+| `tests/test_effects.py` | 33 |
+| **Total** | **125** |
 
 Todas pasan en Python 3.14.6. Se corren con
 `python -m unittest discover -s tests -t . -v` desde `cripta/`.

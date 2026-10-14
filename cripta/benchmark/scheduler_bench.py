@@ -27,6 +27,7 @@ PENDING_EVENTS = 300
 CYCLES = 50_000
 PLAYER_DECISIONS = 2_000
 ENEMIES_PER_ROOM = 20
+FREQUENCY_DECISIONS = 1_000
 SEED = 2026
 
 
@@ -35,6 +36,50 @@ class Measurement:
     name: str
     seconds: float
     detail: str
+
+
+class CountingEventQueue(EventQueue):
+    """Agenda que lleva la cuenta de las operaciones que recibe.
+
+    Existe para responder a la seccion 8 del enunciado, que pide indicar con
+    que frecuencia medida se ejecuta cada operacion. Es una subclase y no una
+    modificacion de EventQueue para no sumar contadores en el camino que el
+    juego recorre decenas de miles de veces, que es justamente el que se mide.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.pushes = 0
+        self.pops = 0
+        self.cancels = 0
+        self.discarded = 0
+        self.max_size = 0
+
+    def push(self, event):
+        super().push(event)
+        self.pushes += 1
+
+        if len(self) > self.max_size:
+            self.max_size = len(self)
+
+    def pop(self):
+        event = super().pop()
+
+        if event is not None:
+            self.pops += 1
+
+        return event
+
+    def cancel(self, event):
+        if not event.cancelled:
+            self.cancels += 1
+
+        super().cancel(event)
+
+    def _discard_cancelled_roots(self):
+        before = len(self)
+        super()._discard_cancelled_roots()
+        self.discarded += before - len(self)
 
 
 class UnsortedEventList:
@@ -142,6 +187,88 @@ def measure_event_cycle(decisions, enemies_per_room, seed):
     return elapsed, game
 
 
+def measure_operation_frequency(enemy_count, decisions, seed):
+    """Cuenta las operaciones que una partida real ejecuta sobre la agenda.
+
+    Responde a la seccion 8 del enunciado. El jugador recibe mucha vida y
+    defensa alta para que la partida no termine antes de completar las
+    decisiones pedidas y la muestra quede completa.
+    """
+    player = Player("p-1", "Heroe", 10_000_000, 6, 100, 100, 1)
+    enemies = [
+        Enemy(
+            f"e-{index:04}",
+            "Rata gigante",
+            1_000_000,
+            5,
+            1,
+            150,
+            1,
+            Enemy.GUARDIAN,
+            regeneration=1,
+        )
+        for index in range(enemy_count)
+    ]
+
+    agenda = CountingEventQueue()
+    game = Game(GameState(seed=seed), player, enemies, event_queue=agenda)
+    game.apply_poison(player, 1)
+    game.light_torch(10_000_000)
+
+    for _ in range(decisions):
+        game.wait()
+
+    return game, agenda
+
+
+def measure_cancellation_frequency(enemy_count, seed):
+    """Cuenta las cancelaciones de una partida con combate.
+
+    El escenario anterior no cancela nada, porque nadie muere. Aqui el jugador
+    mata a un enemigo por accion, lo que cancela la accion pendiente de cada
+    uno, y ademas se aplica y se corta un veneno cada diez ataques, cortandolo al ataque siguiente para que no expire solo.
+    """
+    player = Player("p-1", "Heroe", 10_000_000, 1_000, 100, 100, 1)
+    enemies = [
+        Enemy(f"e-{index:04}", "Rata gigante", 1, 5, 1, 150, 1, Enemy.GUARDIAN)
+        for index in range(enemy_count)
+    ]
+
+    agenda = CountingEventQueue()
+    game = Game(GameState(seed=seed), player, enemies, event_queue=agenda)
+
+    for index, enemy in enumerate(enemies):
+        if index % 10 == 0:
+            game.apply_poison(player, 1)
+
+        if index % 10 == 1:
+            game.cancel_poison(player)
+
+        game.attack(enemy.actor_id)
+
+    return game, agenda
+
+
+def report_frequency(title, game, agenda, decisions):
+    print(title)
+    print(f"  Decisiones del jugador           {decisions:>12,}")
+    print(f"  Eventos procesados               {game.events_processed:>12,}")
+    print(
+        f"  Eventos por decision             "
+        f"{game.events_processed / decisions:>12.1f}"
+    )
+    print(f"  Inserciones en la agenda         {agenda.pushes:>12,}")
+    print(f"  Extracciones de la agenda        {agenda.pops:>12,}")
+    print(
+        f"  Inserciones por extraccion       "
+        f"{agenda.pushes / agenda.pops:>12.2f}"
+    )
+    print(f"  Cancelaciones                    {agenda.cancels:>12,}")
+    print(f"  Cancelados descartados           {agenda.discarded:>12,}")
+    print(f"  Tamano maximo de la agenda       {agenda.max_size:>12,}")
+    print()
+
+
 def report(title, measurements):
     print(title)
 
@@ -186,7 +313,28 @@ def main():
     print(f"Python {__import__('sys').version.split()[0]}\n")
 
     measurements = run()
-    report("Mediciones", measurements)
+    report("Mediciones de tiempo", measurements)
+
+    for label, enemy_count in (("Cripta pequena", 5), ("Cripta grande", 50)):
+        game, agenda = measure_operation_frequency(
+            enemy_count, FREQUENCY_DECISIONS, SEED
+        )
+        report_frequency(
+            f"Frecuencia de operaciones, {label.lower()} ({enemy_count} enemigos)",
+            game,
+            agenda,
+            FREQUENCY_DECISIONS,
+        )
+
+    combat_game, combat_agenda = measure_cancellation_frequency(500, SEED)
+    report_frequency(
+        "Frecuencia de operaciones, partida con combate (500 enemigos)",
+        combat_game,
+        combat_agenda,
+        combat_game.player_actions,
+    )
+    print(f"  Enemigos derrotados              {combat_game.enemies_defeated:>12,}")
+    print()
 
     heap, unsorted_list, cycle = measurements
 

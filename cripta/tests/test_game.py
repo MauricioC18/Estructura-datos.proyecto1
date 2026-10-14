@@ -4,6 +4,7 @@ from model.enemy import Enemy
 from model.game import DEFEAT, IN_PROGRESS, Game
 from model.game_state import GameState
 from model.player import Player
+from structures.event_queue import EventQueue
 
 
 class Weapon:
@@ -304,6 +305,63 @@ class TestVisibleState(unittest.TestCase):
         game = make_game(player=player)
 
         self.assertEqual(game.visible_state().attack, 9)
+
+
+
+class TestCounters(unittest.TestCase):
+
+    def test_player_actions_counts_accepted_actions(self):
+        game = make_game(enemies=[make_enemy()])
+
+        game.wait()
+        game.wait()
+        game.attack("e-201")
+
+        self.assertEqual(game.player_actions, 3)
+
+    def test_rejected_actions_are_not_counted(self):
+        game = make_game(enemies=[make_enemy()])
+
+        game.wait()
+        game.attack("e-999")
+        game.attack("e-201")
+
+        self.assertEqual(game.player_actions, 2)
+
+    def test_defeated_enemies_are_counted(self):
+        first = make_enemy(actor_id="e-1", max_health=1)
+        second = make_enemy(actor_id="e-2", max_health=1)
+        game = make_game(enemies=[first, second])
+
+        self.assertEqual(game.enemies_defeated, 0)
+
+        game.attack("e-1")
+        game.attack("e-2")
+
+        self.assertEqual(game.enemies_defeated, 2)
+
+    def test_processed_events_grow_with_the_game(self):
+        game = make_game(enemies=[make_enemy(speed=250)])
+        after_start = game.events_processed
+
+        game.wait()
+
+        self.assertGreater(game.events_processed, after_start)
+
+    def test_the_game_accepts_an_injected_agenda(self):
+        agenda = EventQueue()
+        game = Game(
+            GameState(seed=2026),
+            make_player(),
+            [make_enemy()],
+            event_queue=agenda,
+        )
+
+        self.assertIs(game.events, agenda)
+
+        game.wait()
+
+        self.assertIs(agenda.peek(), game.enemies[0].scheduled_event)
 
 
 if __name__ == "__main__":

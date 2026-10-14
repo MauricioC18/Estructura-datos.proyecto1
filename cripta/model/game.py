@@ -87,24 +87,40 @@ class Game:
     es provisional porque no cumple el limite de memoria de la seccion 4.8.
     """
 
-    def __init__(self, state, player, enemies=None, message_log=None):
+    def __init__(
+        self,
+        state,
+        player,
+        enemies=None,
+        message_log=None,
+        event_queue=None,
+    ):
         self.state = state
         self.player = player
         self.enemies = [] if enemies is None else list(enemies)
-        self.events = EventQueue()
+        self.events = EventQueue() if event_queue is None else event_queue
         self.messages = [] if message_log is None else message_log
         self.effects = []
         self.torch_lit = False
         self.result = IN_PROGRESS
+        self.player_actions = 0
+        self.enemies_defeated = 0
+        self.events_processed = 0
 
         self._schedule(self.player, self.state.clock)
         self._activate_enemies_in(self.player.room_id)
         self._advance_to_player_turn()
 
     def wait(self):
+        if self.is_over:
+            return self._game_already_ended()
+
         return self._player_acts(WAIT_COST, "Esperas.")
 
     def attack(self, enemy_id):
+        if self.is_over:
+            return self._game_already_ended()
+
         target = self._find_enemy(enemy_id)
 
         if target is None or not target.is_alive:
@@ -175,7 +191,14 @@ class Game:
         )
 
     def apply_speed_change(self, actor, new_speed, duration):
-        """Cambio temporal de velocidad, con reajuste al comenzar y al terminar."""
+        """Cambio temporal de velocidad, con reajuste al comenzar y al terminar.
+
+        Un efecto nuevo reemplaza al anterior en lugar de encimarse. Antes de
+        aplicarlo se devuelve la velocidad original, de modo que el evento de fin
+        del efecto nuevo restaure esa velocidad y no la del efecto anterior.
+        """
+        self._end_previous_speed_effect(actor)
+
         previous_speed = actor.speed
         self.change_actor_speed(actor, new_speed)
 
@@ -194,6 +217,10 @@ class Game:
         self.effects.append(effect)
 
         return effect
+
+    @property
+    def is_over(self):
+        return self.result != IN_PROGRESS
 
     def change_actor_speed(self, actor, new_speed):
         """Aplica un cambio de velocidad y reprograma la accion pendiente.
@@ -244,6 +271,7 @@ class Game:
         )
 
     def _player_acts(self, cost, message):
+        self.player_actions += 1
         self._log(message)
         self._schedule(
             self.player,
@@ -265,6 +293,7 @@ class Game:
                 continue
 
             self.state.advance_clock_to(event.time)
+            self.events_processed += 1
 
             if event.event_type != ACTOR_ACTION:
                 self._run_effect(event)
@@ -323,6 +352,7 @@ class Game:
             self._log("Has muerto.")
             return
 
+        self.enemies_defeated += 1
         self._remove_from_play(actor)
 
     def _damage_from(self, attacker, defender):
@@ -351,6 +381,23 @@ class Game:
         self.events.push(event)
 
         return event
+
+    def _game_already_ended(self):
+        return ActionResult(False, "La partida ya termino.")
+
+    def _end_previous_speed_effect(self, actor):
+        for effect in self.effects:
+            if (
+                effect.name != SPEED
+                or effect.target is not actor
+                or effect.cancelled
+                or effect.ends_at <= self.state.clock
+            ):
+                continue
+
+            original_speed = effect.events[0].amount
+            self.change_actor_speed(actor, original_speed)
+            self._cancel_effect(effect)
 
     def _cancel_effect(self, effect):
         for event in effect.events:
