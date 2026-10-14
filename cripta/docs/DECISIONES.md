@@ -1,119 +1,135 @@
 # Documento de Decisiones de Diseño — CRIPTA
 
-Este documento contiene una sección por cada problema de §4 del enunciado.
-Las secciones marcadas como pendientes aún no tienen evidencia empírica.
+Acá vamos anotando por qué el programa está hecho como está. Cada sección cuenta un
+problema concreto que tuvimos que resolver, qué opciones barajamos y con cuál nos
+quedamos.
+
+Las secciones que corresponden a un problema del §4 del enunciado llevan los seis
+apartados que ese enunciado pide. Las otras documentan decisiones que no son un
+problema del §4 pero que condicionan al resto del grupo, así que conviene tenerlas
+escritas.
+
+Cuando algo todavía no está medido lo decimos. No hay números inventados en este
+documento.
 
 ---
 
 ## 4.1 Qué ocurre a continuación (agenda de eventos)
 
-**Estado:** implementado y probado con pruebas unitarias. Evidencia empírica pendiente (`--bench`).
+Estado: implementado, probado y medido.
 
-### 1. Problema
+### Problema
 
-El bucle principal del juego debe, en cada paso, obtener el evento pendiente con
-menor `tiempo_siguiente` y, en caso de empate, con menor número de secuencia.
+El juego no avanza por rondas. Lleva un reloj entero y una lista de cosas que van a
+pasar, y en cada vuelta del bucle principal hay que sacar la que ocurre antes. Si
+dos ocurren en el mismo instante, gana la que se programó primero.
 
-Las operaciones que el programa ejecuta realmente sobre esta estructura son:
+Eso suena simple hasta que uno mira con qué frecuencia pasa.
 
-| Operación | Cuándo ocurre | Frecuencia esperada |
+| Operación | Cuándo ocurre | Cuántas veces |
 | --- | --- | --- |
-| Obtener y retirar el mínimo | una vez por evento procesado | decenas de miles por partida |
-| Insertar un evento | al programar la siguiente acción de un actor, un pulso de efecto o un cierre de puerta | aproximadamente una por evento procesado |
-| Cancelar un evento | muerte de un actor, antídoto que cancela veneno, reprogramación por cambio de velocidad | poco frecuente |
+| Sacar el evento más próximo | una vez por evento procesado | decenas de miles por partida |
+| Meter un evento | cada vez que un actor actúa y programa su siguiente acción, o cuando arranca un efecto | casi una por cada evento que sale |
+| Cancelar un evento | muere un actor, un antídoto corta el veneno, cambia una velocidad | poco seguido |
 
-El enunciado indica que puede haber varios cientos de eventos simultáneos y que
-la selección del mínimo se ejecutará decenas de miles de veces, por lo que el
-costo de esa operación domina el comportamiento del bucle principal.
+La primera fila es la que manda. El propio enunciado avisa que en las pruebas puede
+haber varios cientos de eventos esperando y que esa operación se ejecuta decenas de
+miles de veces, así que lo que cueste sacar el mínimo es, en la práctica, lo que
+cuesta el juego entero.
 
-La frecuencia medida real se agregará cuando esté disponible el modo `--bench`.
+Hay una exigencia extra que no se puede perder de vista: sacar el siguiente evento
+no puede obligar a revisar todos los que están esperando. El enunciado lo dice con
+todas las letras en §4.1.
 
-### 2. Alternativas consideradas
+### Alternativas consideradas
 
-| Estructura | Insertar | Consultar mínimo | Extraer mínimo |
+Miramos tres formas de guardar los eventos.
+
+| Estructura | Insertar | Ver el mínimo | Sacar el mínimo |
 | --- | --- | --- | --- |
 | Lista sin ordenar | O(1) | O(n) | O(n) |
-| Lista ordenada por inserción | O(n) | O(1) | O(1) |
+| Lista ordenada al insertar | O(n) | O(1) | O(1) |
 | Montículo binario mínimo | O(log n) | O(1) | O(log n) |
 
-**Lista sin ordenar.** Se descartó porque extraer el mínimo obliga a examinar
-todos los eventos pendientes, lo que el enunciado prohíbe explícitamente en §4.1
-("obtener el siguiente evento no puede requerir examinar todos los eventos
-programados"). Con varios cientos de eventos y decenas de miles de extracciones,
-el trabajo total crece como el producto de ambas cantidades.
+La **lista sin ordenar** es la más fácil de escribir: se mete al final y listo. El
+problema es sacar, porque hay que recorrer todo para encontrar el más chico. Eso
+choca de frente con la restricción de §4.1 que acabamos de mencionar. Y como sacar
+ocurre decenas de miles de veces sobre cientos de eventos, el trabajo total termina
+siendo el producto de esas dos cantidades.
 
-**Lista ordenada.** Extraer el mínimo es inmediato, pero insertar obliga a
-desplazar elementos para mantener el orden. En este juego se inserta
-aproximadamente una vez por cada extracción —cada actor que actúa programa su
-siguiente acción—, así que el costo lineal de la inserción reaparece en cada
-paso del bucle y no se amortiza.
+La **lista ordenada** arregla la extracción: el mínimo siempre está al frente. Pero
+mueve el costo a la inserción, porque hay que buscarle el lugar y correr lo que
+estaba después. En este juego eso no sirve de nada, porque insertamos casi tan
+seguido como sacamos. Cada actor que actúa programa de inmediato su siguiente
+acción. Así que el costo lineal vuelve a aparecer en cada vuelta del bucle, solo
+que del otro lado.
 
-### 3. Decisión
+### Decisión
 
-Montículo binario mínimo implementado sobre una `list` como almacenamiento
-contiguo, en `structures/event_queue.py`.
+Montículo binario mínimo, guardado adentro de una `list` de Python, en
+`structures/event_queue.py`.
 
-El criterio de comparación está centralizado en `_less()`: primero `time`
-ascendente y, cuando los tiempos son iguales, `sequence` ascendente. Todas las
-operaciones del montículo usan ese mismo criterio, de modo que el orden es total
-y determinista.
+La comparación entre dos eventos está en un solo lugar, el método `_less()`: primero
+compara `time`, y si empatan compara `sequence`. Todas las operaciones del montículo
+usan ese mismo método, así que el orden es total y siempre el mismo. Eso último
+importa más de lo que parece, porque el enunciado exige que dos partidas con la
+misma semilla y las mismas acciones den el mismo resultado.
 
-La agenda no ejecuta acciones ni administra el reloj virtual. Su única
-responsabilidad es almacenar eventos y devolverlos en el orden correcto.
+La agenda no ejecuta nada ni sabe qué hora es. Solo guarda eventos y los devuelve en
+orden. Quien decide qué significa cada evento es el motor.
 
-**Cancelación por marcado (eliminación diferida).** `cancel(evento)` marca el
-evento como cancelado en O(1) y no lo retira de inmediato. El montículo descarta
-los eventos cancelados cuando llegan a la raíz, en `_discard_cancelled_roots()`.
+**Lo de cancelar.** Acá tomamos la decisión menos obvia de esta sección. Cuando hay
+que cancelar un evento, no lo sacamos del montículo: le ponemos una marca y lo
+dejamos donde está. Cuando ese evento llega a la raíz, el montículo lo tira sin
+entregarlo.
 
-La razón es que §2.10 y §4.1 exigen poder cancelar efectos y detener los eventos
-futuros de un actor muerto *sin recorrer todos los eventos pendientes*. Buscar un
-evento concreto dentro de un montículo cuesta O(n), porque el montículo solo
-ordena padres respecto a hijos y no permite localizar un elemento por su
-contenido. El marcado evita esa búsqueda por completo.
+¿Por qué no borrarlo de una vez? Porque encontrarlo cuesta O(n). Un montículo
+garantiza que cada padre es menor que sus hijos, pero no te dice dónde está un
+elemento concreto, así que para ubicarlo habría que revisar todo. Y el enunciado
+pide justamente lo contrario: §2.10 exige poder cancelar un efecto, y §4.1 exige que
+los eventos de un actor muerto no se ejecuten, en ambos casos sin recorrer los
+eventos pendientes. Marcar y seguir resuelve las dos cosas en O(1).
 
-Para que el marcado sea viable hace falta un acuerdo con el modelo: **quien
-programa un evento conserva la referencia al objeto `Event`**. Como un actor
-tiene a lo sumo una acción pendiente a la vez, basta con que cada actor guarde
-la referencia a su evento programado; al morir, cancelarlo cuesta O(1). El mismo
-acuerdo aplica a los efectos temporales y a los eventos de cierre de puerta.
-Esta dependencia afecta a `model/actor.py` y `model/effects.py`.
+Esto obliga a un acuerdo con el resto del modelo: quien programa un evento se queda
+con la referencia al objeto. Como cada actor tiene a lo sumo una acción esperando,
+alcanza con que cada actor guarde la suya. Al morir, cancelarla es inmediato. Lo
+mismo vale para los efectos temporales y para los eventos de puerta. Afecta a
+`model/actor.py` y a `model/effects.py`.
 
-### 4. Análisis de complejidad
+### Análisis de complejidad
 
-Sea `n` la cantidad de eventos almacenados.
+Con `n` eventos guardados:
 
-| Operación | Costo | Nota |
+| Operación | Costo | Por qué |
 | --- | --- | --- |
-| `push` | O(log n) | el nuevo elemento asciende como máximo la altura del árbol |
-| `peek` | O(1) amortizado | O(1) si la raíz está activa; cada raíz cancelada que descarta cuesta O(log n), pero cada evento se descarta una sola vez en toda su vida |
-| `pop` | O(log n) | |
-| `cancel` | O(1) | solo marca el campo, sin tocar el montículo |
-| `is_empty` | O(1) amortizado | mismo razonamiento que `peek` |
+| `push` | O(log n) | el elemento nuevo sube como mucho la altura del árbol |
+| `pop` | O(log n) | la raíz nueva baja como mucho esa misma altura |
+| `peek` | O(1) amortizado | inmediato si la raíz sirve; cada raíz cancelada que descarta cuesta O(log n), pero un evento se descarta una sola vez en toda su vida |
+| `cancel` | O(1) | pone una marca, no toca el montículo |
+| `is_empty` | O(1) amortizado | igual que `peek` |
 
-El espacio es O(n). Con la eliminación diferida, `n` incluye los eventos
-cancelados que todavía no han llegado a la raíz, por lo que el montículo puede
-ser mayor que la cantidad de eventos activos. El sobrecosto está acotado por la
-cantidad de cancelaciones, que en este juego es poco frecuente frente al número
-de eventos procesados.
+El espacio es O(n), con una salvedad: como los cancelados se quedan adentro hasta
+llegar a la raíz, ese `n` puede ser mayor que la cantidad de eventos que de verdad
+van a ejecutarse. El exceso está acotado por la cantidad de cancelaciones, que en
+este juego son pocas comparadas con los eventos que se procesan.
 
-La operación dominante del bucle principal es `pop`, con costo O(log n). Con
-varios cientos de eventos simultáneos, la altura del árbol es de alrededor de 9
-niveles, de modo que cada selección realiza unas pocas comparaciones en lugar de
-examinar los cientos de eventos pendientes.
+La operación que domina el bucle es `pop`. Con varios cientos de eventos, el árbol
+tiene unos nueve niveles de alto, así que cada extracción hace cerca de nueve
+comparaciones en lugar de revisar los cientos de eventos que hay esperando.
 
-### 5. Evidencia empírica
+### Evidencia empírica
 
-Medido con `benchmark/scheduler_bench.py` en Python 3.14.6 sobre Windows 11. La
-alternativa descartada, la lista sin ordenar, está implementada en ese mismo
-archivo como `UnsortedEventList` y se mide directamente, como pide §8.
+Medimos con `benchmark/scheduler_bench.py`, en Python 3.14.6 sobre Windows 11. La
+lista sin ordenar está implementada en ese mismo archivo, como `UnsortedEventList`,
+solo para poder medirla. El motor no la usa.
 
-La carga reproduce lo que hace el motor: se llena la agenda con una cantidad fija
-de eventos pendientes y después se repite el patrón de extraer el más próximo y
-programar el siguiente, de modo que el tamaño de la agenda se mantiene estable.
+La prueba imita lo que hace el juego de verdad: se llena la agenda con una cantidad
+fija de eventos y después se repite muchas veces el patrón de sacar el más próximo y
+meter el siguiente, de modo que el tamaño se mantiene parejo.
 
-**20 000 ciclos de extraer e insertar, variando los eventos pendientes:**
+Con 20 000 ciclos de sacar e insertar, variando cuántos eventos hay esperando:
 
-| Eventos pendientes | Montículo | Lista sin ordenar | La lista tarda |
+| Eventos esperando | Montículo | Lista sin ordenar | La lista tarda |
 | ---: | ---: | ---: | ---: |
 | 50 | 0.0560 s | 0.0661 s | 1.2 veces más |
 | 100 | 0.0641 s | 0.1215 s | 1.9 veces más |
@@ -121,583 +137,590 @@ programar el siguiente, de modo que el tamaño de la agenda se mantiene estable.
 | 1 000 | 0.0912 s | 1.1588 s | 12.7 veces más |
 | 3 000 | 0.1032 s | 3.4197 s | 33.1 veces más |
 
-Lo importante de esta tabla no es ninguna fila por separado, sino cómo cambia cada
-columna. Al multiplicar por 60 los eventos pendientes, el montículo pasa de 0.0560
-a 0.1032 segundos, menos del doble, que es el crecimiento logarítmico esperado. La
-lista pasa de 0.0661 a 3.4197 segundos, unas 52 veces más, que es el crecimiento
-lineal esperado.
+Ninguna fila por separado dice gran cosa. Lo que importa es cómo cambia cada columna
+al bajar por la tabla. Multiplicamos por 60 los eventos que esperan: el montículo
+pasó de 0.0560 a 0.1032 segundos, ni siquiera el doble, que es el crecimiento
+logarítmico que predice la teoría. La lista pasó de 0.0661 a 3.4197, unas 52 veces
+más, que es el crecimiento lineal.
 
-**Conclusión honesta sobre la alternativa descartada.** Con 50 eventos pendientes
-la lista sin ordenar sería perfectamente suficiente: la diferencia es de una
-décima. La decisión no se justifica a esa escala, sino a la que el enunciado
-plantea. §4.1 dice que en las pruebas puede haber varios cientos de eventos
-simultáneos, y ahí la brecha ya es de 4.4 veces; §9 advierte que la cripta de la
-revisión puede tener más salas, actores y efectos simultáneos que las usadas
-durante el desarrollo, y en esa dirección la lista se degrada sin techo mientras
-el montículo apenas se mueve.
+Y acá viene algo que conviene decir sin adornos: **con 50 eventos esperando, la
+lista sin ordenar alcanzaba de sobra**. La diferencia era de una décima de segundo
+en 20 000 ciclos. A esa escala la decisión no se justifica.
 
-**Medición con 300 eventos y 50 000 extracciones**, que es el escenario que
-describe §4.1: montículo 0.1290 s, lista sin ordenar 0.8524 s, 6.6 veces más.
+Se justifica a la escala que plantea el enunciado. §4.1 dice que en las pruebas
+puede haber varios cientos de eventos simultáneos, y ahí la brecha ya es de 4.4
+veces. Y §9 advierte que la cripta de la revisión puede tener más salas, más actores
+y más efectos que las que usamos nosotros. En esa dirección la lista se degrada sin
+techo mientras el montículo casi no se mueve.
 
-Las mediciones corresponden a una sola corrida por configuración y sirven para
-comparar órdenes de magnitud, no para distinguir diferencias pequeñas.
+En el escenario puntual que describe §4.1, con 300 eventos y 50 000 extracciones:
+montículo 0.1290 s contra 0.8524 s de la lista, 6.6 veces.
 
-### 6. Límites conocidos
+Cada configuración se corrió una sola vez. Los números sirven para comparar órdenes
+de magnitud, no para discutir diferencias de centésimas.
 
-* **Memoria con muchas cancelaciones.** Si un escenario cancelara eventos de forma
-  masiva y esos eventos quedaran en posiciones profundas del montículo, el montículo
-  retendría memoria de eventos que nunca se ejecutarán. Si las mediciones mostraran
-  que esto ocurre, habría que considerar una reconstrucción periódica del montículo
-  o una estructura que permita eliminar por posición.
-* **`__len__` no cuenta eventos activos.** Devuelve los eventos almacenados,
-  incluidos los cancelados que aún no se descartaron. `is_empty()`, `peek()` y
-  `pop()` sí respetan la semántica de eventos activos. Para guardar la partida
-  existe `active_events()`, que recorre el montículo y devuelve los no
-  cancelados; cuesta O(n) y solo se llama al guardar, no en el bucle principal.
-  Si alguna vez hiciera falta el número de eventos activos dentro del bucle,
-  habría que mantener un contador explícito.
-* **La reprogramación no es una operación de la agenda.** Un cambio de velocidad
-  (§2.3) no modifica el evento que ya está en el montículo, porque alterar su
-  `time` rompería la propiedad de orden. El motor debe cancelar el evento anterior
-  e insertar uno nuevo con un número de secuencia nuevo.
+### Límites conocidos
 
-### 7. Pruebas realizadas
+Si alguna vez se cancelaran muchísimos eventos y esos eventos quedaran enterrados en
+el fondo del montículo, estaríamos ocupando memoria con cosas que nunca se van a
+ejecutar. Hoy no pasa, porque las cancelaciones son pocas, pero si llegara a pasar
+habría que reconstruir el montículo cada tanto o usar una estructura que permita
+borrar por posición.
 
-`tests/test_event_queue.py`, 18 pruebas, todas pasan (Python 3.14.6). Las diez
-primeras cubren el orden y la cancelación:
+Ojo con `len()`: devuelve cuántos eventos hay guardados, incluidos los cancelados que
+todavía no salieron. Los que sí respetan la idea de "eventos vivos" son `is_empty()`,
+`peek()` y `pop()`. Para guardar la partida agregamos `active_events()`, que recorre
+el montículo y devuelve los que no están cancelados; cuesta O(n), pero solo se llama
+al guardar y nunca dentro del bucle. Si algún día hiciera falta ese número adentro
+del bucle, habría que llevar un contador aparte.
+
+Una cosa que la agenda no hace, y es a propósito: reprogramar. Cuando cambia la
+velocidad de un actor (§2.3) no se le toca el `time` al evento que ya está adentro,
+porque eso rompería el orden del montículo sin avisar. El motor tiene que cancelar
+el viejo y meter uno nuevo con secuencia nueva.
+
+### Pruebas
+
+`tests/test_event_queue.py`, 18 pruebas, todas pasan en Python 3.14.6. Se corren con
+`python -m unittest discover -s tests -t . -v` parado en `cripta/`.
+
+Diez cubren el orden y la cancelación:
 
 | Prueba | Qué comprueba |
 | --- | --- |
-| `test_order_by_time` | el menor `time` sale primero |
-| `test_order_by_sequence` | con tiempos iguales, desempata el menor `sequence` |
-| `test_peek_does_not_remove_event` | `peek()` es idempotente y no retira |
-| `test_cancel_event` | un evento cancelado nunca se entrega |
-| `test_empty_queue` | `peek()` y `pop()` devuelven `None` en una agenda vacía |
-| `test_cancel_event_in_the_middle` | cancelar un evento que no está en la raíz no altera el orden de los demás |
+| `test_order_by_time` | sale primero el de menor `time` |
+| `test_order_by_sequence` | con tiempos iguales, gana el menor `sequence` |
+| `test_peek_does_not_remove_event` | mirar no saca, y mirar dos veces da lo mismo |
+| `test_cancel_event` | un evento cancelado no se entrega nunca |
+| `test_empty_queue` | la agenda vacía devuelve `None` en vez de reventar |
+| `test_cancel_event_in_the_middle` | cancelar uno que no está en la raíz no desordena a los demás |
 | `test_cancel_all_events` | con todo cancelado, la agenda queda vacía |
-| `test_push_already_cancelled_event` | insertar un evento ya cancelado no lo hace ejecutable |
-| `test_total_order_with_many_events` | 500 eventos con tiempos repetidos salen en orden total estricto por `(time, sequence)` |
-| `test_interleaved_push_pop_keeps_order` | intercalar inserciones y extracciones mantiene el orden |
+| `test_push_already_cancelled_event` | meter uno ya cancelado no lo resucita |
+| `test_total_order_with_many_events` | 500 eventos con tiempos repetidos salen en orden estricto |
+| `test_interleaved_push_pop_keeps_order` | mezclar inserciones y extracciones no rompe el orden |
 
-Comando: `python -m unittest discover -s tests -t . -v` desde `cripta/`.
+Las otras ocho son de `active_events()` y de los campos que lleva cada evento:
+que la lista deja afuera los cancelados, que volver a meter esos eventos en una
+agenda nueva reconstruye el mismo orden de salida, y que cada tipo de evento carga
+sus datos (el daño del veneno, la sala y la dirección de una puerta que se cierra, la
+instancia de una trampa).
 
-Las ocho restantes cubren `active_events()` y los campos de carga de `Event`:
-que la lista excluye los cancelados, que volver a insertar esos eventos en una
-agenda nueva reconstruye el mismo orden de extracción, y que cada tipo de evento
-transporta sus datos (daño del veneno, sala y dirección del cierre de puerta,
-instancia de la trampa).
+### Lo que queda abierto en esta sección
 
-### 8. Decisiones abiertas de esta sección
+El enunciado dice en §2.4 que los enemigos que se activan en el mismo instante se
+programan "en orden ascendente de su id de instancia". El detalle es que los ids
+llegan como texto, del estilo `"e-201"`. Comparando como texto, `"e-10"` va antes que
+`"e-9"`; comparando el número de atrás, al revés. Nosotros comparamos el texto
+completo, porque no asume que el id tenga un número adentro, y §9 prohíbe depender
+del formato de ids de una cripta en particular. Falta confirmarlo con el profesor,
+aunque el riesgo es bajo: lo que el enunciado exige es que nuestro programa sea
+reproducible consigo mismo, no que coincida con el de otro grupo.
 
-* **Orden de activación de enemigos simultáneos.** §2.4 indica que los enemigos
-  activados en el mismo instante se programan "en orden ascendente de su id de
-  instancia", pero los ids llegan como texto (`"e-201"`). Se propone orden
-  lexicográfico sobre el id completo, porque es determinista y no asume que el id
-  contenga un número extraíble —§9 prohíbe depender del formato de ids de una
-  cripta concreta. Pendiente de confirmar.
-* **`event_type` como texto o enumeración.** Se mantiene como texto por ahora,
-  porque la bitácora de reproducción (§4.11) es un archivo de texto y el valor se
-  escribe tal cual. Si la cantidad de tipos crece lo suficiente para que los
-  errores de escritura sean un riesgo real, se pasará a constantes.
-* **Quién asigna los números de secuencia.** Resuelto: `GameState.next_sequence()`.
-  Ver la sección "Reloj virtual y numeración de eventos" más abajo.
+`event_type` sigue siendo texto y no una enumeración. La bitácora de reproducción
+(§4.11) es un archivo de texto y el valor se escribe tal cual, así que por ahora no
+gana nada con ser otra cosa. Si llegamos a tener tantos tipos que equivocarse al
+escribir uno sea un riesgo real, lo pasamos a constantes.
 
 ---
 
-## Reloj virtual y numeración de eventos
+## El reloj virtual y la numeración de eventos
 
-**Estado:** implementado y probado con pruebas unitarias. No corresponde a un
-problema de §4; da soporte a §4.1 y condiciona §4.6.
+Estado: implementado y probado. No es un problema del §4, pero da soporte a 4.1 y
+condiciona 4.6, así que va documentado.
 
-### 1. Problema
+El juego lleva un reloj entero y un número de secuencia que crece, que sirve para
+desempatar eventos programados en el mismo instante. Había que decidir quién maneja
+esos dos valores y, sobre todo, qué pasa con ellos cuando el jugador usa un pergamino
+de retroceso.
 
-El juego mantiene un reloj virtual entero y necesita un número de secuencia
-creciente para desempatar eventos programados en el mismo instante (§2.3). Hay
-que decidir quién administra esos dos valores y cómo se comportan cuando el
-jugador usa un pergamino de retroceso (§2.11).
+### Un solo contador para toda la partida
 
-### 2. Decisión: una única fuente de números de secuencia
+El contador vive en `GameState.next_sequence()`. Arranca en cero y sube de a uno.
 
-El contador vive en `GameState.next_sequence()`, arranca en 0 y se incrementa en
-cada llamada. No lo administra `EventQueue`, porque programar un evento es una
-decisión del motor y no de la estructura que lo almacena.
+No lo pusimos en `EventQueue` porque programar un evento es una decisión del motor,
+no de la estructura que lo guarda. Y descartamos tener un contador por actor, que a
+primera vista parece más ordenado: si cada actor lleva el suyo, dos actores distintos
+pueden generar el mismo número, y entonces el desempate de §2.3 no desempata nada. El
+orden dejaría de ser total.
 
-Se descartó mantener un contador por actor: dos actores podrían generar el mismo
-número y el desempate de §2.3 quedaría sin resolver, con lo que el orden dejaría
-de ser total.
+### El reloj sí se restaura al retroceder; el contador no
 
-### 3. Decisión: el reloj se restaura al retroceder, el contador no
+Esta nos costó entenderla, así que la escribimos con detalle.
 
-Esta es la decisión menos evidente de esta sección.
+El reloj se restaura, y no es opcional: §2.11 y §4.6 lo piden explícitamente. Pero
+además hay una razón de fondo, que es que el valor del reloj significa algo por sí
+solo. Se usa en cuentas cuando se programa algo (`reloj + intervalo`), se compara
+contra la antigüedad del rastro para saber si todavía sirve (`reloj - rastro < 400`),
+y se reporta en la tabla de puntajes al terminar. Si el reloj quedara adelantado
+después de un retroceso, los eventos restaurados quedarían en el pasado y rastros
+frescos parecerían vencidos.
 
-El reloj **sí** se restaura, porque el enunciado lo exige en §2.11 y en §4.6, y
-porque su valor tiene significado absoluto: se usa en aritmética al programar
-(`reloj + intervalo`, §2.3), se compara contra la antigüedad del rastro
-(`reloj - rastro < 400`, §2.9) y se reporta en la tabla de puntajes (§2.12). Un
-reloj adelantado haría que los eventos restaurados quedaran en el pasado y que
-rastros frescos parecieran caducados.
+Con el contador de secuencia pasa algo distinto, y es la parte interesante. Ese
+número no se usa nunca en una cuenta ni como posición: lo único que se hace con él es
+compararlo contra el de otro evento.
 
-El contador de secuencia **no** necesita restaurarse. La razón es que `sequence`
-solo se usa para comparar un evento contra otro, nunca en aritmética ni como
-índice. Los eventos que el retroceso restaura son los que ya estaban pendientes
-antes de la acción revertida, de modo que todos tienen un número menor que el
-valor del contador en ese momento; los eventos programados durante el intervalo
-revertido son precisamente los que el retroceso descarta. Por lo tanto, los
-eventos nuevos reciben números mayores que todos los restaurados, tanto si el
-contador se restaura como si no. El orden que producen las comparaciones es
-idéntico en ambos casos, y la partida observable también. El mismo argumento se
-aplica a dos retrocesos consecutivos (Apéndice B).
+Pensemos en el ejemplo del enunciado. En `t=100` el jugador ataca con el contador en
+50. Durante el intervalo se programan siete cosas, así que el contador llega a 57. En
+`t=200` el jugador usa el pergamino.
 
-Se consideró guardar en el historial cuántos números se consumieron durante el
-intervalo para restarlos al retroceder. Se descartó porque no resuelve ningún
-problema real y es más frágil: si una resta se compone mal con dos retrocesos
-seguidos, el contador reutilizaría números ya emitidos y el orden total se
-rompería sin producir ninguna excepción.
+Los eventos que el retroceso restaura son los que ya estaban esperando antes del
+ataque, o sea que todos tienen número menor que 50. Los que se programaron durante el
+intervalo son exactamente los que el retroceso descarta. Entonces, si el contador
+vuelve a 50, los eventos nuevos reciben 50, 51, 52; y si se queda en 57, reciben 57,
+58, 59. En los dos casos los nuevos son mayores que todos los restaurados, y entre
+ellos conservan el mismo orden relativo. Las comparaciones dan idéntico resultado, así
+que la partida es la misma. Con dos pergaminos seguidos el argumento se repite igual.
 
-No restaurar el contador tiene además una ventaja práctica: cada evento de la
-partida conserva un número de secuencia único, lo que evita ambigüedades al leer
-una bitácora durante la depuración.
+Llegamos a considerar guardar en el historial cuántos números se consumieron en el
+intervalo, para restarlos al retroceder. Lo descartamos por dos motivos. No resuelve
+ningún problema, según lo que acabamos de ver. Y es frágil: si con dos retrocesos
+seguidos una resta se compone mal, el contador vuelve a emitir números ya usados y el
+orden total se rompe sin que salte ninguna excepción.
 
-**Consecuencia para `structures/history.py` (persona 3):** el historial debe
-registrar el valor del reloj de cada acción del jugador, pero no el contador de
-secuencia. Sí debe registrar el `time` y el `sequence` propios de cada evento
-afectado, para poder devolverlos a la agenda tal como estaban.
+Hay además una ventaja práctica en dejarlo subir siempre: cada evento de la partida
+tiene un número único, así que al leer una bitácora depurando nunca aparecen dos
+eventos distintos con el mismo número.
 
-### 4. Decisión: el reloj es de solo lectura
+Esto le afecta a quien implemente `structures/history.py`: el historial tiene que
+guardar el valor del reloj de cada acción del jugador, pero no el contador. Lo que sí
+debe guardar es el `time` y el `sequence` de cada evento que toque, para poder
+devolverlos a la agenda tal como estaban.
 
-`clock` se expone como propiedad sin asignación directa. Solo dos métodos lo
-mueven:
+### Guardar una partida no es lo mismo que retroceder
 
-| Método | Quién lo usa | Regla |
+Conviene aclararlo porque se presta a confusión, y de hecho ya se prestó dentro del
+grupo.
+
+Lo de arriba vale para el pergamino de retroceso. No vale para el guardado de §4.10.
+
+Cuando uno retrocede, la partida sigue corriendo: los eventos restaurados conviven
+con los nuevos y, como solo se comparan entre ellos, alcanza con que los nuevos sigan
+siendo mayores. Cuando uno carga una partida guardada el programa arranca de cero y
+tiene que seguir exactamente donde se quedó. Ahí sí hay que guardar y restaurar el
+reloj, el contador, el estado interno del generador aleatorio y los eventos que
+estaban esperando en la agenda.
+
+Para eso están `GameState.restore(clock, sequence_counter, random_state)` y
+`EventQueue.active_events()`. La prueba
+`test_restore_in_the_middle_of_a_game_keeps_the_rolls_aligned` comprueba que los
+valores aleatorios que salen después de cargar son los mismos que habrían salido si
+no se hubiera guardado nunca.
+
+### El reloj no se puede escribir desde afuera
+
+`clock` es una propiedad de solo lectura. Hay exactamente dos métodos que lo mueven.
+
+`advance_clock_to(time)` lo usa el motor cuando saca un evento. Acepta avanzar o
+quedarse en el mismo instante, porque varios eventos pueden compartir tiempo, y
+rechaza retroceder.
+
+`rewind_clock_to(time)` lo usa únicamente el pergamino. Acepta ir para atrás y rechaza
+adelantar.
+
+Podríamos haber dejado `clock` como un atributo cualquiera, pero entonces cualquier
+módulo podría moverlo hacia atrás por error y el juego seguiría andando con un reloj
+incoherente, sin una sola señal de que algo anda mal. Con las guardas, un error de
+reprogramación aparece como un `ValueError` que dice qué pasó, en vez de como una
+partida silenciosamente equivocada.
+
+Un detalle que vale aclarar: `rewind_clock_to()` no calcula a dónde volver. Lo recibe
+del historial, que anotó el valor del reloj en el momento de la acción que se está
+revirtiendo. Calcularlo restando el tiempo transcurrido necesitaría exactamente la
+misma información y encima podría desincronizarse.
+
+### Qué mueve el reloj y qué no
+
+Esta tabla la armamos porque es fácil equivocarse.
+
+| Situación | Qué le pasa al reloj | Dónde lo dice |
 | --- | --- | --- |
-| `advance_clock_to(time)` | el motor, al extraer un evento | acepta avanzar o quedarse en el mismo instante; rechaza retroceder |
-| `rewind_clock_to(time)` | únicamente el pergamino de retroceso | acepta retroceder o quedarse; rechaza adelantar |
+| Se procesa un evento | salta al `time` de ese evento | §2.3 |
+| Se espera una respuesta HTTP, incluido un 429 | nada | §2.4, §3.1 |
+| Se usa un pergamino de retroceso | vuelve al instante guardado, sin consumir tiempo | §2.11 |
+| Una acción inválida: inventario lleno, llave equivocada | nada | Apéndice B |
+| Veneno, regeneración, cierre de puerta, rearme de trampa | nada; solo programan eventos más adelante | §2.10 |
+| Cambio de velocidad | nada; recalcula cuándo ocurre un evento ya programado | §2.3 |
+| Trampa al entrar a una sala | nada; se aplica en el instante actual | §2.10 |
 
-Quedarse en el mismo instante debe permitirse porque varios eventos comparten
-tiempo. El retroceso es la única operación del juego que mueve el reloj hacia
-atrás (§2.11), y separarla en su propio método hace explícito quién la invoca.
+Solo la primera fila mueve el reloj. Todo lo demás, a lo sumo, programa eventos.
 
-La alternativa era dejar `clock` como atributo público. Se descartó porque
-cualquier módulo podría moverlo hacia atrás por error y el juego seguiría
-ejecutándose con un reloj incoherente sin producir ningún aviso. Con las guardas,
-un error de reprogramación aparece como `ValueError` con contexto en lugar de
-como una partida silenciosamente incorrecta.
+### Los eventos apuntan al actor, no a su identificador
 
-`rewind_clock_to()` no calcula el instante de destino: lo recibe del historial,
-que anotó el valor del reloj en el momento de la acción revertida. Calcularlo
-restando el tiempo transcurrido requeriría la misma información y podría
-desincronizarse.
+Al principio `Event` guardaba `actor_id` y `target_id` como texto. Lo cambiamos a
+referencias directas al objeto `Actor`.
 
-### 5. Qué mueve el reloj y qué no
+El motivo salió al escribir el bucle. El motor necesita el actor cada vez que procesa
+un evento, y con solo el identificador habría que salir a buscarlo recorriendo la
+lista de actores, O(n) por evento. Con decenas de miles de eventos eso se come el
+presupuesto de 20 ms de §5.2. Lo normal sería armar un índice, pero §7 prohíbe usar
+`dict` como tabla de búsqueda. Guardar la referencia no resuelve el problema: lo
+elimina. El acceso es inmediato y no hace falta ninguna estructura extra.
 
-| Situación | Efecto sobre el reloj | Referencia |
-| --- | --- | --- |
-| Procesar un evento | salta al `time` de ese evento | §2.3 |
-| Esperar una respuesta HTTP, incluido un 429 | ninguno | §2.4, §3.1 |
-| Usar un pergamino de retroceso | lo devuelve al instante registrado; no consume tiempo | §2.11 |
-| Acción inválida: inventario lleno, llave incorrecta | ninguno | Apéndice B |
-| Veneno, regeneración, cierre de puerta, rearme de trampa | ninguno; solo programan eventos en `reloj + intervalo` | §2.10 |
-| Cambio de velocidad | ninguno; recalcula el tiempo de un evento programado | §2.3 |
-| Trampa al entrar a una sala | ninguno; se aplica en el instante actual | §2.10 |
+El identificador no se pierde, queda disponible como `event.actor.actor_id`, que es
+lo que se escribe al serializar. Al cargar una partida hay que resolver cada
+identificador contra la lista de actores, pero eso ocurre una sola vez y lejos del
+bucle principal.
 
-### 5b. Cargar una partida no es lo mismo que retroceder
+La clase quedó plana, con campos opcionales según el tipo de evento, en lugar de
+usar subclases. Esa forma la decidió el guardado binario de §4.10: `struct` empaqueta
+registros de tamaño fijo, y una clase plana se empaqueta directo, mientras que una
+jerarquía obligaría a inventar un formato con etiqueta de tipo.
 
-El apartado 3 concluye que el contador de secuencia no necesita restaurarse al
-usar un pergamino de retroceso. Eso **no** se extiende al guardado de §4.10.
+### El azar
 
-El retroceso deja la partida en marcha: los eventos restaurados conviven con los
-nuevos y, como solo se comparan entre sí, basta con que los nuevos sigan siendo
-mayores. Cargar una partida es distinto, porque el programa arranca de cero y
-debe continuar exactamente donde se quedó. Por eso el archivo de guardado sí debe
-conservar y restaurar el reloj, el contador de secuencia, el estado interno del
-generador aleatorio y los eventos activos de la agenda.
+`GameState` guarda la instancia `random.Random(semilla)` que usa todo el modelo, y
+guarda también la semilla, porque hace falta en el archivo de partida y en la cabecera
+de la bitácora de reproducción. El generador global del módulo `random` no se usa en
+ninguna parte, porque el enunciado lo prohíbe.
 
-`GameState.restore(clock, sequence_counter, random_state)` cubre los tres
-primeros y `EventQueue.active_events()` entrega los eventos a persistir. Está
-cubierto por `test_restore_in_the_middle_of_a_game_keeps_the_rolls_aligned`, que
-comprueba que los valores aleatorios posteriores a una carga coinciden con los
-que habría producido la partida sin guardar.
+Queda una duda abierta. §2.11 dice que la reversión incluye "cualquier otro dato
+modificado", y el estado interno del generador se modifica durante el intervalo que se
+revierte. Nosotros no lo restauramos, por dos razones. Una práctica:
+`random.Random.getstate()` devuelve cientos de enteros, y guardarlos por cada
+intervalo se parece demasiado a la copia completa de estado que §2.11 prohíbe. Y una
+de fondo: lo que §2.6 exige es que la misma semilla con la misma secuencia de acciones
+dé la misma partida, y el uso del pergamino forma parte de esa secuencia, así que la
+reproducción sigue siendo fiel. De todos modos conviene preguntarlo.
 
-### 5c. Los eventos apuntan al actor, no a su identificador
+### Complejidad y pruebas
 
-`Event` guardaba `actor_id` y `target_id` como texto. Se cambió a referencias
-directas al objeto `Actor`.
+Todo acá es O(1) en tiempo y espacio constante.
 
-El motor necesita el actor cada vez que procesa un evento. Con solo el
-identificador habría que buscarlo, lo que cuesta O(n) por evento recorriendo la
-lista de actores; con decenas de miles de eventos eso compite contra el
-presupuesto de 20 ms de §5.2. La alternativa habitual sería un índice, pero §7
-prohíbe `dict` como tabla de búsqueda. La referencia directa elimina el problema
-en lugar de resolverlo: el acceso es O(1) y no hace falta ninguna estructura
-adicional.
-
-El identificador sigue disponible como `event.actor.actor_id`, que es lo que se
-escribe al serializar. Al cargar hay que resolver cada identificador contra la
-lista de actores, pero eso ocurre una sola vez y fuera del bucle principal.
-
-La clase se mantuvo plana, con campos opcionales por tipo de evento, en lugar de
-usar subclases o un objeto de datos anidado. El motivo es el guardado binario de
-§4.10: `struct` empaqueta registros de forma fija, y una clase plana se empaqueta
-directamente, mientras que una jerarquía obligaría a un formato con etiqueta de
-tipo.
-
-### 6. Azar reproducible
-
-`GameState` contiene la instancia `random.Random(semilla)` que usa todo el
-modelo, y conserva la semilla porque hace falta en el archivo de guardado y en
-la cabecera de la bitácora de reproducción (§2.6, §4.11). No se usa el generador
-global del módulo `random`, que el enunciado prohíbe.
-
-**Decisión abierta:** §2.11 dice que la reversión incluye "cualquier otro dato
-modificado", y el estado interno del generador aleatorio se modifica durante el
-intervalo revertido. No se restaura, porque `random.Random.getstate()` devuelve
-cientos de enteros y guardarlos por intervalo se aproximaría a una copia de
-estado, que §2.11 prohíbe. El requisito de §2.6 se mantiene igual: misma
-semilla y misma secuencia de acciones del jugador producen la misma partida,
-porque el uso del pergamino forma parte de esa secuencia de acciones. Conviene
-confirmarlo con el profesor.
-
-### 7. Complejidad
-
-Todas las operaciones son O(1) en tiempo y el estado temporal ocupa espacio
-constante.
-
-### 8. Evidencia empírica
-
-**Pendiente.** Estas operaciones son O(1) y no se espera que aparezcan en el
-perfil de rendimiento, pero el presupuesto de §5.2 se medirá sobre el ciclo
-completo de eventos cuando exista `--bench`.
-
-### 9. Pruebas realizadas
-
-`tests/test_game_state.py`, 20 pruebas, todas pasan (Python 3.14.6). Cubren:
-reloj inicial en 0 y con valor cargado, reloj de solo lectura, numeración
-creciente desde 0, avance hacia adelante y al mismo instante, rechazo de
-retroceso en `advance_clock_to()`, retroceso correcto y rechazo de adelanto en
-`rewind_clock_to()`, avance posterior a un retroceso, continuidad del contador
-tras un retroceso, reproducibilidad del azar con la misma semilla, divergencia
-con semillas distintas y disponibilidad de la semilla.
-
-Total del proyecto: 111 pruebas, todas pasan.
-Comando: `python -m unittest discover -s tests -t . -v` desde `cripta/`.
+`tests/test_game_state.py`, 20 pruebas, todas pasan. Cubren el reloj en cero y
+cargado, el reloj de solo lectura, la numeración creciente, el avance hacia adelante y
+al mismo instante, el rechazo de retroceder con `advance_clock_to()`, el retroceso
+correcto y el rechazo de adelantar con `rewind_clock_to()`, el avance después de un
+retroceso, que el contador no vuelve atrás, que la misma semilla da la misma secuencia
+de valores y semillas distintas no, y que la semilla queda accesible.
 
 ---
 
 ## El bucle del motor
 
-**Estado:** implementado y probado para esperar y atacar. Moverse, abrir puertas
-y las acciones de inventario esperan a que existan las salas y el inventario.
+Estado: anda con esperar y atacar. Moverse, abrir puertas y todo lo de inventario
+espera a que existan las salas y el inventario.
 
-### 1. Decisión: una acción del jugador equivale a un ciclo completo de eventos
+### Una acción del jugador es un ciclo completo de eventos
 
-Cada método de acción de `Game` ejecuta la acción y después procesa todos los
-eventos pendientes hasta que vuelva a tocarle decidir al jugador. El controlador
-no administra el reloj ni la agenda.
+Cada método de acción de `Game` hace dos cosas: ejecuta la acción y después procesa
+todos los eventos pendientes hasta que vuelva a tocarle decidir al jugador. El
+controlador no toca el reloj ni la agenda.
 
-La alternativa era exponer el bucle al controlador, con un método que avanzara un
-evento por llamada. Se descartó porque obligaría a la vista a conocer el
-funcionamiento del reloj, y porque §5.2 define el presupuesto de rendimiento
-precisamente sobre "un ciclo completo de eventos entre dos decisiones consecutivas
-del jugador". Con esta forma, ese ciclo es exactamente una llamada y se puede
-medir sin instrumentar nada.
+La otra opción era darle el bucle al controlador, con un método que avanzara un evento
+por llamada. La descartamos porque obligaría a la vista a entender cómo funciona el
+reloj, que es justo lo que §6 pide evitar. Y hay una ventaja que no habíamos previsto:
+§5.2 define el presupuesto de rendimiento sobre "un ciclo completo de eventos entre
+dos decisiones consecutivas del jugador", y con esta forma ese ciclo es exactamente
+una llamada. Se puede medir sin instrumentar nada.
 
-### 2. Decisión: el actor olvida su evento en cuanto se ejecuta
+### El actor se olvida de su evento apenas se ejecuta
 
-Cada actor guarda en `scheduled_event` la referencia a su acción pendiente. Al
-sacar un evento de la agenda y ejecutarlo, el motor pone esa referencia en `None`
-antes de programar la siguiente.
+Cada actor guarda la referencia a su acción pendiente. Cuando el motor saca ese evento
+y lo ejecuta, pone la referencia en `None` antes de programar la siguiente.
 
-Sin eso, un actor seguiría apuntando a un evento ya consumido. Si en ese momento
-un efecto le cambiara la velocidad, `change_speed()` creería que tiene una acción
-pendiente, cancelaría un evento que ya no está en la agenda y programaría una
-acción nueva. Al terminar su turno se programaría otra, de modo que el actor
-quedaría con dos acciones pendientes y actuaría el doble de veces, sin que nada
-produjera un error. Está cubierto por
-`test_the_player_has_no_pending_event_during_their_turn`.
+Esto lo descubrimos escribiendo una prueba, y es el tipo de error que más miedo da.
+Sin esa línea, el actor queda apuntando a un evento que ya se consumió. Si justo en
+ese momento un efecto le cambiara la velocidad, `change_speed()` creería que tiene una
+acción esperando, cancelaría un evento que ya no está en la agenda y programaría una
+nueva. Al terminar el turno se programaría otra. El actor quedaría con dos acciones
+pendientes y actuaría el doble de veces, sin lanzar ninguna excepción y sin que nada
+se viera raro. Lo fija `test_the_player_has_no_pending_event_during_their_turn`.
 
-### 3. Decisión: los eventos de un actor muerto se filtran por dos caminos
+### Los eventos de un muerto se filtran dos veces
 
-Al morir un actor, el motor cancela su evento pendiente. Además, el bucle descarta
-cualquier evento cuyo actor ya no esté vivo antes de ejecutarlo.
+Cuando un actor muere, el motor cancela su evento pendiente. Y además, el bucle
+descarta cualquier evento cuyo actor ya no esté vivo, antes de ejecutarlo.
 
-Parece redundante y no lo es: la cancelación cubre el caso normal, pero un actor
-puede morir por una vía que no pase por el motor, como un pulso de veneno que lo
-deja en cero. El filtro del bucle garantiza la regla de §2.6 —un actor muerto deja
-de ejecutar eventos futuros— sin depender de que todas las causas de muerte
-recuerden cancelar.
+Parece redundante. No lo es. La cancelación cubre el caso normal, el de morir de un
+golpe, pero un actor puede morir por un camino que no pase por el motor, por ejemplo
+un pulso de veneno que lo deja en cero. El filtro del bucle garantiza la regla de §2.6
+sin depender de que todas las causas de muerte se acuerden de cancelar.
 
-Un evento descartado no adelanta el reloj, porque no ocurrió nada.
+Un evento descartado no mueve el reloj, porque no pasó nada.
 
-### 4. Decisión: `GameState` guarda el tiempo, `Game` guarda la partida
+### `GameState` lleva el tiempo, `Game` lleva la partida
 
-`GameState` mantiene el reloj, el contador de secuencia y el generador aleatorio,
-que es exactamente lo que hay que guardar y restaurar para reanudar una partida.
-`Game` mantiene los actores, la agenda y el resultado.
+`GameState` tiene el reloj, el contador y el generador aleatorio, que es justo lo que
+hay que guardar para reanudar una partida. `Game` tiene los actores, la agenda, los
+efectos y el resultado.
 
-El corte está puesto ahí porque `GameState.restore()` ya es la interfaz que usa el
-guardado de §4.10, y mezclar los actores dentro habría obligado a cambiarla otra
-vez.
+El corte quedó ahí por una razón concreta: `GameState.restore()` ya es la interfaz que
+usa el guardado de §4.10, y meterle los actores adentro habría obligado a cambiarla de
+nuevo después de habérsela pasado al resto del grupo.
 
-### 5. Decisión: el ataque efectivo se resuelve por polimorfismo
+### El ataque efectivo se resuelve por polimorfismo
 
-`Actor` expone `effective_attack` y `effective_defense` devolviendo el valor base,
-y `Player` los sobrescribe sumando los bonos del arma y la armadura equipadas
-(§2.7). Así la fórmula de daño es la misma para todos y el motor no pregunta de
-qué tipo es cada actor.
+`Actor` tiene `effective_attack` y `effective_defense`, que devuelven el valor base.
+`Player` los sobrescribe sumando los bonos del arma y la armadura equipadas. Así la
+fórmula de daño es una sola para todos y el motor nunca pregunta de qué tipo es el
+actor que tiene enfrente.
 
-El equipo se trata por duck typing: cualquier objeto con `attack_bonus` o
-`defense_bonus` sirve. Eso permite probar el combate con equipo sin depender del
-catálogo.
+El equipo se trata por duck typing: sirve cualquier objeto que tenga `attack_bonus` o
+`defense_bonus`. Eso nos dejó probar el combate con equipo sin esperar al catálogo.
 
-### 6. Orden de activación de enemigos simultáneos
+### Orden de activación de enemigos
 
-§2.4 exige activarlos en orden ascendente de identificador de instancia. Como los
-identificadores son texto, se comparan como texto completo, según lo ya razonado
-en la sección 4.1. El orden se arma con una inserción simple, porque §4.9 prohíbe
-`sorted()` y `list.sort()` y el módulo de ordenamiento del proyecto todavía no
-existe. Debe reemplazarse por ese módulo cuando esté disponible.
+§2.4 pide activarlos en orden ascendente de identificador. Como son texto, los
+comparamos como texto completo, según lo ya discutido en la sección 4.1. El orden se
+arma con una inserción simple escrita a mano, porque §4.9 prohíbe `sorted()` y
+`list.sort()` y el módulo de ordenamiento del proyecto todavía no existe. Cuando esté,
+hay que reemplazarlo.
 
-### 7. Límites conocidos
+### Límites conocidos
 
-* **La bitácora de mensajes es una `list` que crece.** §4.8 exige memoria constante
-  y que agregar un mensaje no desplace los 19 anteriores. Esa estructura
-  corresponde a `structures/circular_log.py` y todavía no existe, así que la lista
-  es provisional y debe sustituirse.
-* **El errante y el rastreador esperan.** Sin salas no pueden examinar salidas ni
-  rastros. Esperar es lo que §2.8 indica cuando no hay ninguna opción disponible,
-  de modo que el comportamiento actual no es incorrecto, pero está incompleto.
-* **Los valores de `behavior`.** El enunciado solo confirma `"rastreador"` en su
-  ejemplo de catálogo. Los nombres del guardián y del errante deben verificarse
-  contra el servicio real.
-* **Los objetos que suelta un enemigo al morir** (§2.6) no se colocan en ningún
-  lado, porque no existe el suelo de la sala.
+La bitácora de mensajes es hoy una `list` que crece sin parar. §4.8 exige memoria
+constante y que agregar un mensaje no empuje a los 19 anteriores. Esa estructura le
+corresponde a `structures/circular_log.py`, que todavía no existe, así que la lista es
+provisional. `Game` ya la recibe desde afuera, así que cambiarla no va a requerir
+tocar el motor.
 
-### 8. Complejidad
+El errante y el rastreador, por ahora, esperan. Sin salas no pueden mirar salidas ni
+rastros. Esperar es lo que §2.8 manda cuando no hay ninguna opción disponible, así que
+no está mal, pero está incompleto.
+
+Los nombres de `behavior` son una apuesta. El enunciado solo confirma `"rastreador"`
+en su ejemplo de catálogo; los del guardián y el errante hay que verificarlos contra
+el servicio real.
+
+Y los objetos que suelta un enemigo al morir no se colocan en ningún lado, porque no
+existe el suelo de la sala.
+
+### Complejidad
 
 | Operación | Costo |
 | --- | --- |
-| Procesar un evento | O(log n) por la extracción de la agenda |
-| Buscar el enemigo objetivo de un ataque | O(e) sobre los enemigos, una vez por acción del jugador y no por evento |
+| Procesar un evento | O(log n), por sacarlo de la agenda |
+| Buscar el enemigo al que se ataca | O(e) sobre los enemigos, una vez por acción del jugador y no por evento |
 | Programar la acción de un actor | O(log n) |
 | Cancelar la acción de un actor | O(1) |
 
-### 9. Evidencia empírica
+### Evidencia empírica
 
 Medido con `benchmark/scheduler_bench.py` en Python 3.14.6 sobre Windows 11.
 
-§5.2 fija un presupuesto de 20 ms para resolver un ciclo completo de eventos entre
-dos decisiones consecutivas del jugador, excluyendo red y renderizado. La medición
-monta una partida con 20 enemigos en la sala del jugador, todos más rápidos que él
-y con regeneración activa, más un veneno y una antorcha en curso, y ejecuta 2 000
-decisiones del jugador.
+§5.2 da 20 ms para resolver un ciclo completo de eventos entre dos decisiones del
+jugador, sin contar red ni dibujado en pantalla. Montamos una partida con 20 enemigos
+en la sala del jugador, todos más rápidos que él y con regeneración activa, más un
+veneno y una antorcha corriendo, y ejecutamos 2 000 decisiones.
 
 | Medición | Resultado |
 | --- | --- |
 | 2 000 ciclos completos | 0.3409 s |
-| Por ciclo | **0.1705 ms** |
-| Presupuesto de §5.2 | 20 ms |
+| Por ciclo | 0.1705 ms |
+| Lo que permite §5.2 | 20 ms |
 
-El ciclo usa alrededor del 0.9 % del presupuesto, de modo que queda margen
-suficiente para el movimiento, las puertas, las trampas y los comportamientos de
-enemigos que todavía faltan.
+Estamos usando alrededor del 0.9 % del presupuesto. Queda margen de sobra para el
+movimiento, las puertas, las trampas y los comportamientos que faltan.
 
-Hay que volver a medir cuando esas partes existan, porque el escenario actual no
-incluye la decisión de un rastreador, que es la más costosa de §2.8.
+Hay que volver a medir cuando eso exista, porque el escenario de hoy no incluye la
+decisión de un rastreador, que es la más cara de §2.8.
 
-### 10. Pruebas realizadas
+### Pruebas
 
-`tests/test_game.py`, 26 pruebas, todas pasan (Python 3.14.6), en siete grupos:
-bucle, combate, acciones rechazadas, determinismo, activación de enemigos, cambio
-de velocidad y estado visible.
+`tests/test_game.py`, 26 pruebas, todas pasan. Están agrupadas en bucle, combate,
+acciones rechazadas, determinismo, activación de enemigos, cambio de velocidad y
+estado visible.
 
-Los tiempos se verifican contra el ejemplo de §2.13: un enemigo de velocidad 150
-activado en 0 queda programado para 66 y actúa una vez antes de la siguiente
-decisión del jugador; uno de velocidad 250 actúa dos veces. También se comprueba
-que una acción rechazada no mueve el reloj ni consulta el generador aleatorio, y
-que dos partidas con la misma semilla y las mismas acciones producen los mismos
-mensajes.
-
-Total del proyecto: 111 pruebas, todas pasan.
+Los tiempos se verifican contra el ejemplo de §2.13 del enunciado: un enemigo de
+velocidad 150 activado en cero queda programado para 66 y alcanza a actuar una vez
+antes de la siguiente decisión del jugador; uno de velocidad 250 actúa dos veces.
+También comprobamos que una acción rechazada no mueve el reloj ni consulta el
+generador aleatorio, y que dos partidas con la misma semilla y las mismas acciones
+producen exactamente los mismos mensajes.
 
 ---
 
 ## Efectos temporales
 
-**Estado:** implementados veneno, regeneración, cambio de velocidad y antorcha,
-los cuatro de §2.10 que no dependen de las salas. Las trampas y el cierre
-automático de puertas quedan pendientes.
+Estado: andan el veneno, la regeneración, el cambio de velocidad y la antorcha, que
+son los cuatro de §2.10 que no necesitan salas. Faltan las trampas y el cierre
+automático de puertas.
 
-### 1. Decisión: el veneno programa todas sus activaciones de una vez
+### El veneno programa todos sus pulsos de una vez
 
-§2.10 fija el veneno en un pulso cada 80 unidades durante 400. Esos dos números
-son constantes, así que al aplicarlo ya se conocen sus cinco instantes: 80, 160,
-240, 320 y 400. El motor los programa todos juntos.
+§2.10 fija el veneno en un pulso cada 80 unidades durante 400. Los dos números son
+constantes, así que apenas se aplica ya se saben los cinco instantes en que va a hacer
+daño: 80, 160, 240, 320 y 400. El motor los programa todos juntos.
 
-La alternativa era que cada pulso programara el siguiente. Para decidir si queda
-otro, el pulso necesita saber cuándo termina el efecto, y ese dato no cabe en el
-evento, de modo que haría falta un objeto de efecto con estado propio y una forma
-de localizarlo al procesar cada pulso. Programarlos todos elimina las dos cosas:
-cada pulso solo aplica el daño que trae el propio evento.
+Lo primero que intentamos fue lo obvio: que cada pulso programara el siguiente. El
+problema aparece al preguntarse si queda otro pulso, porque para eso el evento tendría
+que saber cuándo termina el efecto, y ese dato no cabe adentro del evento. Habría que
+tener un objeto de efecto con estado propio y, peor, una forma de encontrarlo cada vez
+que se procesa un pulso. Programarlos todos de una vez borra las dos necesidades: cada
+pulso solo aplica el daño que trae el evento.
 
-Además vuelve trivial el antídoto. §2.10 dice que cancelar un efecto impide sus
-activaciones futuras, y aquí esas activaciones son unos eventos concretos que ya
-están identificados, así que cancelarlas es marcarlos.
+De paso, el antídoto se vuelve trivial. §2.10 dice que cancelar un efecto impide sus
+activaciones futuras, y acá esas activaciones son unos eventos concretos que ya
+tenemos identificados. Cancelarlas es marcarlos.
 
-El costo son cinco entradas en el montículo en vez de una. Frente a los varios
-cientos de eventos simultáneos que menciona §4.1, y con la inserción en O(log n)
-medida arriba, no es significativo.
+El costo son cinco entradas en el montículo en vez de una. Frente a los varios cientos
+de eventos simultáneos que menciona §4.1, y con inserción en O(log n), no mueve la
+aguja.
 
-**Interpretación declarada:** el pulso del instante 400 sí se aplica. El enunciado
-dice que el veneno "dura 400 unidades desde su aplicación" y no aclara si la
-activación que cae justo en el límite ocurre. Se decidió incluirla, de modo que
-un veneno completo hace cinco pulsos. Está fijado en
+Una interpretación que declaramos: el pulso del instante 400 sí se aplica. El
+enunciado dice que el veneno "dura 400 unidades desde su aplicación" y no aclara qué
+pasa con la activación que cae justo en el borde. Decidimos incluirla, así que un
+veneno completo hace cinco pulsos. Queda fijado en
 `test_poison_lasts_four_hundred_units_and_no_more`.
 
-### 2. Decisión: la regeneración no se registra como efecto cancelable
+### La regeneración no se registra como efecto cancelable
 
-La regeneración no tiene duración: §2.10 dice que el enemigo recupera la cantidad
-indicada cada 200 unidades, sin más. No se puede programar por adelantado, así
-que cada pulso programa el siguiente.
+La regeneración no tiene duración. §2.10 dice que el enemigo recupera la cantidad
+indicada cada 200 unidades y nada más. Como no se sabe cuándo termina, no se puede
+programar por adelantado, así que acá sí cada pulso programa el siguiente.
 
-No hace falta guardarla en la lista de efectos activos, porque nada la cancela: se
-detiene sola cuando el enemigo muere, ya que el bucle descarta los eventos de los
-actores sin vida. Y tampoco se muestra en la interfaz, porque es una característica
-de los enemigos y no un efecto sobre el jugador.
+No la guardamos en la lista de efectos activos porque nada la cancela: se detiene sola
+cuando el enemigo muere, gracias al filtro del bucle. Y tampoco se muestra en pantalla,
+porque es una característica de los enemigos y no un efecto sobre el jugador.
 
-Cada pulso reprograma el siguiente leyendo la cantidad del propio evento, sin
-consultar ningún estado externo. El límite de `vida_max` lo garantiza el setter de
-`health`, según lo ya razonado.
+Cada pulso reprograma el siguiente leyendo la cantidad del propio evento, sin mirar
+ningún estado externo. Que la vida no pase del máximo lo garantiza el setter de
+`health`, como ya se explicó más abajo.
 
-### 3. Decisión: el cambio de velocidad lo aplica el motor, no el efecto
+### El cambio de velocidad lo aplica el motor
 
-§2.10 exige reajustar la próxima acción al comenzar y al terminar el efecto. Ese
-reajuste cancela un evento e inserta otro, que es trabajo de la agenda, de modo
-que no puede vivir dentro de un objeto de efecto sin que el modelo de efectos
-dependa del motor.
+§2.10 pide reajustar la próxima acción tanto al empezar el efecto como al terminarlo.
+Ese reajuste cancela un evento e inserta otro, que es trabajo de la agenda, así que no
+puede vivir adentro de un objeto de efecto sin que el modelo de efectos pase a depender
+del motor, cosa que generaría una dependencia circular.
 
-`apply_speed_change()` cambia la velocidad llamando a `change_actor_speed()`, que
-ya hace el reescalado de §2.3, y programa un evento de fin que lleva la velocidad
-anterior en su campo `amount`. Al dispararse, el motor llama otra vez a
-`change_actor_speed()` con ese valor, de modo que el reajuste del final usa
-exactamente el mismo camino que el del comienzo.
+`apply_speed_change()` cambia la velocidad llamando a `change_actor_speed()`, que ya
+hace el reescalado de §2.3, y programa un evento de fin que lleva la velocidad anterior
+en el campo `amount`. Cuando ese evento se dispara, el motor vuelve a llamar a
+`change_actor_speed()` con ese valor. El reajuste del final usa exactamente el mismo
+camino que el del comienzo, que es la mejor garantía de que los dos hagan lo mismo.
 
-### 4. Decisión: los eventos de efecto se distinguen por su tipo
+### Cómo se reparten los eventos de efecto
 
-El bucle del motor reparte según `event_type` con una cadena de `if`/`elif`, sin
-tabla de despacho. §7 prohíbe `dict` como tabla de búsqueda, y con cinco tipos de
-evento una cadena de condiciones es más clara que cualquier alternativa y no hay
-que justificarla.
+El bucle mira `event_type` y reparte con una cadena de `if`/`elif`. Sin tabla de
+despacho, porque §7 prohíbe `dict` como tabla de búsqueda y porque con cinco tipos una
+cadena de condiciones se lee mejor que cualquier alternativa y no hay que explicarla.
 
-### 5. Límites conocidos
+### Límites conocidos
 
-* **Trampas y cierre de puertas** dependen de las salas y no están.
-* **La antorcha solo se enciende y se apaga.** Lo que ilumina es asunto de la
-  vista; el modelo únicamente informa si está encendida.
-* **Un segundo veneno sobre el mismo actor** se acumula: se programan los pulsos
-  de ambos y el antídoto cancela los dos. El enunciado no dice qué debe ocurrir en
-  ese caso, así que esta es una interpretación, no una regla verificada.
+Las trampas y el cierre de puertas dependen de las salas y no están.
 
-### 6. Complejidad
+La antorcha solo se enciende y se apaga. Lo que ilumina es asunto de la vista; el
+modelo se limita a informar si está prendida.
+
+Y si a un mismo actor le cae un segundo veneno, los efectos se acumulan: se programan
+los pulsos de los dos y el antídoto cancela ambos. El enunciado no dice qué debería
+pasar ahí, así que esto es una interpretación nuestra y no una regla verificada.
+
+### Complejidad
 
 | Operación | Costo |
 | --- | --- |
 | Aplicar veneno | O(p log n), con p igual a 5 pulsos |
 | Cancelar veneno con un antídoto | O(e + p) sobre los efectos activos |
-| Pulso de veneno o de regeneración | O(log n) |
-| Comenzar o terminar un cambio de velocidad | O(log n) |
+| Un pulso de veneno o de regeneración | O(log n) |
+| Empezar o terminar un cambio de velocidad | O(log n) |
 
-### 7. Pruebas realizadas
+### Pruebas
 
-`tests/test_effects.py`, 24 pruebas, todas pasan (Python 3.14.6). Cubren los casos
-del Apéndice B que corresponden a efectos: un antídoto aplicado antes del siguiente
-pulso evita todo el daño posterior, la vida regenerada nunca supera `vida_max`, y
-la regeneración se detiene cuando el enemigo muere. También que el veneno hace
-exactamente cinco pulsos y ni uno más, que la velocidad vuelve a su valor anterior
-al terminar el efecto, que terminar el efecto reprograma la acción pendiente con
-una secuencia nueva, y que una partida con varios efectos en curso sigue siendo
-reproducible con la misma semilla.
+`tests/test_effects.py`, 24 pruebas, todas pasan.
 
-Incluye además las dos pruebas de la bitácora inyectada, que comprueban que `Game`
-usa la estructura que recibe y que cualquier estructura con `append()` y recorrible
-funciona, incluida una con límite de capacidad.
+Cubren los casos del Apéndice B que tienen que ver con efectos: que un antídoto
+aplicado antes del siguiente pulso evita todo el daño posterior, que la vida regenerada
+nunca supera el máximo, y que la regeneración se corta cuando el enemigo muere.
+
+Además comprobamos que el veneno hace exactamente cinco pulsos y ni uno más, que la
+velocidad vuelve a su valor anterior cuando termina el efecto, que terminar el efecto
+reprograma la acción pendiente con una secuencia nueva, y que una partida con varios
+efectos encima sigue siendo reproducible con la misma semilla.
+
+Van ahí también las dos pruebas de la bitácora inyectada, que comprueban que `Game` usa
+la estructura que le pasan y que funciona con cualquier cosa que tenga `append()` y se
+pueda recorrer, incluida una con límite de capacidad.
 
 ---
 
 ## Actores, intervalos y cambios de velocidad
 
-**Estado:** implementado y probado con pruebas unitarias. No corresponde a un
-problema de §4; implementa las reglas de §2.2 y §2.3.
+Estado: implementado y probado. No es un problema del §4; implementa las reglas de §2.2
+y §2.3.
 
-### 1. Decisión: el `max(1, ...)` del intervalo es un requisito de terminación
+### El `max(1, ...)` del intervalo no es un adorno
 
-El intervalo de una acción es `max(1, costo * 100 // velocidad)` (§2.3). La
-división entera puede dar 0 cuando la velocidad es mucho mayor que el costo: con
-velocidad 10000 y una acción de costo 25, `2500 // 10000` es 0.
+El intervalo de una acción es `max(1, costo * 100 // velocidad)`. Esa división es
+entera, y puede dar cero cuando la velocidad es mucho más grande que el costo: con
+velocidad 10000 y una acción de costo 25, `2500 // 10000` da 0.
 
-Sin el `max(1, ...)`, ese actor quedaría programado para el mismo instante en que
-está actuando y volvería a actuar en ese instante indefinidamente, de modo que el
-reloj virtual no avanzaría nunca y el bucle principal no terminaría. El
-`max(1, ...)` garantiza que toda acción adelante el reloj al menos una unidad.
+Sin el `max(1, ...)`, ese actor quedaría programado para el mismo instante en que está
+actuando. Volvería a actuar en ese instante. Y otra vez. El reloj no avanzaría nunca y
+el bucle principal no terminaría. El mínimo de 1 garantiza que toda acción empuje el
+reloj por lo menos una unidad.
 
-Está cubierto por `test_interval_is_never_zero`.
+Lo fija `test_interval_is_never_zero`.
 
-### 2. Decisión: el límite de vida vive en el setter
+### El límite de vida vive en el setter
 
-`health` se expone como propiedad y su setter recorta el valor al rango
-`[0, max_health]`.
+`health` es una propiedad y su setter recorta el valor al rango `[0, max_health]`.
 
-El enunciado pide ese límite en dos lugares distintos del Apéndice B: la
-regeneración de un enemigo y la poción de curación. La alternativa era escribir
-el recorte en cada operación que modifica la vida, lo que repetiría la regla y
-dejaría abierta la posibilidad de olvidarla en una tercera operación futura, como
-un efecto nuevo. Con el recorte en el setter, la regla se cumple una sola vez y
-es imposible saltarla.
+El enunciado pide ese límite en dos lugares distintos del Apéndice B: la regeneración
+de un enemigo y la poción de curación. Podríamos haber escrito el recorte en cada
+operación que toca la vida, pero eso repite la regla y deja la puerta abierta a
+olvidarla en una tercera operación futura, como un efecto nuevo que todavía no
+existe. Poniéndola en el setter, la regla se escribe una vez y no hay forma de
+saltársela.
 
-La diferencia con el estilo de validación habitual es que aquí no se lanza
-`ValueError`: recortar es la regla del juego, no un error del programa. Donde sí
-se valida con `ValueError` es en `speed`, porque una velocidad de 0 haría fallar
-la división del intervalo, y en `max_health` y `actor_id`.
+Acá no lanzamos `ValueError`, a diferencia del resto de las validaciones, porque
+recortar es una regla del juego y no un error del programa. Donde sí lanzamos es en
+`speed`, porque una velocidad de cero haría fallar la división del intervalo, y en
+`max_health` y `actor_id`.
 
-### 3. Decisión: el actor calcula el reescalado, el motor reprograma
+### El actor calcula el reescalado, el motor reprograma
 
-`change_speed(current_time, new_speed)` aplica la fórmula de §2.3
-(`restante_nuevo = max(1, (tiempo_siguiente - t) * velocidad_anterior // velocidad_nueva)`),
-devuelve el instante reprogramado y recién entonces reemplaza la velocidad.
+`change_speed(current_time, new_speed)` aplica la fórmula de §2.3, devuelve el
+instante reprogramado y recién después reemplaza la velocidad.
 
-Se resolvió en un único método porque la fórmula necesita las dos velocidades a
-la vez. Si el cambio de velocidad y el cálculo fueran dos pasos separados, bastaría
-invertir el orden para que el resultado quedara mal sin producir ningún error
-visible. `test_rescale_uses_the_previous_speed_not_the_new_one` detecta
-precisamente esa inversión.
+Lo resolvimos en un solo método porque la fórmula necesita las dos velocidades al
+mismo tiempo, la vieja y la nueva. Si cambiar la velocidad y calcular fueran dos pasos
+separados, bastaría invertir el orden para que el resultado saliera mal sin que nada
+avisara. `test_rescale_uses_the_previous_speed_not_the_new_one` existe justamente para
+detectar esa inversión.
 
-El método **no modifica** el evento pendiente ni toca la agenda. Devuelve el
-instante y el motor cancela el evento anterior e inserta uno nuevo con un número
-de secuencia nuevo, como exige §2.3 y como requiere la agenda para no romper su
-propiedad de orden.
+El método no toca el evento pendiente ni la agenda. Devuelve el instante, y el motor se
+encarga de cancelar el viejo y meter uno nuevo con secuencia nueva, como exige §2.3 y
+como necesita el montículo para no romperse.
 
-### 4. Decisión: los costos de las acciones no viven en el actor
+### Los costos de las acciones no viven en el actor
 
-`Actor` solo convierte un costo en un intervalo según su velocidad. La tabla de
-costos de §2.3 es una propiedad de cada acción, no del actor, así que vive en el
-motor.
+`Actor` solo sabe convertir un costo en un intervalo según su velocidad. La tabla de
+costos de §2.3 es una propiedad de cada acción, no del actor, así que vive en el motor.
 
-### 5. Referencia al evento pendiente
+### La referencia al evento pendiente
 
-Cada actor guarda en `scheduled_event` la referencia a su evento programado. Como
-un actor tiene a lo sumo una acción pendiente a la vez, eso permite cancelarlo en
-O(1) cuando muere, sin recorrer la agenda, que es lo que exige §4.1.
+Cada actor guarda en `scheduled_event` la referencia a su acción programada. Como un
+actor tiene a lo sumo una pendiente a la vez, eso permite cancelarla en O(1) cuando
+muere, sin recorrer la agenda. Es lo que hace posible cumplir §4.1.
 
-### 6. Complejidad
+### Complejidad y pruebas
 
-Todas las operaciones son O(1) en tiempo y espacio.
+Todo acá es O(1) en tiempo y espacio.
 
-### 7. Pruebas realizadas
+`tests/test_actor.py`, 23 pruebas, todas pasan, agrupadas en intervalos, vida,
+validación y cambio de velocidad.
 
-`tests/test_actor.py`, 23 pruebas, todas pasan (Python 3.14.6), agrupadas en
-cuatro casos: intervalos, vida, validación y cambio de velocidad.
+Los intervalos los verificamos contra los números del propio enunciado: velocidad 150
+con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jugador de
+§2.13, moverse en 0, recoger en 100 y equipar en 125, produce 100, 125 y 175.
 
-Los intervalos se verifican contra los números del propio enunciado: velocidad
-150 con costo 100 da 66 (§2.4 y §2.13), y la secuencia del jugador de §2.13
-—moverse en 0, recoger en 100, equipar en 125— produce 100, 125 y 175.
+---
 
-Total del proyecto: 111 pruebas, todas pasan.
+## Resumen del estado de las pruebas
+
+| Archivo | Pruebas |
+| --- | ---: |
+| `tests/test_event_queue.py` | 18 |
+| `tests/test_game_state.py` | 20 |
+| `tests/test_actor.py` | 23 |
+| `tests/test_game.py` | 26 |
+| `tests/test_effects.py` | 24 |
+| **Total** | **111** |
+
+Todas pasan en Python 3.14.6. Se corren con
+`python -m unittest discover -s tests -t . -v` desde `cripta/`.
+
+Las mediciones se corren con `python -m benchmark.scheduler_bench` desde la misma
+carpeta.

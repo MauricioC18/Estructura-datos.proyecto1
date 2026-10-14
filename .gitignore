@@ -11,3 +11,6 @@ env/
 # Material de referencia del curso, no se sube al repositorio
 *.zip
 estructuras-de-datos-main/
+
+# Guia de estudio personal, no se sube
+cripta/docs/GUIA_DE_ESTUDIO.md
