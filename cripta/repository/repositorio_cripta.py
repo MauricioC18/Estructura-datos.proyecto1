@@ -14,14 +14,23 @@ Uso típico, desde el controlador
     criptas = repositorio.listar_criptas()           # para que el jugador elija
     datos = repositorio.iniciar_partida(id_elegido)  # deja lista la sala inicial
 
+    # Objetos del modelo, hechos por el Traductor (repository/traductor.py):
+    jugador = repositorio.crear_jugador()            # en la sala inicial
+    mapa = repositorio.crear_mapa()                  # salas y puertas compartidas
+    enemigos = repositorio.cargar_contenido_de_sala(mapa.room(datos.sala_inicial))
+
     # Antes de confirmar que el jugador entra a una sala (§2.5):
-    entrada = repositorio.preparar_entrada_a_sala(id_sala)
+    enemigos_nuevos = repositorio.cargar_contenido_de_sala(mapa.room(id_sala))
     # Después de cada acción del jugador:
     repositorio.despues_de_accion(id_sala_actual)
-    # Cuando un enemigo muere y suelta objetos:
-    repositorio.asegurar_fichas(ids_de_objetos_soltados)
+    # Para la función consultar_ids_en_uso de la caché (§4.4):
+    en_uso = repositorio.ids_en_uso(enemigos_vivos, objetos, trampas)
     # Al terminar la partida (§5.1):
     reporte = repositorio.reporte_de_red()
+
+    cargar_contenido_de_sala llama a preparar_entrada_a_sala, que deja
+    listas también las fichas de lo que sueltan los enemigos de la sala. Así,
+    cuando un enemigo muere, el motor solo pasa enemigo.drops al suelo.
 
 Arranque en frío y en caliente (cripta-01)
     En frío: lista + datos generales + versión del catálogo + página del
@@ -54,6 +63,7 @@ from adapters.almacen_fichas import AlmacenFichas, ErrorAlmacenDisco
 from adapters.fuente_datos import PresupuestoAgotado
 from structures.cache_catalogo import CAPACIDAD_POR_DEFECTO, CacheCatalogo
 from structures.grafo_salas import construir_grafo_desde_esqueleto
+from structures.lista_sin_repetidos import ListaSinRepetidos
 from structures.tabla_hash import TablaHash
 from repository.gestor_catalogo import FichaNoDisponible, GestorCatalogo
 from repository.gestor_contenido import (
@@ -62,6 +72,7 @@ from repository.gestor_contenido import (
     descargar_salas_del_esqueleto,
     tipos_de_la_sala,
 )
+from repository.traductor import NOMBRE_DEL_JUGADOR, Traductor
 
 
 class VersionesIncompatibles(Exception):
@@ -149,7 +160,10 @@ class RepositorioCripta:
         self._datos_de_partida = None
         self._gestor_contenido = None
         self._grafo = None
+        self._salas_del_esqueleto = None
         self._salas_por_id = None
+        self._traductor = None
+        self._enemigos_con_soltados_listos = None
         self._avisos = []
 
     # ------------------------------------------------------------------
@@ -193,6 +207,9 @@ class RepositorioCripta:
             self._intentar_en_disco(lambda: self._almacen_cripta.guardar_esqueleto(id_cripta, salas))
 
         self._grafo = construir_grafo_desde_esqueleto(salas)
+        self._salas_del_esqueleto = salas
+        self._traductor = Traductor(self.obtener_ficha)
+        self._enemigos_con_soltados_listos = ListaSinRepetidos()
         self._salas_por_id = TablaHash()
         for sala in salas:
             self._salas_por_id.insertar(sala["id"], sala)
@@ -219,8 +236,9 @@ class RepositorioCripta:
 
     def preparar_entrada_a_sala(self, id_sala):
         """Garantiza el contenido de la sala y las fichas de todo lo que hay
-        en ella. Se llama ANTES de confirmar que el jugador entra (§2.5).
-        Devuelve la entrada de contenido (el JSON del API).
+        en ella, incluidas las de lo que sueltan sus enemigos. Se llama ANTES
+        de confirmar que el jugador entra (§2.5). Devuelve la entrada de
+        contenido (el JSON del API).
 
         Si lanza PresupuestoAgotado, el movimiento debe rechazarse sin
         consumir tiempo (supuesto del grupo)."""
@@ -228,7 +246,45 @@ class RepositorioCripta:
         self._gestor_contenido.asegurar_contenido(id_sala)
         entrada = self._gestor_contenido.contenido_de_sala(id_sala)
         self._gestor_catalogo.asegurar_fichas(tipos_de_la_sala(entrada))
+        # Casi siempre ya llegaron con la precarga; si no, se piden ahora,
+        # antes de entrar, y no a mitad de un combate.
+        self._asegurar_lo_que_sueltan_los_enemigos([entrada])
         return entrada
+
+    # ------------------------------------------------------------------
+    # Objetos del modelo (Traductor)
+    # ------------------------------------------------------------------
+
+    def crear_jugador(self, nombre=NOMBRE_DEL_JUGADOR):
+        """Player con las estadísticas de la cripta, en la sala inicial."""
+        self._exigir_partida()
+        return self._traductor.crear_jugador(self._datos_de_partida, nombre)
+
+    def crear_mapa(self):
+        """RoomMap con todas las salas y sus puertas compartidas, sin contenido.
+        Los avisos de datos raros del esqueleto salen en el reporte final."""
+        self._exigir_partida()
+        return self._traductor.crear_mapa(self._salas_del_esqueleto)
+
+    def cargar_contenido_de_sala(self, sala):
+        """Prepara la entrada a la sala (puede usar la red) y la llena con sus
+        objetos y trampas. Devuelve sus enemigos, dormidos, para que el motor
+        los agregue a su lista; si la sala ya estaba cargada, devuelve [].
+
+        Puede lanzar PresupuestoAgotado: el movimiento se rechaza sin consumir
+        tiempo y la sala queda sin cargar, igual que antes de intentarlo."""
+        self._exigir_partida()
+        if sala.content_loaded:
+            return []
+        entrada = self.preparar_entrada_a_sala(sala.room_id)
+        return self._traductor.llenar_sala(sala, entrada)
+
+    def ids_en_uso(self, enemigos=(), objetos=(), trampas=()):
+        """TablaHash de ids de tipo en uso, para consultar_ids_en_uso (§4.4):
+        enemigos vivos (y lo que sueltan), objetos del inventario, equipados o
+        del suelo de la sala actual, y sus trampas."""
+        self._exigir_partida()
+        return self._traductor.ids_en_uso(enemigos, objetos, trampas)
 
     def despues_de_accion(self, id_sala_actual):
         """Precarga contenido y fichas alrededor del jugador. Se llama
@@ -303,6 +359,8 @@ class RepositorioCripta:
         reporte.lotes_de_catalogo = catalogo.lotes_de_catalogo_descargados
         reporte.desalojos_de_memoria = catalogo.desalojos_de_memoria
         reporte.avisos = list(catalogo.avisos) + list(self._avisos)
+        if self._traductor is not None:
+            reporte.avisos += self._traductor.avisos
 
         if self._gestor_contenido is not None:
             contenido = self._gestor_contenido.estadisticas()
@@ -318,18 +376,44 @@ class RepositorioCripta:
 
     def _precargar_fichas_cercanas(self, id_sala):
         """Asegura las fichas de la sala y de sus vecinas que ya tienen
-        contenido, si quedan más solicitudes que la reserva."""
+        contenido (y las de lo que sueltan sus enemigos), si quedan más
+        solicitudes que la reserva."""
         restantes = self._fuente.solicitudes_restantes()
         if restantes is not None and restantes <= RESERVA_DE_SOLICITUDES:
             return
+        entradas = []
         tipos = []
         for sala in [id_sala] + self._grafo.vecinos(id_sala):
             if self._gestor_contenido.tiene_contenido(sala):
-                tipos.extend(tipos_de_la_sala(self._gestor_contenido.contenido_de_sala(sala)))
+                entrada = self._gestor_contenido.contenido_de_sala(sala)
+                entradas.append(entrada)
+                tipos.extend(tipos_de_la_sala(entrada))
         try:
             self._gestor_catalogo.asegurar_fichas(tipos)
+            self._asegurar_lo_que_sueltan_los_enemigos(entradas)
         except (PresupuestoAgotado, FichaNoDisponible):
             pass  # es solo precarga: si hace falta de verdad, se reintentará al entrar
+
+    def _asegurar_lo_que_sueltan_los_enemigos(self, entradas):
+        """Asegura las fichas de lo que sueltan los enemigos de esas entradas
+        de contenido; las fichas de los enemigos ya deben estar disponibles.
+
+        Cada tipo de enemigo se revisa una sola vez por partida: después, lo
+        que suelta ya está en memoria o en disco. Así la precarga no relee
+        fichas en cada acción ni infla los aciertos del reporte."""
+        tipos_sin_revisar = ListaSinRepetidos()
+        for entrada in entradas:
+            for enemigo in entrada.get("enemigos") or []:
+                if not self._enemigos_con_soltados_listos.contiene(enemigo["tipo"]):
+                    tipos_sin_revisar.agregar(enemigo["tipo"])
+        if tipos_sin_revisar.cantidad() == 0:
+            return
+
+        self._gestor_catalogo.asegurar_fichas(
+            objetos_que_sueltan(tipos_sin_revisar.elementos, self._gestor_catalogo.obtener_ficha))
+        # Se marcan al final: si faltó presupuesto, se reintentará.
+        for id_tipo in tipos_sin_revisar.elementos:
+            self._enemigos_con_soltados_listos.agregar(id_tipo)
 
     def _preparar_copia_en_disco(self, generales):
         try:
@@ -350,6 +434,16 @@ class RepositorioCripta:
     def _exigir_partida(self):
         if self._datos_de_partida is None or self._gestor_contenido is None:
             raise RuntimeError("Primero hay que llamar a iniciar_partida()")
+
+
+def objetos_que_sueltan(tipos_de_enemigo, obtener_ficha):
+    """Ids de lo que sueltan esos tipos de enemigo (campo "suelta" de su
+    ficha), en orden y sin repetir."""
+    soltados = ListaSinRepetidos()
+    for id_tipo in tipos_de_enemigo:
+        for id_objeto in obtener_ficha(id_tipo).get("suelta") or []:
+            soltados.agregar(id_objeto)
+    return soltados.elementos
 
 
 def _comprobar_versiones(id_cripta, version_cripta, version_catalogo, versiones_requeridas):

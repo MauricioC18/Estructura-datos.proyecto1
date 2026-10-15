@@ -13,6 +13,10 @@ Cómo recorre la cripta
     sala actual. No aplica reglas del juego (puertas cerradas, enemigos):
     solo carga los datos que el juego necesitaría.
 
+    Usa el Traductor como lo hará el controlador: crea el jugador y el mapa
+    (salas y puertas) y llena cada sala antes de entrar, así que al final
+    muestra cuántos enemigos, objetos y trampas del modelo se crearon.
+
 Uso, desde la carpeta cripta/:
     python -m tools.simular_partida_bloque2
         con el API real y la caché en la carpeta cache_cripta
@@ -33,17 +37,9 @@ from adapters.fuente_datos import ErrorFuenteDatos
 from adapters.fuente_http import FuenteHttp
 from adapters.fuente_offline import FuenteOffline
 from structures.cache_catalogo import CAPACIDAD_POR_DEFECTO
-from repository.gestor_contenido import tipos_de_la_sala
 from repository.repositorio_cripta import RepositorioCripta
 
 CARPETA_DE_CACHE_POR_DEFECTO = "cache_cripta"
-
-
-def usar_fichas_de_la_sala(repositorio, entrada):
-    """Pide las fichas de todo lo que hay en la sala, como hará el juego
-    al crear sus enemigos, objetos y trampas."""
-    for tipo in tipos_de_la_sala(entrada):
-        repositorio.obtener_ficha(tipo)
 
 
 def simular_partida(repositorio, id_cripta=None, pasos=20, semilla=2026, mostrar=print):
@@ -56,22 +52,42 @@ def simular_partida(repositorio, id_cripta=None, pasos=20, semilla=2026, mostrar
     mostrar(f"Partida en {datos.id_cripta} (versión {datos.version_cripta}, "
             f"catálogo {datos.version_catalogo}), presupuesto {datos.presupuesto_solicitudes}")
 
+    jugador = repositorio.crear_jugador()
+    mapa = repositorio.crear_mapa()
+    enemigos = repositorio.cargar_contenido_de_sala(mapa.room(jugador.room_id))
+
     azar = random.Random(semilla)
-    actual = datos.sala_inicial
-    usar_fichas_de_la_sala(repositorio, repositorio.contenido_de_sala(actual))
-    recorrido = [actual]
+    recorrido = [jugador.room_id]
     for _ in range(pasos):
-        vecinas = repositorio.vecinos_de_sala(actual)
-        if not vecinas:
+        salidas = mapa.room(jugador.room_id).exits()
+        if not salidas:
             break
-        siguiente = azar.choice(vecinas)
-        entrada = repositorio.preparar_entrada_a_sala(siguiente)  # antes de confirmar la entrada
-        usar_fichas_de_la_sala(repositorio, entrada)
-        actual = siguiente
-        recorrido.append(actual)
-        repositorio.despues_de_accion(actual)           # después de la acción
+        siguiente = azar.choice(salidas).destination
+        # Antes de confirmar la entrada: puede usar la red.
+        enemigos.extend(repositorio.cargar_contenido_de_sala(mapa.room(siguiente)))
+        jugador.room_id = siguiente
+        recorrido.append(siguiente)
+        repositorio.despues_de_accion(siguiente)  # después de la acción
     mostrar("Recorrido: " + " → ".join(str(sala) for sala in recorrido))
+    mostrar(resumen_del_modelo(mapa, enemigos))
     return repositorio.reporte_de_red()
+
+
+def resumen_del_modelo(mapa, enemigos):
+    """Cuántos objetos del modelo creó el Traductor durante el recorrido."""
+    salas_cargadas = objetos = trampas = 0
+    for id_sala in mapa.room_ids():
+        sala = mapa.room(id_sala)
+        if sala.content_loaded:
+            salas_cargadas += 1
+            objetos += len(sala.floor_items)
+            trampas += len(sala.traps)
+    soltados = 0
+    for enemigo in enemigos:
+        soltados += len(enemigo.drops)
+    return (f"Modelo creado por el Traductor: salas {len(mapa)} (con contenido {salas_cargadas}), "
+            f"enemigos {len(enemigos)}, objetos en el suelo {objetos}, "
+            f"objetos que sueltan los enemigos {soltados}, trampas {trampas}")
 
 
 def main():

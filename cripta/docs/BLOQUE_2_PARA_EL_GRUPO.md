@@ -24,9 +24,11 @@ terminado.
 | Fichas: memoria → disco → API en lotes de 10 | `repository/gestor_catalogo.py` | Listo |
 | Contenido con precarga BFS | `repository/gestor_contenido.py` | Listo |
 | **Punto de entrada para el controlador** | `repository/repositorio_cripta.py` | Listo |
-| `Traductor` (JSON → objetos del modelo) | — | **Pendiente: necesita las clases de la persona 1** |
+| `Traductor` (JSON → objetos del modelo) | `repository/traductor.py` | Listo |
+| Clases del modelo que faltaban: sala, puerta, salida, mapa | `model/room.py` | Listo (revisar con la persona 1) |
+| Instancia de objeto y de trampa | `model/item.py`, `model/trap.py` | Listo (revisar con la persona 1) |
 
-Pruebas: 216 del bloque 2; con las del resto del grupo son 303 y todas pasan
+Pruebas: 286 del bloque 2; con las del resto del grupo son 373 y todas pasan
 (`python -m unittest discover -s tests -t .` desde `cripta/`). Conexión real con el API
 verificada. Las mediciones están en `docs/mediciones/bloque2/`.
 
@@ -37,7 +39,9 @@ sigue entre las decisiones pendientes del grupo (ARQUITECTURA, sección 9).
 
 Presupuesto medido con cripta-01 (presupuesto 9):
 - arranque en frío: **7 solicitudes** (lista, datos generales, versión del catálogo, 1 página,
-  1 lote de contenido con las 6 salas, 2 lotes de catálogo con las 11 fichas);
+  1 lote de contenido con las 6 salas, 2 lotes de catálogo con las 11 fichas). Las 7 ocurren
+  antes del primer movimiento, así que recorrer la cripta completa no hace esperar en ninguna
+  puerta;
 - arranque en caliente (copia en disco vigente): **3 solicitudes** (lista, datos generales,
   versión del catálogo).
 
@@ -69,22 +73,29 @@ datos = repositorio.iniciar_partida(id_elegido)
 # datos.sala_inicial, datos.sala_salida, datos.llave_salida, datos.inventario_max,
 # datos.presupuesto_solicitudes, datos.jugador (vida_max, ataque, defensa, velocidad)
 
+# Objetos del modelo (los crea el Traductor, sección 2.1):
+jugador = repositorio.crear_jugador()         # Player en la sala inicial
+mapa = repositorio.crear_mapa()               # RoomMap: salas con salidas y puertas compartidas
+enemigos = repositorio.cargar_contenido_de_sala(mapa.room(jugador.room_id))
+partida = Game(estado, jugador, enemigos)     # el motor guarda la lista plana de enemigos
+
 # Antes de confirmar que el jugador entra a una sala (§2.5):
 try:
-    entrada = repositorio.preparar_entrada_a_sala(id_destino)
+    nuevos = repositorio.cargar_contenido_de_sala(mapa.room(id_destino))
+    partida.enemies.extend(nuevos)            # llegan dormidos; el motor los activa (§2.4)
 except PresupuestoAgotado:
     ...  # rechazar el movimiento SIN consumir tiempo virtual (supuesto S1)
 
 # Después de cada acción del jugador (precarga contenido y fichas):
 repositorio.despues_de_accion(id_sala_actual)
 
-# Cuando un enemigo muere y suelta objetos:
-repositorio.asegurar_fichas(ids_de_los_objetos)
+# Cuando un enemigo muere: no hace falta la red. Sus objetos ya vienen creados.
+sala.floor_items.extend(enemigo.drops)
 
-# Datos que va a necesitar el Traductor / el modelo:
-repositorio.sala_del_esqueleto(id_sala)   # la sala con sus salidas (JSON del API)
-repositorio.contenido_de_sala(id_sala)    # enemigos, objetos y trampas (JSON del API)
-repositorio.obtener_ficha(id_tipo)        # ficha del catálogo (JSON del API); nunca usa la red
+# Si alguna vez hace falta el JSON del API sin traducir:
+repositorio.sala_del_esqueleto(id_sala)   # la sala con sus salidas
+repositorio.contenido_de_sala(id_sala)    # enemigos, objetos y trampas
+repositorio.obtener_ficha(id_tipo)        # ficha del catálogo; nunca usa la red
 repositorio.vecinos_de_sala(id_sala)      # ids vecinos en orden N, S, E, O
 
 # Al terminar (§5.1):
@@ -92,26 +103,55 @@ for linea in repositorio.reporte_de_red().lineas_de_texto():
     print(linea)
 ```
 
+### 2.1 Objetos del modelo que entrega el Traductor
+
+`repository/traductor.py` es el único archivo que conoce los nombres de los campos del API.
+El controlador no lo usa directamente: `RepositorioCripta` lo crea en `iniciar_partida` y
+ofrece `crear_jugador`, `crear_mapa`, `cargar_contenido_de_sala` e `ids_en_uso`.
+
+| Clase | Archivo | Qué trae |
+|---|---|---|
+| `Player` | `model/player.py` (persona 1) | Estadísticas de los datos generales, en la sala inicial. Id `"jugador"` |
+| `Enemy` | `model/enemy.py` (persona 1) | Estadísticas de su ficha; `behavior` ya convertido a `Enemy.GUARDIAN`, `WANDERER` o `TRACKER`; `drops` con los `Item` que suelta |
+| `RoomMap` | `model/room.py` | Todas las salas, buscables por id con `room(id)` (usa `TablaHash`) |
+| `Room` | `model/room.py` | `exit_towards("N")`, `exits()` en orden N, S, E, O, `floor_items`, `traps`, `content_loaded` |
+| `Exit` / `Door` | `model/room.py` | Salida: `direction`, `destination`, `door`. Puerta: `closed`, `key_id`, `auto_close`, `is_open` |
+| `Item` | `model/item.py` | `instance_id`, `type_id`, `name`, `item_class`, `weight`, `value`, `attack_bonus`, `defense_bonus`, `heal`, `speed_modifier`, `duration`, `opens` |
+| `Trap` | `model/trap.py` | `instance_id`, `type_id`, `name`, `damage`, `rearm_interval` (300 si falta), `room_id`, `armed` |
+
+Acuerdos que salen de cómo están hechas:
+- **Una sola puerta por paso** (S9): el mismo objeto `Door` aparece en las dos salas, así que
+  abrirla desde un lado se ve desde el otro. Las reglas (abrir con llave, cierre automático)
+  las aplica el motor.
+- **Los enemigos no se guardan en `Room`**: llegan dormidos y el motor los agrega a su lista
+  plana (`Game.enemies`), cada uno con su `room_id`, porque se mueven entre salas.
+- **Lo que suelta un enemigo ya viene creado** en `enemigo.drops`. Las fichas de esos objetos
+  se aseguran antes de entrar a la sala (normalmente con la precarga), nunca a mitad de un
+  combate.
+- **`Item` es plana**, como `Event`: los campos que no aplican a una clase valen 0 o `None`.
+  Así el guardado binario (§4.10) la empaqueta igual para todas las clases. `attack_bonus` y
+  `defense_bonus` son los nombres que `Player` ya usa por duck typing.
+- **El modelo nunca compara contra textos del API**: el Traductor convierte `"guardián"` a
+  `Enemy.GUARDIAN`. Un comportamiento desconocido es un error de datos (`ErrorDatosCripta`).
+- Datos raros del esqueleto (salida a una sala inexistente, llaves distintas en cada lado de
+  una puerta) no detienen el juego: se resuelven según S9 y aparecen como aviso en el reporte.
+
 ### La función `consultar_ids_en_uso`
 
 La caché no puede liberar una ficha "en uso" (§4.4). El controlador le entrega al repositorio
-una función sin argumentos que devuelve una `TablaHash` con los **ids de tipo** en uso:
-
-- tipos de los enemigos vivos (persona 1);
-- tipos de los objetos del inventario (persona 3);
-- tipos de los objetos y trampas del suelo de la sala actual (persona 1).
+una función sin argumentos que devuelve una `TablaHash` con los **ids de tipo** en uso. El
+repositorio ya la arma con `ids_en_uso`; el controlador solo le pasa los objetos del modelo:
 
 ```python
-from structures.tabla_hash import TablaHash
-
 def consultar_ids_en_uso():
-    en_uso = TablaHash()
-    for tipo in tipos_en_uso_del_modelo():   # lo arma el controlador con datos del modelo
-        en_uso.insertar(tipo, True)
-    return en_uso
+    sala = mapa.room(jugador.room_id)
+    objetos = inventario_y_equipo() + sala.floor_items   # Item (persona 3 y persona 1)
+    return repositorio.ids_en_uso(partida.enemies, objetos, sala.traps)
 ```
 
-Solo se llama cuando la caché necesita liberar algo, que es poco frecuente.
+Cuenta los enemigos vivos (y lo que sueltan), los objetos y las trampas. Solo se llama cuando
+la caché necesita liberar algo, que es poco frecuente. Como el repositorio se crea antes que
+el mapa, la función puede devolver una `TablaHash()` vacía mientras la partida no haya empezado.
 
 ### `--replay` (§4.11)
 
@@ -138,30 +178,35 @@ y `benchmark.bench_precarga_contenido`.
 | `ErrorFuenteDatos` | `adapters.fuente_datos` | Mostrar el mensaje (ya dice qué operación falló) |
 | `VersionesIncompatibles` | `repository.repositorio_cripta` | En `--replay`: mostrar el mensaje y no reproducir |
 | `FichaNoDisponible`, `ContenidoNoDisponible` | `repository.gestor_*` | Error de datos del API o de uso; mostrar el mensaje |
+| `ErrorDatosCripta` | `repository.traductor` | El API mandó datos que no se pueden convertir al modelo; mostrar el mensaje |
 
 ---
 
 ## 3. Lo que el bloque 2 necesita de cada integrante
 
 ### Persona 1 (motor)
-1. **Las clases que faltan del modelo**: sala y puerta/salida (`model/room.py`), objeto en el
-   suelo y trampa. `Player` y `Enemy` ya existen, así que la parte del `Traductor` que crea al
-   jugador y a los enemigos ya se puede escribir; el resto espera esas clases.
-2. **Los tipos en uso del motor**: enemigos vivos y objetos y trampas del suelo de la sala actual.
-3. Revisar los supuestos S9 a S15 (sección 5), que afectan al motor. El mecanismo para
-   rechazar una acción sin consumir tiempo ya existe (`ActionResult`); cuando exista `move()`,
-   deberá usarlo si el repositorio lanza `PresupuestoAgotado` (S1).
-4. Tres detalles del modelo actual frente a los datos reales del API:
-   - `Enemy.GUARDIAN` vale `"guardian"`, pero el API envía `"guardián"` con tilde (verificado
-     en el esquema del API y en los datos de `cripta-01`). Si `decide_action()` compara con esa
-     constante, un guardián real no se reconocería. `"errante"` y `"rastreador"` coinciden.
+1. **Revisar las clases nuevas del modelo** (`model/room.py`, `model/item.py`,
+   `model/trap.py`). Las hizo el bloque 2 para poder terminar el Traductor y siguen el estilo
+   de `Actor` y `Event` (nombres en inglés, sin reglas del juego). No se modificó ningún
+   archivo existente del modelo. Si en tu rama ya tienes tu propio `room.py`, avísame para
+   unificar antes de fusionar.
+2. **Usar `cargar_contenido_de_sala` en `move()`**: si lanza `PresupuestoAgotado`, el movimiento
+   se rechaza con `ActionResult` sin consumir tiempo (S1). Los enemigos que devuelve van a
+   `Game.enemies`; al morir uno, sus `drops` pasan a `floor_items` de su sala.
+3. Revisar los supuestos S9 a S15 (sección 5), que afectan al motor.
+4. Detalles del modelo frente a los datos reales del API (ya resueltos en el Traductor):
+   - `Enemy.GUARDIAN` vale `"guardian"` y el API envía `"guardián"` con tilde. El Traductor
+     convierte el texto del API a la constante, así que `decide_action()` puede comparar con
+     `Enemy.GUARDIAN` sin problema. No hay que cambiar `Enemy`.
    - `Enemy` acepta `regeneration`, pero las fichas del API no traen ningún campo de
-     regeneración (S13): con los datos actuales siempre será 0.
-   - `Player` usa `attack_bonus` y `defense_bonus`; el API envía `ataque_bonus` y
-     `defensa_bonus`. El `Traductor` hará esa conversión, así que no hay que cambiar `Player`.
+     regeneración (S13): el Traductor lo deja en 0.
+   - `Player` usa `attack_bonus` y `defense_bonus`; `Item` usa esos mismos nombres, así que
+     equipar un `Item` funciona sin cambiar `Player`.
 
 ### Persona 3 (inventario, retroceso, rastro, ordenamientos)
-1. **Los tipos de los objetos del inventario**, porque esas fichas también están en uso.
+1. **El inventario guarda objetos `Item`** (`model/item.py`): `weight` y `value` sirven para
+   el peso y los ordenamientos, `instance_id` distingue dos objetos del mismo tipo y `type_id`
+   es lo que se pasa a `ids_en_uso`.
 2. Coordinar §4.9: el enunciado menciona "listas auxiliares del catálogo" entre los contextos
    de ordenamiento. Hoy el índice de fichas se mantiene ordenado insertando cada id en su
    lugar, sin llamar a un algoritmo de ordenamiento. Hay que decidir si ese contexto lo cubre
@@ -171,8 +216,8 @@ y `benchmark.bench_precarga_contenido`.
 
 ### Persona 4 (MVC, interfaz, replay, bench)
 1. Integrar `RepositorioCripta` como muestra la sección 2.
-2. Pasar `--offline` y `--cache-size`, y armar `consultar_ids_en_uso` con lo que entreguen
-   las personas 1 y 3.
+2. Pasar `--offline` y `--cache-size`, y armar `consultar_ids_en_uso` con
+   `repositorio.ids_en_uso(...)` (sección 2.1).
 3. Usar `versiones_de_la_partida()` y `versiones_requeridas` en `--replay`.
 4. Incluir en `--bench` el `run()` de los cuatro benchmarks del bloque 2.
 
@@ -180,8 +225,8 @@ y `benchmark.bench_precarga_contenido`.
 
 ## 4. Contrato de datos (lo que entrega el API)
 
-El repositorio entrega el JSON del API tal cual. El `Traductor` lo convertirá en objetos del
-modelo aplicando estos valores por defecto. Los campos marcados "puede faltar" pueden no venir
+Este es el JSON que llega del API. El `Traductor` lo convierte en objetos del modelo
+aplicando estos valores por defecto. Los campos marcados "puede faltar" pueden no venir
 o venir en `null`.
 
 **Datos generales** (`DatosDePartida`): `id`, `version`, `salas_total`, `paginas`,
@@ -279,7 +324,7 @@ el Documento de Decisiones.
 Desde la carpeta `cripta/`:
 
 ```
-python -m unittest discover -s tests -t .                     # 303 pruebas (216 del bloque 2)
+python -m unittest discover -s tests -t .                     # 373 pruebas (286 del bloque 2)
 python -m tools.simular_partida_bloque2 --borrar-cache        # recorrido contra el API real, en frío
 python -m tools.simular_partida_bloque2                       # otra vez: arranque en caliente
 python -m tools.simular_partida_bloque2 --offline datos_offline
