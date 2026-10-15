@@ -244,6 +244,58 @@ Se detectó que el Traductor no lee ningún campo de regeneración de la ficha d
 
 Cambios realizados por el estudiante: [Indicar qué se comunicó a la Persona 2 sobre la regeneración y qué se acordó.]
 
+### 3.14 Movimiento, puertas, trampas y comportamiento errante
+
+Fecha: 2026-10-15
+
+Objetivo: Implementar lo que al motor le faltaba del enunciado una vez disponibles las clases de sala del bloque 2.
+
+Prompts utilizados:
+
+- "sigamos con el movimiento y las puertas, ya que es creo que lo más importante de momento que nos falta. Y ya sabemos cómo hacerlo."
+- Después, la indicación de continuar con el comportamiento errante y con los objetos que sueltan los enemigos al morir.
+
+Uso en el proyecto: Se implementaron `move()` y `open_door()`, las trampas al entrar a una sala y su rearme, el cierre automático de puertas, la condición de victoria, el comportamiento errante y el paso de los objetos de un enemigo muerto al suelo de su sala.
+
+Jugando la cripta real apareció un error que las pruebas unitarias no habían detectado: el motor comparaba el campo `abre` de la llave contra la llave que pide la puerta, y con los datos reales nunca coincide. §2.7 dice que la coincidencia es contra el id de la ficha. Las pruebas pasaban porque construían la llave con el mismo malentendido que el código.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó y qué se decidió.]
+
+### 3.15 Revisión de la rama de la Persona 4 y coordinación con el grupo
+
+Fecha: 2026-10-15
+
+Objetivo: Revisar el controlador, la vista y la bitácora de reproducción antes de integrarlos, y preparar lo que hay que pedirle al resto del grupo.
+
+Prompts utilizados:
+
+- "Revisemos la rama de mi compañero, de la persona 4, y no hagamos lo del rastro, ya que prefiero esperar a los demás."
+- "dame todo lo que falta de mi módulo, lo que me faltaría a mí por trabajar, sepáralo por lo que no depende de mí y por lo que depende de mí."
+
+Uso en el proyecto: Se fusionaron las tres ramas en una rama temporal, se comprobó que no hay conflictos y se jugó la cripta real a través de su controlador, grabando la bitácora de reproducción y reproduciéndola después; la reproducción dio exactamente la misma partida.
+
+Aparecieron dos errores, los dos del motor y no de su código: escribir cualquiera de los siete comandos que dependen del inventario terminaba el programa con `AttributeError`, y al entrar a una sala con trampa el mensaje del daño se anotaba antes que el de la entrada. Se corrigieron ambos.
+
+Se redactaron además los mensajes de coordinación para la Persona 3 y la Persona 4.
+
+Cambios realizados por el estudiante: [Indicar qué se comunicó al grupo y qué se acordó.]
+
+### 3.16 Nueva medición del presupuesto de procesamiento
+
+Fecha: 2026-10-15
+
+Objetivo: Rehacer la medición de §5.2 con un escenario que recorra una cripta de verdad.
+
+Prompts utilizados:
+
+- "volvamos a medir y hagamos las frecuencias para después subir esto y de momento no revisemos nada, debido a que faltan cosas y siento que es pérdida de tiempo."
+
+Uso en el proyecto: La medición anterior era insuficiente, porque el jugador solo esperaba y los enemigos eran guardianes quietos, sin salas ni trampas ni puertas. El escenario nuevo recorre una cripta en línea con trampas que se rearman, puertas que se cierran solas y enemigos errantes. Se comprobó que ejercita lo que declara contando las activaciones reales.
+
+De los datos salió una conclusión que antes no se podía sacar: lo que llena la agenda es la cantidad de enemigos activos y no el tamaño de la cripta, lo que responde directamente a una de las preguntas de orientación del enunciado.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó de las mediciones.]
+
 ## 4. Revisión de interfaces existentes y contrato de la Persona 4
 
 Herramienta: Claude (Claude Sonnet 5.5), mediante la interfaz de chat de claude.ai
