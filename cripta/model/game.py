@@ -37,6 +37,9 @@ IN_PROGRESS = "en_curso"
 VICTORY = "victoria"
 DEFEAT = "derrota"
 
+INVENTORY = "el inventario"
+REVERSIBLE_HISTORY = "el historial reversible"
+
 
 @dataclass
 class ActionResult:
@@ -181,10 +184,10 @@ class Game:
         self.player.room_id = destination.room_id
         self._activate_enemies_in(destination.room_id)
         message = f"Entras a {destination.name}."
+        self._log(message)
 
         if destination.room_id == self.exit_room_id:
             self.result = VICTORY
-            self._log(message)
             self._log("Has encontrado la salida de la cripta.")
             self.player_actions += 1
 
@@ -193,12 +196,11 @@ class Game:
         self._trigger_traps(destination)
 
         if self.is_over:
-            self._log(message)
             self.player_actions += 1
 
             return ActionResult(True, message)
 
-        return self._player_acts(MOVE_COST, message)
+        return self._finish_player_action(MOVE_COST, message)
 
     def open_door(self, direction):
         """Abre la puerta de esa salida si el jugador tiene la llave (§2.5).
@@ -235,6 +237,27 @@ class Game:
             )
 
         return self._player_acts(OPEN_DOOR_COST, message)
+
+    def pick_up(self, floor_index):
+        return self._not_available_yet("recoger objetos", INVENTORY)
+
+    def drop(self):
+        return self._not_available_yet("soltar objetos", INVENTORY)
+
+    def use_item(self):
+        return self._not_available_yet("usar objetos", INVENTORY)
+
+    def equip_item(self):
+        return self._not_available_yet("equipar objetos", INVENTORY)
+
+    def inventory_next(self):
+        return self._not_available_yet("recorrer el inventario", INVENTORY)
+
+    def inventory_previous(self):
+        return self._not_available_yet("recorrer el inventario", INVENTORY)
+
+    def rewind(self):
+        return self._not_available_yet("usar un pergamino", REVERSIBLE_HISTORY)
 
     def apply_poison(self, target, damage):
         """Programa de una vez todas las activaciones del veneno (seccion 2.10).
@@ -366,8 +389,18 @@ class Game:
         )
 
     def _player_acts(self, cost, message):
-        self.player_actions += 1
         self._log(message)
+
+        return self._finish_player_action(cost, message)
+
+    def _finish_player_action(self, cost, message):
+        """Programa la siguiente accion del jugador y corre el ciclo.
+
+        Esta separado de _player_acts porque moverse anota su mensaje antes de
+        disparar las trampas, para que el jugador lea primero que entro a la
+        sala y despues lo que le paso adentro.
+        """
+        self.player_actions += 1
         self._schedule(
             self.player,
             self.player.next_time_after(self.state.clock, cost),
@@ -518,6 +551,20 @@ class Game:
 
     def _game_already_ended(self):
         return ActionResult(False, "La partida ya termino.")
+
+    def _not_available_yet(self, what, missing_module):
+        """Rechazo de una accion que el motor todavia no puede ejecutar.
+
+        No es un rechazo por una regla del juego: la accion existe en el
+        enunciado y falta la estructura de otro integrante. Se devuelve un
+        rechazo en lugar de dejar que el controlador reviente, y como toda
+        accion rechazada no consume tiempo ni se registra en la bitacora de
+        reproduccion. Al llegar la estructura se reemplaza el cuerpo del
+        metodo y la interfaz no cambia.
+        """
+        return ActionResult(
+            False, f"Todavia no se puede {what}: falta {missing_module}."
+        )
 
     def _exit_towards(self, direction):
         """Devuelve (rechazo, salida). Uno de los dos es siempre None."""

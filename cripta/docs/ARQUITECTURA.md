@@ -325,6 +325,8 @@ Acuerdos que esta interfaz impone al resto del modelo:
 
 `rewind()` no consume tiempo virtual y no cuenta como acción del jugador (§2.11).
 
+**Los once métodos existen y se pueden llamar.** Los siete que dependen del inventario y del historial reversible todavía no hacen nada: devuelven un `ActionResult` rechazado que dice qué estructura falta, por ejemplo "Todavía no se puede soltar objetos: falta el inventario". Así el controlador despacha los once comandos del enunciado sin que el programa se caiga. Cuando lleguen esas estructuras se reemplaza el cuerpo de cada método y esta interfaz no cambia.
+
 **La partida terminada rechaza todo.** `Game.is_over` es `True` cuando el resultado ya no es "en curso". Toda acción pública lo revisa como primera línea, antes de validar cualquier otra cosa, y devuelve un `ActionResult` rechazado sin tocar nada. Las acciones que falten deben seguir el mismo patrón.
 
 **Resultado de una acción.** Toda acción devuelve un `ActionResult` con `accepted` y `message`. Una acción rechazada no consume tiempo virtual, no modifica el estado y no consulta el generador aleatorio. Los casos de rechazo están en el Apéndice B del enunciado: recoger con el inventario lleno, abrir una puerta sin la llave correcta, moverse hacia una salida que no existe o está cerrada, atacar a un enemigo que no está en la sala.

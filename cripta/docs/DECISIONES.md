@@ -539,6 +539,29 @@ La prueba `test_the_key_matches_by_its_type_id_and_not_by_opens` construye la ll
 un `opens` que a propósito no coincide, igual que en los datos reales, para que el
 error no pueda volver.
 
+### Las acciones que dependen de otro integrante rechazan, no revientan
+
+El controlador de la Persona 4 despacha los once comandos del enunciado, incluidos
+`recoger`, `soltar`, `usar`, `equipar`, recorrer el inventario y el pergamino. Siete de
+esos métodos no existían todavía en `Game`, porque dependen del inventario y del
+historial reversible de la Persona 3, así que escribir "soltar" terminaba el programa
+con `AttributeError`.
+
+No era un error de su controlador: programó contra el contrato acordado. El hueco era
+nuestro. Ahora esos siete métodos existen y devuelven un `ActionResult` rechazado que
+dice qué falta, por ejemplo "Todavía no se puede soltar objetos: falta el inventario".
+
+Es un rechazo distinto de los del Apéndice B: ahí la acción existe y el juego la
+prohíbe, acá la acción es válida y el programa todavía no sabe hacerla. Se eligió
+rechazar y no lanzar una excepción por dos razones. El enunciado pide que los errores
+se reporten con contexto y no que terminen el programa, y una acción rechazada ya tiene
+la semántica correcta para este caso: no consume tiempo, no cambia el estado, no
+consulta el azar y no se registra en la bitácora de reproducción, de modo que una
+partida reproducida no se ve afectada.
+
+Cuando lleguen esas estructuras solo se reemplaza el cuerpo de cada método y la interfaz
+no cambia.
+
 ### El enemigo decide, el motor ejecuta
 
 `decide_action()` devuelve el par `(acción, salida)`, y la salida solo viene cuando la
@@ -911,12 +934,12 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_event_queue.py` | 18 |
 | `tests/test_game_state.py` | 20 |
 | `tests/test_actor.py` | 23 |
-| `tests/test_game.py` | 31 |
+| `tests/test_game.py` | 36 |
 | `tests/test_effects.py` | 33 |
-| `tests/test_movement.py` | 45 |
-| **Total del motor** | **170** |
+| `tests/test_movement.py` | 47 |
+| **Total del motor** | **177** |
 
-Con las del bloque 2 integradas, el proyecto tiene 456 pruebas y todas pasan en
+Con las del bloque 2 integradas, el proyecto tiene 463 pruebas y todas pasan en
 Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
 `cripta/`, con las dependencias de `requirements.txt` instaladas.
 

@@ -688,5 +688,36 @@ class TestEnemyDrops(unittest.TestCase):
         self.assertIn(loot, room_map.room(1).floor_items)
 
 
+
+class TestMessageOrder(unittest.TestCase):
+
+    def test_entering_is_announced_before_the_trap_fires(self):
+        room_map, _ = make_map()
+        room_map.room(2).traps.append(make_trap(damage=4))
+        game = make_game(room_map)
+
+        game.move("N")
+
+        entered = game.messages.index("Entras a Pasillo de las urnas.")
+        trap = next(
+            index
+            for index, text in enumerate(game.messages)
+            if "Dardos" in text
+        )
+
+        self.assertLess(entered, trap)
+
+    def test_entering_is_announced_before_winning(self):
+        room_map, _ = make_map()
+        game = make_game(room_map, exit_room_id=2)
+
+        game.move("N")
+
+        entered = game.messages.index("Entras a Pasillo de las urnas.")
+        won = game.messages.index("Has encontrado la salida de la cripta.")
+
+        self.assertLess(entered, won)
+
+
 if __name__ == "__main__":
     unittest.main()

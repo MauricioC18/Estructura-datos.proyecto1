@@ -364,5 +364,62 @@ class TestCounters(unittest.TestCase):
         self.assertIs(agenda.peek(), game.enemies[0].scheduled_event)
 
 
+
+class TestActionsThatNeedAnotherModule(unittest.TestCase):
+
+    def setUp(self):
+        self.game = make_game(enemies=[make_enemy()])
+
+    def pending_actions(self):
+        return (
+            ("pick_up", lambda: self.game.pick_up(0)),
+            ("drop", self.game.drop),
+            ("use_item", self.game.use_item),
+            ("equip_item", self.game.equip_item),
+            ("inventory_next", self.game.inventory_next),
+            ("inventory_previous", self.game.inventory_previous),
+            ("rewind", self.game.rewind),
+        )
+
+    def test_they_answer_instead_of_crashing(self):
+        for name, action in self.pending_actions():
+            with self.subTest(action=name):
+                result = action()
+
+                self.assertFalse(result.accepted)
+                self.assertIn("Todavia no se puede", result.message)
+
+    def test_they_consume_no_time(self):
+        for name, action in self.pending_actions():
+            with self.subTest(action=name):
+                clock_before = self.game.state.clock
+
+                action()
+
+                self.assertEqual(self.game.state.clock, clock_before)
+
+    def test_they_are_not_counted_as_player_actions(self):
+        for name, action in self.pending_actions():
+            with self.subTest(action=name):
+                actions_before = self.game.player_actions
+
+                action()
+
+                self.assertEqual(self.game.player_actions, actions_before)
+
+    def test_they_consume_no_randomness(self):
+        for name, action in self.pending_actions():
+            with self.subTest(action=name):
+                state_before = self.game.state.random_state()
+
+                action()
+
+                self.assertEqual(self.game.state.random_state(), state_before)
+
+    def test_the_message_names_the_missing_module(self):
+        self.assertIn("inventario", self.game.drop().message)
+        self.assertIn("historial reversible", self.game.rewind().message)
+
+
 if __name__ == "__main__":
     unittest.main()
