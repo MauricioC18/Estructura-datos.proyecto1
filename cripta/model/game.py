@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from model.effects import (
     ActiveEffect,
+    DOOR_CLOSE,
     POISON,
     POISON_DURATION,
     POISON_PULSE,
@@ -12,9 +13,12 @@ from model.effects import (
     SPEED_END,
     TORCH,
     TORCH_END,
+    TRAP_REARM,
 )
 from model.enemy import Enemy
 from model.event import Event
+from model.item import Item
+from model.room import DIRECTIONS
 from structures.event_queue import EventQueue
 
 
@@ -92,12 +96,16 @@ class Game:
         state,
         player,
         enemies=None,
+        room_map=None,
+        exit_room_id=None,
         message_log=None,
         event_queue=None,
     ):
         self.state = state
         self.player = player
         self.enemies = [] if enemies is None else list(enemies)
+        self.room_map = room_map
+        self.exit_room_id = exit_room_id
         self.events = EventQueue() if event_queue is None else event_queue
         self.messages = [] if message_log is None else message_log
         self.effects = []
@@ -140,6 +148,93 @@ class Game:
             message = f"{message} {target.name} muere."
 
         return self._player_acts(ATTACK_COST, message)
+
+    def move(self, direction):
+        """Mueve al jugador a la sala vecina en esa direccion (§2.5).
+
+        El contenido de la sala destino tiene que estar ya en memoria. El
+        modelo no sabe de donde sale: quien lo carga antes de llamar es el
+        controlador, con el repositorio del bloque 2 (§4.2 y §6).
+        """
+        if self.is_over:
+            return self._game_already_ended()
+
+        rejection, exit_ = self._exit_towards(direction)
+
+        if rejection is not None:
+            return rejection
+
+        if not exit_.door.is_open:
+            return ActionResult(
+                False, f"La puerta hacia {direction} esta cerrada."
+            )
+
+        destination = self.room_map.room(exit_.destination)
+
+        if not destination.content_loaded:
+            return ActionResult(
+                False,
+                f"El contenido de la sala {destination.room_id} todavia no esta "
+                "disponible.",
+            )
+
+        self.player.room_id = destination.room_id
+        self._activate_enemies_in(destination.room_id)
+        message = f"Entras a {destination.name}."
+
+        if destination.room_id == self.exit_room_id:
+            self.result = VICTORY
+            self._log(message)
+            self._log("Has encontrado la salida de la cripta.")
+            self.player_actions += 1
+
+            return ActionResult(True, message)
+
+        self._trigger_traps(destination)
+
+        if self.is_over:
+            self._log(message)
+            self.player_actions += 1
+
+            return ActionResult(True, message)
+
+        return self._player_acts(MOVE_COST, message)
+
+    def open_door(self, direction):
+        """Abre la puerta de esa salida si el jugador tiene la llave (§2.5).
+
+        La llave no se consume. Si la salida declara cierre automatico, se
+        programa el cierre para el intervalo que indica la cripta (§2.10).
+        """
+        if self.is_over:
+            return self._game_already_ended()
+
+        rejection, exit_ = self._exit_towards(direction)
+
+        if rejection is not None:
+            return rejection
+
+        door = exit_.door
+
+        if door.is_open:
+            return ActionResult(
+                False, f"La puerta hacia {direction} ya esta abierta."
+            )
+
+        if not self._player_has_key(door.key_id):
+            return ActionResult(
+                False, f"No tienes la llave de la puerta hacia {direction}."
+            )
+
+        door.closed = False
+        message = f"Abres la puerta hacia {direction}."
+
+        if door.auto_close is not None:
+            self._schedule_door_close(
+                self.player.room_id, direction, door.auto_close
+            )
+
+        return self._player_acts(OPEN_DOOR_COST, message)
 
     def apply_poison(self, target, damage):
         """Programa de una vez todas las activaciones del veneno (seccion 2.10).
@@ -324,9 +419,17 @@ class Game:
         elif event.event_type == TORCH_END:
             self.torch_lit = False
             self._log("La antorcha se apaga.")
+        elif event.event_type == DOOR_CLOSE:
+            self._close_door(event.room_id, event.direction)
+        elif event.event_type == TRAP_REARM:
+            self._rearm_trap(event.room_id, event.instance_id)
 
     def _run_enemy_turn(self, enemy):
-        action = enemy.decide_action(self.player)
+        action, chosen_exit = enemy.decide_action(
+            self.player,
+            self._room_of(enemy),
+            self.state.random_generator,
+        )
 
         if action == Enemy.ATTACK:
             damage = self._damage_from(enemy, self.player)
@@ -338,10 +441,19 @@ class Game:
                 return
 
             cost = ATTACK_COST
+        elif action == Enemy.MOVE:
+            enemy.room_id = chosen_exit.destination
+            cost = MOVE_COST
         else:
             cost = WAIT_COST
 
         self._schedule(enemy, enemy.next_time_after(self.state.clock, cost))
+
+    def _room_of(self, actor):
+        if self.room_map is None:
+            return None
+
+        return self.room_map.room(actor.room_id)
 
     def _check_death(self, actor):
         if actor.is_alive:
@@ -353,7 +465,17 @@ class Game:
             return
 
         self.enemies_defeated += 1
+        self._drop_what_it_carries(actor)
         self._remove_from_play(actor)
+
+    def _drop_what_it_carries(self, enemy):
+        """Los objetos que suelta un enemigo van al suelo de su sala (§2.6)."""
+        if not enemy.drops or self.room_map is None:
+            return
+
+        self.room_map.room(enemy.room_id).floor_items.extend(enemy.drops)
+        names = ", ".join(item.name for item in enemy.drops)
+        self._log(f"{enemy.name} suelta: {names}.")
 
     def _damage_from(self, attacker, defender):
         roll = self.state.random_generator.randint(0, 4)
@@ -370,13 +492,25 @@ class Game:
 
         return event
 
-    def _schedule_effect(self, event_type, actor, time, amount=None):
+    def _schedule_effect(
+        self,
+        event_type,
+        actor,
+        time,
+        amount=None,
+        room_id=None,
+        direction=None,
+        instance_id=None,
+    ):
         event = Event(
             time,
             self.state.next_sequence(),
             event_type,
             actor,
             amount=amount,
+            room_id=room_id,
+            direction=direction,
+            instance_id=instance_id,
         )
         self.events.push(event)
 
@@ -384,6 +518,90 @@ class Game:
 
     def _game_already_ended(self):
         return ActionResult(False, "La partida ya termino.")
+
+    def _exit_towards(self, direction):
+        """Devuelve (rechazo, salida). Uno de los dos es siempre None."""
+        if self.room_map is None:
+            return ActionResult(False, "La cripta todavia no esta cargada."), None
+
+        if direction not in DIRECTIONS:
+            return ActionResult(False, f"Direccion invalida: {direction}."), None
+
+        room = self.room_map.room(self.player.room_id)
+        exit_ = room.exit_towards(direction)
+
+        if exit_ is None:
+            return ActionResult(False, f"No hay salida hacia {direction}."), None
+
+        return None, exit_
+
+    def _player_has_key(self, key_id):
+        """La puerta declara el id de la ficha de la llave que la abre.
+
+        §2.7 dice que una llave abre las puertas cuya llave coincide con su id,
+        asi que se compara contra type_id y no contra el campo `abre` de la
+        ficha, que en los datos reales nombra la puerta y no la llave.
+        """
+        if key_id is None:
+            return True
+
+        if self.player.inventory is None:
+            return False
+
+        for item in self.player.inventory:
+            if item.item_class == Item.KEY and item.type_id == key_id:
+                return True
+
+        return False
+
+    def _trigger_traps(self, room):
+        """Activa las trampas armadas de la sala en la que entra el jugador.
+
+        Ocurre en el instante actual, justo despues de completar el movimiento
+        y antes de procesar el siguiente evento del reloj (§2.10).
+        """
+        for trap in room.traps:
+            if not trap.armed:
+                continue
+
+            trap.armed = False
+            self.player.take_damage(trap.damage)
+            self._log(f"{trap.name} te quita {trap.damage} de vida.")
+            self._schedule_effect(
+                TRAP_REARM,
+                None,
+                self.state.clock + trap.rearm_interval,
+                room_id=room.room_id,
+                instance_id=trap.instance_id,
+            )
+            self._check_death(self.player)
+
+            if self.is_over:
+                return
+
+    def _schedule_door_close(self, room_id, direction, interval):
+        return self._schedule_effect(
+            DOOR_CLOSE,
+            None,
+            self.state.clock + interval,
+            room_id=room_id,
+            direction=direction,
+        )
+
+    def _close_door(self, room_id, direction):
+        exit_ = self.room_map.room(room_id).exit_towards(direction)
+
+        if exit_ is None or exit_.door.closed:
+            return
+
+        exit_.door.closed = True
+        self._log(f"La puerta hacia {direction} se cierra sola.")
+
+    def _rearm_trap(self, room_id, instance_id):
+        for trap in self.room_map.room(room_id).traps:
+            if trap.instance_id == instance_id:
+                trap.armed = True
+                return
 
     def _end_previous_speed_effect(self, actor):
         for effect in self.effects:

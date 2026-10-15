@@ -509,6 +509,70 @@ actor que tiene enfrente.
 El equipo se trata por duck typing: sirve cualquier objeto que tenga `attack_bonus` o
 `defense_bonus`. Eso nos dejó probar el combate con equipo sin esperar al catálogo.
 
+### El motor no sale a buscar el contenido de una sala
+
+`move()` exige que el contenido de la sala destino ya esté en memoria y, si no lo está,
+rechaza el movimiento sin consumir tiempo. Lo comprueba con `Room.content_loaded`.
+
+El motor no puede pedirlo él mismo porque §6 dice que el modelo no conoce HTTP ni
+archivos. Quien lo carga es el controlador, antes de llamar a `move()`, con
+`RepositorioCripta.cargar_contenido_de_sala()`. Así se cumple la regla de §4.2 de que
+el jugador nunca quede en una sala cuyo contenido no se conoce, sin que el modelo sepa
+de dónde salieron los datos.
+
+### La llave se reconoce por el id de su ficha, no por su campo `abre`
+
+Esto lo encontramos probando contra los datos reales del API, y las pruebas unitarias
+no lo habían detectado porque tenían adentro el mismo malentendido que el código.
+
+La primera versión comparaba el campo `abre` de la llave contra la llave que pide la
+puerta. Con los datos reales no coincide nunca: la llave negra trae
+`abre: "puerta_salida"`, mientras que la puerta de la salida pide
+`llave: "itm_llave_negra"`. Son dos cosas distintas, el nombre de una puerta y el id de
+una ficha.
+
+§2.7 lo dice sin ambigüedad: una llave "permite abrir puertas cuya llave coincide con
+su id". O sea que hay que comparar contra el id de la ficha de la llave, que en el
+modelo es `Item.type_id`. El campo `abre` queda como información descriptiva.
+
+La prueba `test_the_key_matches_by_its_type_id_and_not_by_opens` construye la llave con
+un `opens` que a propósito no coincide, igual que en los datos reales, para que el
+error no pueda volver.
+
+### El enemigo decide, el motor ejecuta
+
+`decide_action()` devuelve el par `(acción, salida)`, y la salida solo viene cuando la
+acción es moverse. El enemigo recibe su sala y el generador aleatorio, pero no toca ni
+el reloj ni la agenda: quien cambia la sala del enemigo y programa su siguiente acción
+es el motor.
+
+El errante filtra las salidas por `door.is_open` antes de elegir, porque §2.5 dice que
+los enemigos no pueden abrir puertas cerradas. Si no queda ninguna abierta, espera con
+costo 100, como fija el Apéndice B.
+
+La elección sale de `GameState.random_generator`, el mismo generador con semilla que usa
+el combate, de modo que el recorrido de un errante es reproducible.
+
+Una prueba comprueba la regla **directamente sobre `decide_action()`**, con cien
+elecciones sobre una sala que tiene una salida abierta y otra cerrada, y verifica que
+nunca elige la cerrada. La versión anterior de esa prueba lo comprobaba jugando una
+partida y pasaba por la razón equivocada: el errante se movía a la sala del jugador en
+su primer turno y a partir de ahí atacaba en vez de moverse, así que nunca llegaba a
+probar la puerta cerrada.
+
+### La partida termina en el instante en que se gana o se pierde
+
+Cuando el jugador entra a la sala de salida, o cuando una trampa lo mata al entrar, la
+acción se ejecuta y se cuenta, pero el reloj no avanza el costo de esa acción ni se
+procesan los eventos que venían después.
+
+Es una interpretación declarada. El enunciado no dice qué pasa con el tiempo de la
+acción que termina la partida. Hacer avanzar el reloj otras 100 unidades obligaría a
+procesar los turnos de enemigos posteriores a una partida ya ganada, lo que no tiene
+sentido y hasta podría matar al jugador después de haber ganado. El tiempo final que
+§2.12 pide para la tabla de puntajes es entonces el instante en que se entró a la sala
+de salida.
+
 ### Una partida terminada no acepta más acciones
 
 Otro hallazgo de la revisión. Después de que el jugador moría, `wait()` y `attack()`
@@ -554,9 +618,13 @@ corresponde a `structures/circular_log.py`, que todavía no existe, así que la 
 provisional. `Game` ya la recibe desde afuera, así que cambiarla no va a requerir
 tocar el motor.
 
-El errante y el rastreador, por ahora, esperan. Sin salas no pueden mirar salidas ni
-rastros. Esperar es lo que §2.8 manda cuando no hay ninguna opción disponible, así que
-no está mal, pero está incompleto.
+De los tres comportamientos de §2.8 quedan dos listos. El rastreador sigue esperando el
+rastro del jugador, que le corresponde a la Persona 3, y mientras tanto espera, que es
+lo que §2.8 manda cuando no hay ninguna opción disponible.
+
+El rastro tampoco se refresca todavía. §2.9 y el Apéndice B piden que la sala del
+jugador registre el instante en cada acción, y eso se conectará cuando exista
+`structures/trail.py`.
 
 Los nombres de `behavior` ya están verificados. Eran una apuesta, porque el enunciado
 solo confirma `"rastreador"` en su ejemplo de catálogo, pero al integrar el bloque 2 se
@@ -573,8 +641,9 @@ la declare, así que hoy no se nota, pero §9 advierte que la revisión usa una 
 no hemos visto. Si esa cripta trae un enemigo con regeneración, no se curaría nunca y
 nada lo avisaría. Falta averiguar cómo se llama ese campo en el API.
 
-Y los objetos que suelta un enemigo al morir no se colocan en ningún lado, porque no
-existe el suelo de la sala.
+Los objetos que suelta un enemigo al morir ya se colocan en el suelo de la sala donde
+murió, como pide §2.6. Se verificó contra los datos reales: las dos ratas gigantes de
+la sala 2 de `cripta-01` dejan su poción menor junto a la daga que ya estaba ahí.
 
 ### Complejidad
 
@@ -844,10 +913,17 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_actor.py` | 23 |
 | `tests/test_game.py` | 31 |
 | `tests/test_effects.py` | 33 |
-| **Total** | **125** |
+| `tests/test_movement.py` | 45 |
+| **Total del motor** | **170** |
 
-Todas pasan en Python 3.14.6. Se corren con
-`python -m unittest discover -s tests -t . -v` desde `cripta/`.
+Con las del bloque 2 integradas, el proyecto tiene 456 pruebas y todas pasan en
+Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
+`cripta/`, con las dependencias de `requirements.txt` instaladas.
+
+El motor se probó además contra los datos reales de `cripta-01`: se recorre la cripta
+desde la sala inicial hasta la de salida, disparando la trampa de la sala 2, abriendo
+con la llave negra la puerta de la salida y terminando en victoria con el reloj en 350
+y cero solicitudes de red.
 
 Las mediciones se corren con `python -m benchmark.scheduler_bench` desde la misma
 carpeta.

@@ -287,7 +287,13 @@ Acuerdos que esta interfaz impone al resto del modelo:
 
 ### Interfaz de `Game` (implementada en parte)
 
-**Lo que ya funciona:** `wait()`, `attack(enemy_id)`, `visible_state()`, `change_actor_speed(actor, new_speed)` y el bucle de eventos completo, con el combate de §2.6 y el azar reproducible. El resto de los métodos de la tabla siguen pendientes de las salas y del inventario.
+**Lo que ya funciona:** `wait()`, `attack(enemy_id)`, `move(direction)`, `open_door(direction)`, `visible_state()`, `change_actor_speed(actor, new_speed)` y el bucle de eventos completo, con el combate de §2.6, las trampas y el cierre automático de puertas de §2.10, la victoria de §2.12 y el azar reproducible. Faltan las acciones de inventario y el pergamino, que dependen de la Persona 3.
+
+`Game` se construye ahora con `room_map` y `exit_room_id`. Sin `room_map` no hay movimiento: `move()` y `open_door()` se rechazan. `exit_room_id` sale de `DatosDePartida.sala_salida`.
+
+**El controlador carga el contenido antes de mover.** `move()` exige que la sala destino tenga `content_loaded` en verdadero y, si no, rechaza el movimiento sin consumir tiempo. El motor no puede pedirlo él mismo porque §6 le prohíbe conocer HTTP. El orden es: llamar a `RepositorioCripta.cargar_contenido_de_sala()` con la sala destino, agregar los enemigos que devuelve a `Game.enemies`, y recién entonces llamar a `move()`.
+
+**La llave se reconoce por `Item.type_id`**, que es el id de la ficha, y no por el campo `opens`. §2.7 dice que una llave abre las puertas cuya llave coincide con su id, y en los datos reales `opens` nombra la puerta, no la llave. El inventario solo tiene que ser recorrible: el motor itera `player.inventory` buscando un objeto de clase llave con el `type_id` que pide la puerta.
 
 `Game` se construye con un `GameState`, el `Player` y la lista de enemigos, y ya dentro del constructor programa la primera acción del jugador en el instante 0, activa los enemigos de la sala inicial según §2.4 y deja la partida esperando la primera decisión.
 
@@ -353,7 +359,11 @@ Ambas heredan de `Actor`.
 
 `Player` agrega `equipped_weapon`, `equipped_armor` e `inventory`, y sobrescribe `effective_attack` y `effective_defense` sumando los bonos del equipo (§2.7). El arma y la armadura se tratan por duck typing: basta con que el objeto tenga `attack_bonus` o `defense_bonus`, así que el catálogo puede entregar lo que quiera mientras respete esos nombres. `inventory` se asigna desde fuera, para que la estructura de inventario encaje sin modificar `Player`.
 
-`Enemy` agrega `behavior`, `drops`, `regeneration` e `is_active`, y expone `decide_action(player)`, que devuelve `Enemy.ATTACK` o `Enemy.WAIT` según §2.8. Compartir sala con el jugador tiene prioridad sobre el comportamiento. El guardián está completo; el errante y el rastreador esperan hasta que existan las salas y el rastro.
+`Enemy` agrega `behavior`, `drops`, `regeneration` e `is_active`, y expone `decide_action(player, room, random_generator)`, que devuelve el par `(acción, salida)` según §2.8. La acción es `Enemy.ATTACK`, `Enemy.WAIT` o `Enemy.MOVE`, y la salida solo viene con `MOVE`. Compartir sala con el jugador tiene prioridad sobre el comportamiento.
+
+El enemigo decide pero no ejecuta: quien cambia su `room_id` y programa su siguiente acción es el motor. El guardián y el errante están completos; el rastreador espera el rastro del jugador, que le corresponde a la Persona 3.
+
+Los objetos de `drops` pasan al `floor_items` de la sala donde el enemigo muere (§2.6), cosa que hace el motor.
 
 Los valores de `behavior` son los que entrega el catálogo. El enunciado solo confirma `"rastreador"` en su ejemplo, así que los nombres del guardián y del errante deben verificarse contra el servicio real antes de confiar en ellos.
 

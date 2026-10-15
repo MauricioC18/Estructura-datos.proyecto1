@@ -2,6 +2,8 @@ POISON_PULSE = "poison_pulse"
 REGENERATION_PULSE = "regeneration_pulse"
 SPEED_END = "speed_end"
 TORCH_END = "torch_end"
+DOOR_CLOSE = "door_close"
+TRAP_REARM = "trap_rearm"
 
 POISON_PULSE_INTERVAL = 80
 POISON_DURATION = 400
