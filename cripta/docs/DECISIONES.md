@@ -176,18 +176,22 @@ recorre decenas de miles de veces, que es justamente el que se está midiendo. `
 recibe la agenda desde fuera, de modo que la partida medida es idéntica a una normal
 salvo por los contadores.
 
-| | 5 enemigos | 50 enemigos | 500 enemigos, con combate |
-| --- | ---: | ---: | ---: |
-| Decisiones del jugador | 1 000 | 1 000 | 500 |
-| Eventos procesados | 11 081 | 101 756 | 189 310 |
-| Eventos por decisión | 11.1 | 101.8 | 378.6 |
-| Inserciones | 11 092 | 101 857 | 190 010 |
-| Extracciones | 11 081 | 101 756 | 189 310 |
-| Inserciones por extracción | 1.00 | 1.00 | 1.00 |
-| Cancelaciones | 0 | 0 | 750 |
-| Tamaño máximo de la agenda | 17 | 107 | 506 |
+Se midieron cinco escenarios. Los dos primeros son estáticos, con el jugador esperando
+en una sala; los dos del medio recorren una cripta de verdad, con movimiento, trampas y
+puertas; el último es una partida de combate donde el jugador mata 500 enemigos.
 
-Tres conclusiones.
+| | Estático, 5 | Estático, 50 | Recorrido, 6 salas | Recorrido, 40 salas | Combate, 500 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Decisiones del jugador | 1 000 | 1 000 | 1 000 | 1 000 | 500 |
+| Eventos procesados | 11 081 | 101 756 | 11 235 | 90 504 | 189 310 |
+| Eventos por decisión | 11.1 | 101.8 | 11.2 | 90.5 | 378.6 |
+| Inserciones | 11 092 | 101 857 | 11 247 | 90 607 | 190 010 |
+| Extracciones | 11 081 | 101 756 | 11 235 | 90 504 | 189 310 |
+| Inserciones por extracción | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| Cancelaciones | 0 | 0 | 0 | 0 | 750 |
+| Tamaño máximo de la agenda | 17 | 107 | 19 | 109 | 506 |
+
+Cuatro conclusiones.
 
 La cantidad de eventos por decisión del jugador crece en proporción directa con los
 enemigos activos, porque cada uno programa una acción cada vez que actúa. Con 50
@@ -195,12 +199,18 @@ enemigos ya son 102 eventos entre dos decisiones, de modo que la estimación de 
 cientos de eventos simultáneos" de §4.1 corresponde a una cripta con unas pocas decenas
 de enemigos activos a la vez, que no es nada raro.
 
-La proporción de 1.00 inserciones por extracción se mantiene en los tres escenarios.
+La proporción de 1.00 inserciones por extracción se mantiene en los cinco escenarios.
 Esa es la medición que respalda el descarte de la lista ordenada: no sirve abaratar la
 extracción si se paga en la inserción, porque ocurren la misma cantidad de veces.
 
-Las cancelaciones son raras. En los dos primeros escenarios no hay ninguna, porque
-nadie muere. En el tercero, donde el jugador mata 500 enemigos y además corta 50
+Lo que manda es la cantidad de enemigos activos, no el tamaño de la cripta. Las
+columnas tercera y cuarta recorren 6 y 40 salas, pero sus cifras son casi idénticas a
+las de los escenarios estáticos con la misma cantidad de enemigos. Moverse, abrir
+puertas y disparar trampas agrega eventos, pero son unos pocos por decisión; lo que
+llena la agenda son los actores que programan su siguiente acción.
+
+Las cancelaciones son raras. En los cuatro primeros escenarios no hay ninguna, porque
+nadie muere. En el de combate, donde el jugador mata 500 enemigos y además corta 50
 venenos con antídoto, hay 750 cancelaciones contra 189 310 eventos procesados: una cada
 252. Eso respalda lo que se dice más abajo sobre el costo en memoria de la eliminación
 diferida.
@@ -682,21 +692,38 @@ la sala 2 de `cripta-01` dejan su poción menor junto a la daga que ya estaba ah
 Medido con `benchmark/scheduler_bench.py` en Python 3.14.6 sobre Windows 11.
 
 §5.2 da 20 ms para resolver un ciclo completo de eventos entre dos decisiones del
-jugador, sin contar red ni dibujado en pantalla. Montamos una partida con 20 enemigos
-en la sala del jugador, todos más rápidos que él y con regeneración activa, más un
-veneno y una antorcha corriendo, y ejecutamos 2 000 decisiones.
+jugador, sin contar red ni dibujado en pantalla.
 
-| Medición | Resultado |
-| --- | --- |
-| 2 000 ciclos completos | 0.3409 s |
-| Por ciclo | 0.1705 ms |
-| Lo que permite §5.2 | 20 ms |
+La primera versión de esta medición era floja: el jugador solo esperaba, los enemigos
+eran guardianes que no se movían y no había ni salas ni trampas ni puertas. Daba
+0.1705 ms por ciclo, pero no probaba casi nada de lo que el motor hace.
 
-Estamos usando alrededor del 0.9 % del presupuesto. Queda margen de sobra para el
-movimiento, las puertas, las trampas y los comportamientos que faltan.
+El escenario actual recorre una cripta de verdad. El jugador camina de punta a punta y
+vuelve, cada sala tiene una trampa que se rearma, una de cada tres puertas está cerrada
+y se cierra sola después de abrirla, y los enemigos son errantes que se reparten por la
+cripta mientras el jugador la recorre. Además hay un veneno y una antorcha corriendo, y
+todos los enemigos tienen regeneración.
 
-Hay que volver a medir cuando eso exista, porque el escenario de hoy no incluye la
-decisión de un rastreador, que es la más cara de §2.8.
+Que el escenario ejercita lo que dice está comprobado: en la corrida de la cripta
+pequeña hubo 833 entradas a salas con sus 833 activaciones de trampa, 167 aperturas de
+puerta y 167 cierres automáticos.
+
+| | 6 salas, 5 errantes | 40 salas, 50 errantes |
+| --- | ---: | ---: |
+| Decisiones del jugador | 1 000 | 1 000 |
+| Eventos por decisión | 11.2 | 90.5 |
+| Tamaño máximo de la agenda | 19 | 109 |
+| **Tiempo por ciclo** | **0.0357 ms** | **0.3302 ms** |
+| Lo que permite §5.2 | 20 ms | 20 ms |
+
+En el caso grande usamos el 1.7 % del presupuesto. El margen sigue siendo enorme, pero
+conviene notar que el ciclo se volvió casi diez veces más caro al pasar de 5 a 50
+enemigos, y que el costo crece con la cantidad de enemigos activos y no con el tamaño
+de la cripta: lo que pesa es cuántos actores programan eventos, no cuántas salas hay.
+
+Falta una sola cosa por medir: la decisión de un rastreador, que es la más cara de §2.8
+porque examina las salas vecinas y consulta el rastro. Cuando exista hay que repetir
+esta medición.
 
 ### Pruebas
 

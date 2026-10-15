@@ -20,6 +20,8 @@ from model.event import Event
 from model.game import Game
 from model.game_state import GameState
 from model.player import Player
+from model.room import Door, Exit, Room, RoomMap
+from model.trap import Trap
 from structures.event_queue import EventQueue
 
 
@@ -221,6 +223,110 @@ def measure_operation_frequency(enemy_count, decisions, seed):
     return game, agenda
 
 
+def build_synthetic_crypt(room_count, trap_rearm=150, auto_close=400):
+    """Salas en linea, con trampas en todas y una puerta de cada tres cerrada.
+
+    Las puertas cerradas no piden llave, de modo que el jugador tiene que
+    abrirlas al pasar; como se cierran solas, vuelve a abrirlas en el viaje de
+    vuelta. Asi la medicion pasa por abrir puertas y por sus eventos de cierre.
+    """
+    rooms = []
+
+    for number in range(1, room_count + 1):
+        room = Room(number, f"Sala {number}")
+        room.content_loaded = True
+        room.traps.append(
+            Trap(
+                instance_id=f"t-{number}",
+                type_id="trp_dardos",
+                name="Dardos",
+                damage=1,
+                rearm_interval=trap_rearm,
+                room_id=number,
+            )
+        )
+        rooms.append(room)
+
+    for index in range(room_count - 1):
+        closed = index % 3 == 0
+        door = Door(
+            rooms[index].room_id,
+            rooms[index + 1].room_id,
+            closed=closed,
+            key_id=None,
+            auto_close=auto_close if closed else None,
+        )
+        rooms[index].add_exit(Exit("N", rooms[index + 1].room_id, door))
+        rooms[index + 1].add_exit(Exit("S", rooms[index].room_id, door))
+
+    room_map = RoomMap()
+
+    for room in rooms:
+        room_map.add(room)
+
+    return room_map
+
+
+def walk_the_crypt(game, target_actions):
+    """Camina de punta a punta de la cripta, abriendo lo que encuentre cerrado."""
+    direction = "N"
+
+    while game.player_actions < target_actions and not game.is_over:
+        if game.move(direction).accepted:
+            continue
+
+        if game.open_door(direction).accepted:
+            continue
+
+        direction = "S" if direction == "N" else "N"
+
+
+def measure_full_cycle(room_count, wanderers, decisions, seed):
+    """Mide el ciclo de eventos con todo lo que el motor hace hoy.
+
+    A diferencia del escenario anterior, el jugador se mueve de verdad, dispara
+    trampas que se rearman, abre puertas que se cierran solas, y los enemigos
+    errantes recorren la cripta en lugar de quedarse quietos.
+    """
+    room_map = build_synthetic_crypt(room_count)
+    player = Player("p-1", "Heroe", 100_000_000, 6, 100, 100, 1)
+    enemies = [
+        Enemy(
+            f"e-{index:04}",
+            "Errante",
+            1_000_000,
+            5,
+            1,
+            150,
+            1 + index % room_count,
+            Enemy.WANDERER,
+            regeneration=1,
+        )
+        for index in range(wanderers)
+    ]
+
+    agenda = CountingEventQueue()
+    game = Game(
+        GameState(seed=seed),
+        player,
+        enemies,
+        room_map=room_map,
+        event_queue=agenda,
+    )
+
+    for room_id in range(1, room_count + 1):
+        game._activate_enemies_in(room_id)
+
+    game.apply_poison(player, 1)
+    game.light_torch(100_000_000)
+
+    start = time.perf_counter()
+    walk_the_crypt(game, decisions)
+    elapsed = time.perf_counter() - start
+
+    return elapsed, game, agenda
+
+
 def measure_cancellation_frequency(enemy_count, seed):
     """Cuenta las cancelaciones de una partida con combate.
 
@@ -325,6 +431,24 @@ def main():
             agenda,
             FREQUENCY_DECISIONS,
         )
+
+    for label, rooms, wanderers in (
+        ("cripta pequena", 6, 5),
+        ("cripta grande", 40, 50),
+    ):
+        seconds, walk_game, walk_agenda = measure_full_cycle(
+            rooms, wanderers, FREQUENCY_DECISIONS, SEED
+        )
+        report_frequency(
+            f"Partida completa, {label} ({rooms} salas, {wanderers} errantes)",
+            walk_game,
+            walk_agenda,
+            walk_game.player_actions,
+        )
+        per_cycle = seconds / walk_game.player_actions * 1000
+        print(f"  Tiempo por ciclo                 {per_cycle:>12.4f} ms")
+        print(f"  Salas visitadas por el jugador   {walk_game.player_actions:>12,}")
+        print()
 
     combat_game, combat_agenda = measure_cancellation_frequency(500, SEED)
     report_frequency(
