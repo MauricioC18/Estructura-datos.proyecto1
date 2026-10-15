@@ -418,6 +418,22 @@ class PruebasRepositorioConElModelo(unittest.TestCase):
         texto = "\n".join(repositorio.reporte_de_red().lineas_de_texto())
         self.assertIn("42", texto)
 
+    def test_un_campo_nuevo_del_api_llega_al_reporte(self):
+        # Si el API agregara, por ejemplo, regeneración a la rata, el juego
+        # sigue y el reporte final lo dice (S13).
+        fichas = []
+        for ficha in FICHAS_CRIPTA_01:
+            if ficha["id"] == "ent_rata_gigante":
+                ficha = dict(ficha, regeneracion=2)
+            fichas.append(ficha)
+
+        repositorio, _, _, _, enemigos = self.jugar_con_el_modelo(FuenteCriptaFalsa(fichas=fichas),
+                                                                   recorrido=[2])
+
+        self.assertEqual(enemigos[0].regeneration, 0)
+        texto = "\n".join(repositorio.reporte_de_red().lineas_de_texto())
+        self.assertIn("Aviso: La ficha ent_rata_gigante trae el campo 'regeneracion'", texto)
+
     def test_hay_que_iniciar_la_partida(self):
         repositorio = RepositorioCripta(FuenteCriptaFalsa(), self.carpeta_cache)
         for operacion in (repositorio.crear_jugador, repositorio.crear_mapa, repositorio.ids_en_uso):

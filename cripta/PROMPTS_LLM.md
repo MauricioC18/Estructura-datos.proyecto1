@@ -603,7 +603,7 @@ Completo con clases propias (Recomendado)
 
 Uso en el proyecto: `repository/traductor.py`, `model/room.py`, `model/item.py`, `model/trap.py`, integración en `repository/repositorio_cripta.py` y `tools/simular_partida_bloque2.py`, pruebas en `tests/test_traductor.py`, `tests/test_room.py` y `tests/test_repositorio_cripta.py`, y actualización de `docs/BLOQUE_2_PARA_EL_GRUPO.md`, `docs/ARQUITECTURA.md` y `README.md`.
 
-Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+Cambios realizados por el estudiante:  Ante la pregunta de cómo hacer el Traductor, se eligió la opción completa con clases propias (`model/room.py`, `model/item.py`, `model/trap.py`), porque las clases de sala, objeto y trampa no existían en ninguna rama y sin ellas el Traductor quedaba a medias. Se aceptaron los acuerdos propuestos: una sola puerta compartida por cada paso entre dos salas, los enemigos fuera de `Room` (en la lista de `Game`), los objetos que suelta un enemigo creados de antemano y el comportamiento del API traducido a las constantes de `Enemy`. Antes de agregar los archivos se comprobó que la rama local estaba igual que la de GitHub (`git rev-parse HEAD^{tree}`), y después se verificaron las 373 pruebas y la simulación sin conexión. Los cambios se subieron en el commit 480e6d2 de la rama `Parte_2-API-cache-persistencia`.
 
 ### 6.27 Verificación del `Traductor` contra el API real
 
@@ -625,4 +625,38 @@ Adjuntos: Captura de Git Bash con el resultado de `git rev-parse HEAD^{tree}` y 
 
 Uso en el proyecto: Evidencia en `docs/mediciones/bloque2/presupuesto_api_real_2026-10-14.md` (segunda medición) y `docs/mediciones/bloque2/presupuesto_api_real_traductor_2026-10-14.png`.
 
-Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+Cambios realizados por el estudiante: Se ejecutó la simulación contra el API real con la caché borrada y después otra vez con la caché llena. Se obtuvieron 7 de 9 solicitudes en frío y 3 de 9 en caliente, y el Traductor creó 6 salas, 3 enemigos, 8 objetos en el suelo, 2 objetos que sueltan los enemigos y 1 trampa. También se verificaron las 373 pruebas. Se decidió guardar esta segunda medición como evidencia junto a la primera, en `docs/mediciones/bloque2/`. Se aclaró cuál de los archivos enviados correspondía al código y cuál a la documentación, y todo se subió en el mismo commit 480e6d2.
+
+### 6.28 Revisión del proyecto integrado y regeneración de enemigos
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-15
+
+Objetivo: Revisar el proyecto con las ramas de las personas 1, 2 y 4 unidas, comprobar que los bloques funcionen juntos y resolver la observación de la persona 1 sobre la regeneración de los enemigos.
+
+Prompts utilizados:
+
+```text
+(mensaje sin texto: solo la captura de pantalla con las 521 pruebas y la simulación offline en la rama de revisión)
+```
+
+Segundo mensaje, con el proyecto adjunto:
+
+```text
+Te adjunto el proyecto para que revises todos los archivos y me ayudes a contrastar que todo funcione bien junto, ademas, te pasare un mensaje de un companero sobre algo que hay que resolver para que una vez revisado el proyecto, hagas la revision del mensaje y poder resolverlo:
+
+El mensaje del companero:
+"La incongruencia que sí importa
+El traductor no lee ningún campo de regeneración. Tu motor la implementa completa y la activa sola cuando enemy.regeneration > 0, pero el traductor nunca llena ese campo, así que siempre llega en cero.
+
+En cripta-01 no hay ningún enemigo con regeneración, así que hoy no se nota. Pero §2.10 dice que un enemigo puede declararla, y §9 avisa que la revisión usa una cripta que nadie vio. Si esa cripta trae uno, no se va a curar nunca y nada lo va a avisar.
+
+No lo arreglé yo porque el traductor es su archivo y, sobre todo, porque no sabemos cómo se llama ese campo en el API. Hay que preguntárselo a él o encontrar una cripta publicada que lo traiga."
+```
+
+Adjuntos: Captura de PowerShell con las pruebas y la simulación en la rama `revision-integracion`, y el zip del repositorio completo en esa rama (con la carpeta `.git`).
+
+Uso en el proyecto: Revisión de la integración (pruebas, simulación y una partida de prueba que une los bloques 1, 2 y 4), verificación del contrato del API en `/openapi.json`, avisos de campos desconocidos en `repository/traductor.py` con sus pruebas, y actualización de S13 y de los pasos de integración para la persona 4 en `docs/BLOQUE_2_PARA_EL_GRUPO.md`.
+
+Cambios realizados por el estudiante: Se unieron en una rama local de revisión (`revision-integracion`) las ramas de las personas 1 y 4 con la del bloque 2, sin conflictos, y se comprobó que pasaban las 521 pruebas y la simulación sin conexión. Sobre la observación de la persona 1, se revisó la evidencia del contrato del API (`/openapi.json`, versión 1.0.0): el esquema `Enemy` es cerrado y no tiene ningún campo de regeneración. Por eso se decidió no adivinar el nombre de un campo y dejar `regeneration` en 0 (S13), agregando en el Traductor un aviso en el reporte final por si el API llega a enviar un campo que el programa no conoce. Los cambios se aplicaron en la rama `Parte_2-API-cache-persistencia` y no en la de revisión, y se verificaron las 380 pruebas antes de subirlos. Los problemas de integración que dependen de otros integrantes (cargar la sala desde el controlador, `main.py`, la vista y el bloque de la persona 3) se comunican al grupo en lugar de modificar sus archivos.

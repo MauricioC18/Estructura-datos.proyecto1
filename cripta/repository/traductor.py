@@ -21,10 +21,21 @@ Qué hace con los datos (supuestos de docs/BLOQUE_2_PARA_EL_GRUPO.md)
       las constantes de Enemy, así el modelo nunca compara contra textos del
       API. Los objetos de "suelta" se crean ya como Item, para que el motor
       solo tenga que pasarlos al suelo cuando el enemigo muere (§2.6).
+      La regeneración queda en 0 (S13): el contrato del API no tiene ningún
+      campo para declararla.
     - Objetos (S12): ids deterministas. En el suelo, "o-<sala>-<posición>";
       los que suelta un enemigo, "<instancia>-s<posición>".
     - Trampas: si la ficha no trae rearme, se usa el intervalo por defecto
       de §2.10 (300).
+
+Campos que el programa no conoce
+    Los esquemas del API (Swagger, /openapi.json) son cerrados: cada ficha,
+    colocación y salida solo puede traer los campos que declara su esquema
+    ("additionalProperties": false). Las tablas CAMPOS_* copian esos campos.
+    Si algún dato trae un campo que no está en ellas, el contrato cambió: el
+    campo se ignora y queda un aviso en el reporte final, una sola vez por
+    campo. Así un campo nuevo (por ejemplo, uno de regeneración) nunca se
+    pierde en silencio, y no hace falta adivinar su nombre.
 
 Qué no hace
     No pide nada a la red ni al disco: recibe la función obtener_ficha del
@@ -43,6 +54,7 @@ from model.item import Item
 from model.player import Player
 from model.room import DIRECTIONS, Door, Exit, Room, RoomMap
 from model.trap import DEFAULT_REARM_INTERVAL, Trap
+from structures.lista_sin_repetidos import ListaSinRepetidos
 from structures.tabla_hash import TablaHash
 
 ID_DEL_JUGADOR = "jugador"
@@ -61,6 +73,25 @@ COMPORTAMIENTOS = (
     ("errante", Enemy.WANDERER),
     ("rastreador", Enemy.TRACKER),
 )
+
+# Campos que permite el contrato del API (esquemas del Swagger, versión 1.0.0).
+# Solo sirven para avisar si llega uno nuevo; nunca deciden cómo se traduce.
+CAMPOS_COMUNES_DE_OBJETO = ("id", "nombre", "clase", "peso", "valor")
+CAMPOS_POR_CLASE = (
+    (CLASE_ENEMIGO, ("id", "nombre", "clase", "vida_max", "ataque", "defensa",
+                     "velocidad", "comportamiento", "suelta")),
+    (Item.WEAPON, CAMPOS_COMUNES_DE_OBJETO + ("ataque_bonus",)),
+    (Item.ARMOR, CAMPOS_COMUNES_DE_OBJETO + ("defensa_bonus",)),
+    (Item.POTION, CAMPOS_COMUNES_DE_OBJETO + ("cura", "modificador_velocidad", "duracion")),
+    (Item.ANTIDOTE, CAMPOS_COMUNES_DE_OBJETO),
+    (Item.KEY, CAMPOS_COMUNES_DE_OBJETO + ("abre",)),
+    (Item.TORCH, CAMPOS_COMUNES_DE_OBJETO + ("duracion",)),
+    (Item.REWIND_SCROLL, CAMPOS_COMUNES_DE_OBJETO),
+    (CLASE_TRAMPA, ("id", "nombre", "clase", "daño", "rearme")),
+)
+CAMPOS_DE_COLOCACION_DE_ENEMIGO = ("instancia", "tipo", "vida")
+CAMPOS_DE_COLOCACION_DE_TRAMPA = ("instancia", "tipo")
+CAMPOS_DE_SALIDA = ("sala", "cerrada", "llave", "cierre_automatico")
 
 
 class ErrorDatosCripta(Exception):
@@ -82,6 +113,8 @@ class Traductor:
         """obtener_ficha: función id de tipo → ficha (el JSON del catálogo)."""
         self._obtener_ficha = obtener_ficha
         self._tipo_por_instancia_de_enemigo = TablaHash()
+        self._fichas_revisadas = ListaSinRepetidos()
+        self._campos_desconocidos_avisados = ListaSinRepetidos()
         self.avisos = []
 
     # ------------------------------------------------------------------
@@ -133,6 +166,7 @@ class Traductor:
 
     def _agregar_salida(self, mapa, pendientes, origen, direccion, salida):
         destino = _campo_obligatorio(salida, "sala", f"la salida {direccion} de la sala {origen}")
+        self._avisar_campos_desconocidos(salida, CAMPOS_DE_SALIDA, "Una salida del esqueleto")
         if not mapa.contains(destino):
             self.avisos.append(
                 f"La salida {direccion} de la sala {origen} lleva a la sala {destino}, "
@@ -214,6 +248,8 @@ class Traductor:
     def crear_enemigo(self, colocacion, id_sala):
         id_tipo = _campo_obligatorio(colocacion, "tipo", f"un enemigo de la sala {id_sala}")
         id_instancia = _campo_obligatorio(colocacion, "instancia", f"un enemigo de la sala {id_sala}")
+        self._avisar_campos_desconocidos(colocacion, CAMPOS_DE_COLOCACION_DE_ENEMIGO,
+                                         "Una colocación de enemigo")
         ficha = self._ficha_de_clase(id_tipo, (CLASE_ENEMIGO,))
         comportamiento = _comportamiento_del_modelo(ficha.get("comportamiento"), id_tipo)
 
@@ -233,6 +269,7 @@ class Traductor:
                 behavior=comportamiento,
                 health=colocacion.get("vida"),
                 drops=soltados,
+                regeneration=0,  # el contrato del API no tiene campo de regeneración (S13)
             )
         except (KeyError, ValueError, TypeError) as error:
             raise ErrorDatosCripta(f"Datos inválidos para el enemigo {id_instancia} ({id_tipo}): {error}") from error
@@ -263,6 +300,8 @@ class Traductor:
     def crear_trampa(self, colocacion, id_sala):
         id_tipo = _campo_obligatorio(colocacion, "tipo", f"una trampa de la sala {id_sala}")
         id_instancia = _campo_obligatorio(colocacion, "instancia", f"una trampa de la sala {id_sala}")
+        self._avisar_campos_desconocidos(colocacion, CAMPOS_DE_COLOCACION_DE_TRAMPA,
+                                         "Una colocación de trampa")
         ficha = self._ficha_de_clase(id_tipo, (CLASE_TRAMPA,))
         rearme = ficha.get("rearme")
         try:
@@ -315,7 +354,33 @@ class Traductor:
                 f"La ficha {id_tipo} es de clase {clase!r}; aquí se esperaba "
                 f"{' o '.join(clases_aceptadas)}."
             )
+        if self._fichas_revisadas.agregar(id_tipo):
+            self._avisar_campos_desconocidos(ficha, campos_conocidos_de_la_clase(clase),
+                                             f"La ficha {id_tipo}")
         return ficha
+
+    def _avisar_campos_desconocidos(self, datos, campos_conocidos, que_dato_es):
+        """Anota un aviso por cada campo que no está en campos_conocidos.
+
+        Cada campo se avisa una sola vez por tipo de dato (por ejemplo, una vez
+        para "La ficha ent_x" aunque haya cien instancias de ese enemigo). Con
+        el contrato actual nunca ocurre; si ocurre, el API cambió."""
+        for campo in datos:
+            if campo in campos_conocidos:
+                continue
+            if self._campos_desconocidos_avisados.agregar(f"{que_dato_es}|{campo}"):
+                self.avisos.append(
+                    f"{que_dato_es} trae el campo {campo!r}, que este programa no conoce, y se "
+                    f"ignoró. Puede que el API haya cambiado su contrato."
+                )
+
+
+def campos_conocidos_de_la_clase(clase):
+    """Los campos que el contrato del API permite en una ficha de esa clase."""
+    for clase_de_la_tabla, campos in CAMPOS_POR_CLASE:
+        if clase_de_la_tabla == clase:
+            return campos
+    raise ValueError(f"Clase de ficha sin campos declarados: {clase!r}")
 
 
 def _comportamiento_del_modelo(comportamiento_del_api, id_tipo):
