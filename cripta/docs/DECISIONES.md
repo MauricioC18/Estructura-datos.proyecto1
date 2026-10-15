@@ -558,9 +558,20 @@ El errante y el rastreador, por ahora, esperan. Sin salas no pueden mirar salida
 rastros. Esperar es lo que §2.8 manda cuando no hay ninguna opción disponible, así que
 no está mal, pero está incompleto.
 
-Los nombres de `behavior` son una apuesta. El enunciado solo confirma `"rastreador"`
-en su ejemplo de catálogo; los del guardián y el errante hay que verificarlos contra
-el servicio real.
+Los nombres de `behavior` ya están verificados. Eran una apuesta, porque el enunciado
+solo confirma `"rastreador"` en su ejemplo de catálogo, pero al integrar el bloque 2 se
+comprobó contra el API real que el servicio envía `"guardián"` con tilde. El Traductor
+convierte el texto del API a las constantes de `Enemy` antes de que lleguen al modelo,
+así que `decide_action()` compara contra `Enemy.GUARDIAN` sin problema y no hubo que
+cambiar nada.
+
+**Pendiente de coordinar con la Persona 2: la regeneración nunca se llena.** El motor
+implementa la regla de §2.10 y la activa sola cuando `enemy.regeneration` es mayor que
+cero, pero el Traductor no lee ningún campo de regeneración de la ficha del catálogo,
+de modo que ese valor siempre llega en cero. En `cripta-01` no hay ningún enemigo que
+la declare, así que hoy no se nota, pero §9 advierte que la revisión usa una cripta que
+no hemos visto. Si esa cripta trae un enemigo con regeneración, no se curaría nunca y
+nada lo avisaría. Falta averiguar cómo se llama ese campo en el API.
 
 Y los objetos que suelta un enemigo al morir no se colocan en ningún lado, porque no
 existe el suelo de la sala.
