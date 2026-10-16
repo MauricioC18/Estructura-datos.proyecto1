@@ -262,7 +262,7 @@ class TestEffectsAndDeterminism(unittest.TestCase):
 
         self.assertEqual(first.player.health, second.player.health)
         self.assertEqual(first.state.clock, second.state.clock)
-        self.assertEqual(first.messages, second.messages)
+        self.assertEqual(list(first.messages), list(second.messages))
 
     def test_the_game_stays_in_progress_with_several_effects(self):
         game = self.play(2026)

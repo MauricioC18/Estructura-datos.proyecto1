@@ -549,13 +549,57 @@ La prueba `test_the_key_matches_by_its_type_id_and_not_by_opens` construye la ll
 un `opens` que a propósito no coincide, igual que en los datos reales, para que el
 error no pueda volver.
 
+### Recorrer el inventario no pasa por el ciclo de eventos
+
+`inventory_next()` e `inventory_previous()` cuestan 0, así que mueven el cursor y
+devuelven sin programar nada ni procesar eventos.
+
+No es un atajo, es obligatorio. Si pasaran por el camino normal de una acción, el
+`max(1, costo * 100 // velocidad)` de §2.3 convertiría ese 0 en 1 y cada vez que el
+jugador mirara su inventario el reloj avanzaría una unidad. Tampoco suman a
+`player_actions`, porque §2.12 define una acción del jugador como la que consume tiempo
+virtual.
+
+Sí devuelven `accepted` en verdadero y por lo tanto quedan en la bitácora de
+reproducción, que es lo que el grupo acordó: soltar, usar y equipar actúan sobre el
+objeto que muestra el cursor, de modo que sin la navegación la reproducción elegiría
+otro objeto.
+
+### Usar un objeto aplica su efecto antes de correr el ciclo
+
+`use_item()` aplica el efecto y recién después programa la siguiente acción del jugador.
+Importa para la poción de velocidad: al aplicarse primero, la acción siguiente ya se
+programa con la velocidad nueva.
+
+El objeto se consume sin pasar por el suelo. `Inventory.drop_current()` lo quita del
+inventario y el motor simplemente no lo coloca en ningún lado, que es lo que §2.7 pide
+para los consumibles.
+
+Las armas, las armaduras y las llaves no se pueden usar, y un pergamino de retroceso se
+rechaza indicando que tiene su propia acción. Los tres rechazos no consumen tiempo.
+
+### El cursor no se mueve al recoger
+
+Vale dejarlo anotado porque sorprende y afecta a la vista. `Inventory.pick_up()` agrega
+el objeto al final y solo mueve el cursor si el inventario estaba vacío. O sea que
+recoger un arma y equiparla necesita una navegación en el medio.
+
+Es una decisión de la Persona 3 y es defendible, porque el cursor es un concepto
+separado del orden real. Pero conviene que la vista lo tenga en cuenta, y que el grupo
+sepa que cada secuencia de recoger y equipar deja un comando más en la bitácora de
+reproducción.
+
 ### Las acciones que dependen de otro integrante rechazan, no revientan
 
 El controlador de la Persona 4 despacha los once comandos del enunciado, incluidos
 `recoger`, `soltar`, `usar`, `equipar`, recorrer el inventario y el pergamino. Siete de
-esos métodos no existían todavía en `Game`, porque dependen del inventario y del
+esos métodos no existían todavía en `Game`, porque dependían del inventario y del
 historial reversible de la Persona 3, así que escribir "soltar" terminaba el programa
 con `AttributeError`.
+
+De esos siete, seis ya están implementados contra el inventario real. El único que
+sigue devolviendo el rechazo provisional es `rewind()`, que espera a que el motor anote
+sus cambios en el historial.
 
 No era un error de su controlador: programó contra el contrato acordado. El hueco era
 nuestro. Ahora esos siete métodos existen y devuelven un `ActionResult` rechazado que
@@ -592,6 +636,46 @@ nunca elige la cerrada. La versión anterior de esa prueba lo comprobaba jugando
 partida y pasaba por la razón equivocada: el errante se movía a la sala del jugador en
 su primer turno y a partir de ahí atacaba en vez de moverse, así que nunca llegaba a
 probar la puerta cerrada.
+
+### El rastreador usa el rastro, no lo reimplementa
+
+`PlayerTrail.freshest_exit(room, instante)` ya aplica las tres reglas de §2.9: examina
+solo las vecinas por salidas abiertas, descarta los rastros de 400 unidades o más de
+antigüedad, y desempata por la sala de menor id. El rastreador del motor no repite nada
+de eso: pide la salida y responde `(MOVE, salida)` o `(WAIT, None)`.
+
+`decide_action()` recibe ahora el rastro y el reloj, además de la sala y el generador.
+La alternativa que ofrecía la Persona 3 era que el motor calculara la salida y se la
+pasara ya resuelta. Se descartó porque obligaría al motor a preguntar de qué tipo es
+cada enemigo antes de llamar a `decide_action()`, lo que duplicaría el reparto que ese
+método ya hace. Con esta forma cada comportamiento recibe lo que necesita y decide solo:
+el errante la sala y el generador, el rastreador el rastro y el reloj.
+
+La firma quedó en cinco parámetros. Es su forma final, porque los tres comportamientos
+de §2.8 ya están completos y no hay un cuarto.
+
+### El rastro se marca en el instante de la acción, no al terminar su costo
+
+Esta era una pregunta que la Persona 3 dejó abierta para el grupo: al moverse, ¿con qué
+reloj se marca la sala destino?
+
+Se marca con el reloj del instante en que se ejecuta la acción, antes de correr el ciclo
+de eventos. Si el jugador se mueve en el instante 0 con una acción de costo 100, la sala
+destino recibe 0 y no 100.
+
+El enunciado lo define sin ambigüedad aunque no lo diga en §2.9. §2.5 dice que "el
+jugador aparece en la sala destino al ejecutar la acción", y el ejemplo de §2.13 lo
+confirma: el jugador se mueve al norte en el instante 0 y la rata, al actuar en el 66,
+ya comparte sala con él. El costo de 100 define cuándo el jugador vuelve a actuar, no
+cuándo llega.
+
+Marcarlo después tendría además una consecuencia concreta: un rastreador que actuara
+entre las dos decisiones del jugador vería el rastro más fresco de lo que corresponde.
+
+La marca vive en `_finish_player_action()`, que es por donde pasan todas las acciones
+aceptadas. Así se cumple de una sola vez lo que pide el Apéndice B, que el rastro de la
+sala actual se refresque en cada acción del jugador y no solo al moverse. Las acciones
+rechazadas no pasan por ahí, de modo que no lo tocan.
 
 ### La partida termina en el instante en que se gana o se pierde
 
@@ -638,26 +722,27 @@ acción del jugador.
 ### Orden de activación de enemigos
 
 §2.4 pide activarlos en orden ascendente de identificador. Como son texto, los
-comparamos como texto completo, según lo ya discutido en la sección 4.1. El orden se
-arma con una inserción simple escrita a mano, porque §4.9 prohíbe `sorted()` y
-`list.sort()` y el módulo de ordenamiento del proyecto todavía no existe. Cuando esté,
-hay que reemplazarlo.
+comparamos como texto completo, según lo ya discutido en la sección 4.1.
+
+El orden lo arma `structures/sorting.py`, el módulo de la Persona 3, que mide el
+desorden de los datos y escoge entre inserción y mezcla. Antes había acá una inserción
+escrita a mano, provisional mientras ese módulo no existiera. Usarlo no solo quita
+código repetido: la activación de enemigos pasa a ser uno de los contextos reales de
+ordenamiento que §4.9 pide, y el algoritmo lo escoge el programa y no nosotros.
 
 ### Límites conocidos
 
-La bitácora de mensajes es hoy una `list` que crece sin parar. §4.8 exige memoria
-constante y que agregar un mensaje no empuje a los 19 anteriores. Esa estructura le
-corresponde a `structures/circular_log.py`, que todavía no existe, así que la lista es
-provisional. `Game` ya la recibe desde afuera, así que cambiarla no va a requerir
-tocar el motor.
+La bitácora de mensajes ya es el `CircularLog` de la Persona 3, y es lo que `Game` usa
+por omisión cuando no le pasan otra. Antes era una `list` que crecía sin parar, lo que
+incumplía §4.8. Se puso como valor por omisión y no como algo que haya que conectar,
+para que el comportamiento correcto sea el que sale sin hacer nada.
 
-De los tres comportamientos de §2.8 quedan dos listos. El rastreador sigue esperando el
-rastro del jugador, que le corresponde a la Persona 3, y mientras tanto espera, que es
-lo que §2.8 manda cuando no hay ninguna opción disponible.
+Un efecto secundario que vale anotar: `messages` dejó de ser una lista, así que el
+código que la lea debe recorrerla y no usar métodos de lista. Cuatro pruebas nuestras
+asumían lo contrario y hubo que corregirlas para que respetaran el contrato que
+nosotros mismos habíamos documentado.
 
-El rastro tampoco se refresca todavía. §2.9 y el Apéndice B piden que la sala del
-jugador registre el instante en cada acción, y eso se conectará cuando exista
-`structures/trail.py`.
+Los tres comportamientos de §2.8 están completos.
 
 Los nombres de `behavior` ya están verificados. Eran una apuesta, porque el enunciado
 solo confirma `"rastreador"` en su ejemplo de catálogo, pero al integrar el bloque 2 se
@@ -971,10 +1056,11 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_actor.py` | 23 |
 | `tests/test_game.py` | 36 |
 | `tests/test_effects.py` | 33 |
-| `tests/test_movement.py` | 47 |
-| **Total del motor** | **177** |
+| `tests/test_movement.py` | 61 |
+| `tests/test_inventory_actions.py` | 32 |
+| **Total del motor** | **223** |
 
-Con las del bloque 2 integradas, el proyecto tiene 463 pruebas y todas pasan en
+Con las del bloque 2 integradas, el proyecto tiene 618 pruebas y todas pasan en
 Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
 `cripta/`, con las dependencias de `requirements.txt` instaladas.
 

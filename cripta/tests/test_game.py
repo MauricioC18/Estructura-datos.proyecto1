@@ -198,13 +198,13 @@ class TestDeterminism(unittest.TestCase):
 
         self.assertEqual(first.player.health, second.player.health)
         self.assertEqual(first.state.clock, second.state.clock)
-        self.assertEqual(first.messages, second.messages)
+        self.assertEqual(list(first.messages), list(second.messages))
 
     def test_a_different_seed_produces_a_different_game(self):
         first = self.play(2026)
         other = self.play(1807)
 
-        self.assertNotEqual(first.messages, other.messages)
+        self.assertNotEqual(list(first.messages), list(other.messages))
 
 
 class TestEnemyActivation(unittest.TestCase):

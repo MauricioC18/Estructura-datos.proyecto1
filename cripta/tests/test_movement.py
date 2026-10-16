@@ -7,6 +7,8 @@ from model.item import Item
 from model.player import Player
 from model.room import Door, Exit, Room, RoomMap
 from model.trap import Trap
+from structures.circular_log import CircularLog
+from structures.trail import PlayerTrail
 
 
 OPPOSITE = {"N": "S", "S": "N", "E": "O", "O": "E"}
@@ -698,10 +700,10 @@ class TestMessageOrder(unittest.TestCase):
 
         game.move("N")
 
-        entered = game.messages.index("Entras a Pasillo de las urnas.")
+        entered = list(game.messages).index("Entras a Pasillo de las urnas.")
         trap = next(
             index
-            for index, text in enumerate(game.messages)
+            for index, text in enumerate(list(game.messages))
             if "Dardos" in text
         )
 
@@ -713,10 +715,201 @@ class TestMessageOrder(unittest.TestCase):
 
         game.move("N")
 
-        entered = game.messages.index("Entras a Pasillo de las urnas.")
-        won = game.messages.index("Has encontrado la salida de la cripta.")
+        entered = list(game.messages).index("Entras a Pasillo de las urnas.")
+        won = list(game.messages).index("Has encontrado la salida de la cripta.")
 
         self.assertLess(entered, won)
+
+
+
+def make_tracker(actor_id="e-1", room_id=3, speed=100):
+    return Enemy(
+        actor_id=actor_id,
+        name="Rastreador",
+        max_health=1000,
+        attack=1,
+        defense=0,
+        speed=speed,
+        room_id=room_id,
+        behavior=Enemy.TRACKER,
+    )
+
+
+class TestTrackerBehaviour(unittest.TestCase):
+
+    def test_it_follows_the_freshest_trail(self):
+        room_map, _ = make_map()
+        trail = PlayerTrail()
+        trail.mark(1, 0)
+        tracker = make_tracker(room_id=2)
+
+        action, chosen = tracker.decide_action(
+            make_player(room_id=3), room_map.room(2), None, trail, 100
+        )
+
+        self.assertEqual(action, Enemy.MOVE)
+        self.assertEqual(chosen.destination, 1)
+
+    def test_it_waits_when_there_is_no_trail(self):
+        room_map, _ = make_map()
+        tracker = make_tracker(room_id=2)
+
+        action, chosen = tracker.decide_action(
+            make_player(room_id=3), room_map.room(2), None, PlayerTrail(), 100
+        )
+
+        self.assertEqual(action, Enemy.WAIT)
+        self.assertIsNone(chosen)
+
+    def test_it_ignores_a_trail_of_four_hundred_units_or_more(self):
+        room_map, _ = make_map()
+        trail = PlayerTrail()
+        trail.mark(1, 0)
+        tracker = make_tracker(room_id=2)
+        player = make_player(room_id=3)
+
+        fresh, _ = tracker.decide_action(
+            player, room_map.room(2), None, trail, 399
+        )
+        stale, _ = tracker.decide_action(
+            player, room_map.room(2), None, trail, 400
+        )
+
+        self.assertEqual(fresh, Enemy.MOVE)
+        self.assertEqual(stale, Enemy.WAIT)
+
+    def test_a_tie_is_broken_by_the_lower_room_id(self):
+        room_map, _ = make_map()
+        trail = PlayerTrail()
+        trail.mark(1, 50)
+        trail.mark(3, 50)
+        tracker = make_tracker(room_id=2)
+
+        action, chosen = tracker.decide_action(
+            make_player(room_id=99), room_map.room(2), None, trail, 100
+        )
+
+        self.assertEqual(action, Enemy.MOVE)
+        self.assertEqual(chosen.destination, 1)
+
+    def test_it_never_crosses_a_closed_door(self):
+        room_map, _ = make_map(door_between_2_and_3_closed=True)
+        trail = PlayerTrail()
+        trail.mark(3, 50)
+        tracker = make_tracker(room_id=2)
+
+        action, chosen = tracker.decide_action(
+            make_player(room_id=3), room_map.room(2), None, trail, 100
+        )
+
+        self.assertEqual(action, Enemy.WAIT)
+
+    def test_sharing_the_room_beats_tracking(self):
+        room_map, _ = make_map()
+        trail = PlayerTrail()
+        trail.mark(1, 50)
+        tracker = make_tracker(room_id=2)
+
+        action, chosen = tracker.decide_action(
+            make_player(room_id=2), room_map.room(2), None, trail, 100
+        )
+
+        self.assertEqual(action, Enemy.ATTACK)
+
+    def test_it_chases_the_player_in_a_real_game(self):
+        room_map, _ = make_map()
+        trail = PlayerTrail()
+        tracker = make_tracker(room_id=3)
+        game = Game(
+            GameState(seed=2026),
+            make_player(max_health=100000, defense=1000),
+            [tracker],
+            room_map=room_map,
+            trail=trail,
+        )
+        game._activate_enemies_in(3)
+
+        game.move("N")
+
+        for _ in range(4):
+            game.wait()
+
+        self.assertEqual(tracker.room_id, game.player.room_id)
+
+
+class TestTrailMarking(unittest.TestCase):
+
+    def game_with_trail(self):
+        room_map, _ = make_map()
+        trail = PlayerTrail()
+        game = Game(
+            GameState(seed=2026),
+            make_player(),
+            None,
+            room_map=room_map,
+            trail=trail,
+        )
+
+        return game, trail
+
+    def test_the_initial_room_is_marked_at_instant_zero(self):
+        _, trail = self.game_with_trail()
+
+        self.assertEqual(trail.time_at(1), 0)
+
+    def test_every_accepted_action_refreshes_the_trail(self):
+        game, trail = self.game_with_trail()
+
+        game.wait()
+        game.wait()
+
+        self.assertEqual(trail.time_at(1), 100)
+
+    def test_a_rejected_action_does_not_refresh_the_trail(self):
+        game, trail = self.game_with_trail()
+
+        game.wait()
+        game.move("E")
+
+        self.assertEqual(trail.time_at(1), 0)
+
+    def test_moving_marks_the_destination_room(self):
+        game, trail = self.game_with_trail()
+
+        game.wait()
+        game.move("N")
+
+        self.assertEqual(trail.time_at(2), 100)
+
+    def test_the_trail_uses_the_instant_of_the_action(self):
+        """El jugador llega a la sala al ejecutar la accion, no al terminar su
+        costo: §2.5 dice que aparece en la sala destino al ejecutarla, y el
+        ejemplo de §2.13 lo confirma. Por eso el rastro se marca antes de correr
+        el ciclo de eventos y queda por debajo del reloj con el que vuelve el
+        metodo."""
+        game, trail = self.game_with_trail()
+
+        game.move("N")
+
+        self.assertEqual(trail.time_at(2), 0)
+        self.assertEqual(game.state.clock, 100)
+
+
+class TestTheDefaultMessageLog(unittest.TestCase):
+
+    def test_the_game_uses_a_circular_log_by_default(self):
+        game = make_game(make_map()[0])
+
+        self.assertIsInstance(game.messages, CircularLog)
+
+    def test_the_messages_stop_at_twenty(self):
+        room_map, _ = make_map()
+        game = make_game(room_map, player=make_player(max_health=100000))
+
+        for _ in range(40):
+            game.wait()
+
+        self.assertEqual(len(game.visible_state().messages), 20)
 
 
 if __name__ == "__main__":

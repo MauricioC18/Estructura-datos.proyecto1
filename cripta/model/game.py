@@ -19,7 +19,9 @@ from model.enemy import Enemy
 from model.event import Event
 from model.item import Item
 from model.room import DIRECTIONS
+from structures.circular_log import CircularLog
 from structures.event_queue import EventQueue
+from structures.sorting import sort
 
 
 MOVE_COST = 100
@@ -101,6 +103,7 @@ class Game:
         enemies=None,
         room_map=None,
         exit_room_id=None,
+        trail=None,
         message_log=None,
         event_queue=None,
     ):
@@ -109,8 +112,9 @@ class Game:
         self.enemies = [] if enemies is None else list(enemies)
         self.room_map = room_map
         self.exit_room_id = exit_room_id
+        self.trail = trail
         self.events = EventQueue() if event_queue is None else event_queue
-        self.messages = [] if message_log is None else message_log
+        self.messages = CircularLog() if message_log is None else message_log
         self.effects = []
         self.torch_lit = False
         self.result = IN_PROGRESS
@@ -118,6 +122,7 @@ class Game:
         self.enemies_defeated = 0
         self.events_processed = 0
 
+        self._mark_trail()
         self._schedule(self.player, self.state.clock)
         self._activate_enemies_in(self.player.room_id)
         self._advance_to_player_turn()
@@ -239,22 +244,93 @@ class Game:
         return self._player_acts(OPEN_DOOR_COST, message)
 
     def pick_up(self, floor_index):
-        return self._not_available_yet("recoger objetos", INVENTORY)
+        """Recoge un objeto del suelo de la sala actual (§2.7)."""
+        rejection = self._inventory_ready()
+
+        if rejection is not None:
+            return rejection
+
+        floor = self._player_floor()
+
+        if floor is None:
+            return ActionResult(False, "La cripta todavia no esta cargada.")
+
+        if floor_index < 0 or floor_index >= len(floor):
+            return ActionResult(
+                False, f"No hay ningun objeto en la posicion {floor_index}."
+            )
+
+        if self.player.inventory.is_full():
+            return ActionResult(
+                False, "El inventario esta lleno. Tenes que soltar algo primero."
+            )
+
+        item = floor.pop(floor_index)
+        self.player.inventory.pick_up(item)
+
+        return self._player_acts(PICK_UP_COST, f"Recoges {item.name}.")
 
     def drop(self):
-        return self._not_available_yet("soltar objetos", INVENTORY)
+        """Suelta al suelo el objeto que muestra el cursor (§4.5)."""
+        rejection = self._selected_item()
+
+        if isinstance(rejection, ActionResult):
+            return rejection
+
+        floor = self._player_floor()
+
+        if floor is None:
+            return ActionResult(False, "La cripta todavia no esta cargada.")
+
+        dropped = self.player.inventory.drop_current(self.player)
+        floor.append(dropped)
+
+        return self._player_acts(DROP_COST, f"Sueltas {dropped.name}.")
 
     def use_item(self):
-        return self._not_available_yet("usar objetos", INVENTORY)
+        """Usa el objeto que muestra el cursor y lo consume (§2.7)."""
+        item = self._selected_item()
+
+        if isinstance(item, ActionResult):
+            return item
+
+        if item.item_class == Item.REWIND_SCROLL:
+            return ActionResult(
+                False, "Un pergamino de retroceso se usa con la accion de retroceder."
+            )
+
+        message = self._apply_item_effect(item)
+
+        if message is None:
+            return ActionResult(False, f"{item.name} no se puede usar.")
+
+        self.player.inventory.drop_current(self.player)
+
+        return self._player_acts(USE_ITEM_COST, message)
 
     def equip_item(self):
-        return self._not_available_yet("equipar objetos", INVENTORY)
+        """Equipa el objeto que muestra el cursor y lo mueve al frente (§2.7)."""
+        item = self._selected_item()
+
+        if isinstance(item, ActionResult):
+            return item
+
+        if not self.player.inventory.can_equip_current():
+            return ActionResult(False, f"{item.name} no se puede equipar.")
+
+        replaced = self.player.inventory.equip_current(self.player)
+        message = f"Equipas {item.name}."
+
+        if replaced is not None:
+            message = f"{message} Guardas {replaced.name}."
+
+        return self._player_acts(EQUIP_ITEM_COST, message)
 
     def inventory_next(self):
-        return self._not_available_yet("recorrer el inventario", INVENTORY)
+        return self._move_cursor(True)
 
     def inventory_previous(self):
-        return self._not_available_yet("recorrer el inventario", INVENTORY)
+        return self._move_cursor(False)
 
     def rewind(self):
         return self._not_available_yet("usar un pergamino", REVERSIBLE_HISTORY)
@@ -393,6 +469,16 @@ class Game:
 
         return self._finish_player_action(cost, message)
 
+    def _mark_trail(self):
+        """Refresca el rastro en la sala donde queda el jugador (§2.9).
+
+        Se marca con el reloj del instante en que se ejecuta la accion, antes
+        de correr el ciclo de eventos. Si se marcara despues, un rastreador
+        veria el rastro mas fresco de lo que corresponde.
+        """
+        if self.trail is not None:
+            self.trail.mark(self.player.room_id, self.state.clock)
+
     def _finish_player_action(self, cost, message):
         """Programa la siguiente accion del jugador y corre el ciclo.
 
@@ -401,6 +487,7 @@ class Game:
         sala y despues lo que le paso adentro.
         """
         self.player_actions += 1
+        self._mark_trail()
         self._schedule(
             self.player,
             self.player.next_time_after(self.state.clock, cost),
@@ -462,6 +549,8 @@ class Game:
             self.player,
             self._room_of(enemy),
             self.state.random_generator,
+            self.trail,
+            self.state.clock,
         )
 
         if action == Enemy.ATTACK:
@@ -551,6 +640,88 @@ class Game:
 
     def _game_already_ended(self):
         return ActionResult(False, "La partida ya termino.")
+
+    def _inventory_ready(self):
+        """Rechazo si la accion de inventario no se puede intentar, o None."""
+        if self.is_over:
+            return self._game_already_ended()
+
+        if self.player.inventory is None:
+            return self._not_available_yet("usar el inventario", INVENTORY)
+
+        return None
+
+    def _selected_item(self):
+        """El objeto que muestra el cursor, o un ActionResult de rechazo."""
+        rejection = self._inventory_ready()
+
+        if rejection is not None:
+            return rejection
+
+        item = self.player.inventory.current()
+
+        if item is None:
+            return ActionResult(False, "No tenes ningun objeto seleccionado.")
+
+        return item
+
+    def _player_floor(self):
+        if self.room_map is None:
+            return None
+
+        return self.room_map.room(self.player.room_id).floor_items
+
+    def _move_cursor(self, forward):
+        """Recorrer el inventario cuesta 0, asi que no pasa por el ciclo.
+
+        Si pasara por _player_acts, el max(1, ...) del intervalo convertiria
+        ese 0 en 1 y adelantaria el reloj. Tampoco cuenta como accion del
+        jugador, porque §2.12 define una accion como la que consume tiempo.
+        """
+        rejection = self._inventory_ready()
+
+        if rejection is not None:
+            return rejection
+
+        inventory = self.player.inventory
+        moved = inventory.next() if forward else inventory.previous()
+
+        if not moved:
+            return ActionResult(False, "No hay mas objetos en esa direccion.")
+
+        return ActionResult(True, f"Ves {inventory.current().name}.")
+
+    def _apply_item_effect(self, item):
+        """Aplica el efecto del objeto y devuelve el mensaje, o None si no sirve.
+
+        Ocurre en el instante de la accion, antes de que corra el ciclo, de modo
+        que la siguiente accion del jugador ya usa la velocidad nueva si bebio
+        una pocion de velocidad.
+        """
+        if item.item_class == Item.POTION:
+            if item.heal > 0:
+                self.player.heal(item.heal)
+                return f"Bebes {item.name} y recuperas vida."
+
+            if item.speed_modifier:
+                self.apply_speed_change(
+                    self.player,
+                    max(1, self.player.speed + item.speed_modifier),
+                    item.duration,
+                )
+                return f"Bebes {item.name} y cambias de velocidad."
+
+            return None
+
+        if item.item_class == Item.ANTIDOTE:
+            self.cancel_poison(self.player)
+            return f"Usas {item.name}."
+
+        if item.item_class == Item.TORCH:
+            self.light_torch(item.duration)
+            return f"Enciendes {item.name}."
+
+        return None
 
     def _not_available_yet(self, what, missing_module):
         """Rechazo de una accion que el motor todavia no puede ejecutar.
@@ -708,21 +879,12 @@ class Game:
                 self.apply_regeneration(enemy, enemy.regeneration)
 
     def _by_ascending_id(self, enemies):
-        """Orden de activacion de la seccion 2.4, por insercion.
+        """Orden de activacion de la seccion 2.4.
 
-        Se reemplazara por el modulo de ordenamiento del proyecto cuando exista.
+        Usa el modulo de ordenamiento del proyecto, que mide el desorden de los
+        datos y escoge entre insercion y mezcla, como pide la seccion 4.9.
         """
-        ordered = []
-
-        for enemy in enemies:
-            position = len(ordered)
-
-            while position > 0 and ordered[position - 1].actor_id > enemy.actor_id:
-                position -= 1
-
-            ordered.insert(position, enemy)
-
-        return ordered
+        return sort(enemies, key=lambda enemy: enemy.actor_id)
 
     def _log(self, message):
         self.messages.append(message)
