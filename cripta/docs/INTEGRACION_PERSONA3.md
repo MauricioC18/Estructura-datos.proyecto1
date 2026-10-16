@@ -10,7 +10,8 @@ Esta rama agrega solo archivos nuevos. No modifica ningún archivo de otro integ
 | `structures/trail.py` | `PlayerTrail` |
 | `structures/sorting.py` | `insertion_sort`, `merge_sort` y `sort` (selección automática) |
 | `benchmark/persona3_bench.py` | `run()`, con el mismo contrato de `Measurement` |
-| `tests/test_*.py` | 102 pruebas; con las del grupo suman 565 y todas pasan |
+| `tests/test_*.py` | 113 pruebas propias |
+| `tests/verificar_retroceso.py` | `assert_rewind_restores`, para probar el retroceso del motor (sección 4) |
 
 Esta rama se basa en `mauricio-logica-juego`, porque necesita `model/item.py`, `model/room.py` y `structures/tabla_hash.py`.
 
@@ -33,7 +34,7 @@ game = Game(state, player, enemies, room_map, exit_room_id, message_log=Circular
 | Método | Devuelve | Para |
 | --- | --- | --- |
 | `is_full()` | `bool` | rechazar `recoger` sin consumir tiempo (Apéndice B) |
-| `pick_up(item)` | `bool` | agrega al final del orden real |
+| `pick_up(item)` | `bool` | agrega al final del orden real y deja el cursor sobre el objeto recogido |
 | `current()` | `Item` o `None` | el objeto que se está viendo |
 | `next()`, `previous()`, `go_to_start()` | `bool` | navegación, costo 0 |
 | `drop_current(player)` | `Item` o `None` | lo quita y, si estaba equipado, lo desequipa en `player` |
@@ -41,6 +42,8 @@ game = Game(state, player, enemies, room_map, exit_room_id, message_log=Circular
 | `equip_current(player)` | `Item` sustituido o `None` | mueve al frente y actualiza `player.equipped_weapon` o `player.equipped_armor` |
 | `sorted_view("peso" \| "valor" \| "nombre", reverse=False)` | `list` | vista para el comando `ver`; no altera el orden real |
 | `scroll_count()`, `consume_scroll()` | | pergaminos |
+
+**Cursor después de recoger.** El enunciado no define este caso, así que es una decisión de implementación. El cursor queda sobre el objeto recogido, para que `recoger` seguido de `equipar` o `usar` actúe sobre él sin un `sig` en medio. Un `recoger` rechazado no mueve el cursor. Esto cambia lo que muestra la vista, pero no afecta la reproducción: el replay ejecuta el mismo código y deja el cursor en el mismo lugar.
 
 El equipo sigue viviendo en `Player`. El inventario solo lo actualiza, así que `effective_attack` y `effective_defense` no cambian.
 
@@ -57,7 +60,7 @@ exit_ = trail.freshest_exit(room, state.clock)  # turno del rastreador: Exit o N
 
 `freshest_exit` devuelve el `Exit`, así que `Enemy.decide_action()` puede responder `(MOVE, exit_)` o `(WAIT, None)`, igual que el errante. Para eso, `decide_action` tiene que recibir el `trail` o el `Exit` ya calculado. Ese cambio le corresponde a la Persona 1.
 
-**A confirmar por el grupo:** en `move()`, ¿se marca la sala destino con el reloj del instante en que se ejecuta la acción? §2.9 dice "al completar un movimiento, la sala destino recibe el tiempo actual".
+**Acordado:** en `move()`, la sala destino se marca con el reloj del **instante en que se ejecuta la acción**, no al terminar su costo. Moverse en t=0 con costo 100 marca con 0. Lo dice §2.5 ("el jugador aparece en la sala destino al ejecutar la acción") y lo confirma el ejemplo de §2.13. `PlayerTrail.mark()` recibe el instante como parámetro, así que no cambia nada en este módulo.
 
 ## 4. Historial reversible
 
@@ -132,6 +135,34 @@ def rewind(self):
 ```
 
 No consume tiempo, no llama a `begin_action()` y no suma a `player_actions`.
+
+### Cómo probar que no se escapa ningún cambio
+
+Un cambio sin anotar no lanza ninguna excepción: simplemente no se deshace. Para detectarlo está `tests/verificar_retroceso.py`:
+
+```python
+from tests.verificar_retroceso import assert_rewind_restores
+
+def test_atacar_se_revierte(self):
+    assert_rewind_restores(self, game, lambda: game.attack("e-201"), trail=game.trail)
+```
+
+Toma una foto de todo lo que §2.11 pide revertir, ejecuta la acción, llama a `game.rewind()` y compara. Si algo quedó distinto, la prueba falla y dice el campo exacto, por ejemplo `sala 2.trampa t-1.armada: antes True, despues del retroceso False`. También verifica que el pergamino quede consumido.
+
+La foto existe solo dentro de la prueba y nunca se usa para restaurar nada, así que no choca con la prohibición de §2.11.
+
+Compara:
+- reloj, resultado, antorcha, `player_actions` y `enemies_defeated`;
+- vida, sala, velocidad, equipo y evento pendiente del jugador y de cada enemigo, más `is_active` de los enemigos;
+- puertas, trampas y suelo de cada sala;
+- el orden real del inventario;
+- los eventos activos de la agenda con su `time` y `sequence`;
+- los efectos;
+- el rastro, si se pasa `trail`.
+
+No compara, a propósito: pergaminos, bitácora en pantalla, contador de secuencia, generador aleatorio, `events_processed` ni el cursor.
+
+Conviene una prueba por cada acción y por cada evento que el motor procesa: esperar, atacar con y sin muerte, moverse con trampa, moverse hacia la salida, abrir con cierre automático, recoger, soltar, usar cada tipo de objeto y equipar. Con el motor de la rama `mauricio-logica-juego` sin anotar nada, el verificador ya encuentra que `wait()` deja `player_actions` en 1 después de deshacer. La agenda y el reloj sí vuelven, por `ReversibleEventQueue`.
 
 ### Decisiones tomadas en este módulo
 

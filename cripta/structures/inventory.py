@@ -24,6 +24,11 @@ Equipo
     (equipped_weapon, equipped_armor), que es quien las usa para calcular el
     ataque y la defensa. El inventario solo las actualiza.
 
+Cursor
+    Recoger deja el cursor sobre el objeto recogido, para que "recoger" y
+    despues "equipar" o "usar" actuen sobre el sin un "sig" en medio. El
+    enunciado no define este caso; es una decision de implementacion.
+
 Retroceso
     Con un History, cada cambio anota su inversa. Los movimientos de un
     pergamino de retroceso no se anotan: §2.11 los deja fuera del retroceso.
@@ -251,15 +256,16 @@ class Inventory:
         return self._scrolls
 
     def pick_up(self, item):
-        """Agrega al final del orden real. Devuelve False si esta lleno (Apendice B)."""
+        """Agrega al final del orden real y deja el cursor sobre el objeto.
+
+        Devuelve False si esta lleno (Apendice B).
+        """
         if self.is_full():
             return False
 
         node = _Node(item)
         self._items.append(node)
-
-        if self._cursor is None:
-            self._cursor = node
+        self._cursor = node
 
         if is_rewind_scroll(item):
             self._scrolls += 1

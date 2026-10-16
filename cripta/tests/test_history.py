@@ -274,6 +274,7 @@ class TestReversibleInventory(unittest.TestCase):
         self.inventory = Inventory(5, self.history)
         for name in ("a", "b", "c"):
             self.inventory.pick_up(make_item(name))
+        self.inventory.go_to_start()
 
     def test_undo_pick_up(self):
         self.history.begin_action()
@@ -289,6 +290,13 @@ class TestReversibleInventory(unittest.TestCase):
         self.assertEqual(names(self.inventory), ["a", "b", "c"])
         self.assertEqual(self.inventory.current().name, "b")
 
+    def test_undo_pick_up_moves_cursor_off_the_item(self):
+        self.history.begin_action()
+        self.inventory.pick_up(make_item("d"))
+        self.assertEqual(self.inventory.current().name, "d")
+        self.history.undo()
+        self.assertEqual(self.inventory.current().name, "c")
+
     def test_undo_drop_first(self):
         self.history.begin_action()
         self.inventory.drop_current(self.player)
@@ -300,6 +308,7 @@ class TestReversibleInventory(unittest.TestCase):
         inventory.pick_up(make_item("pocion"))
         inventory.pick_up(make_weapon("daga"))
         inventory.pick_up(make_weapon("hacha"))
+        inventory.go_to_start()
         inventory.next()
         self.history.begin_action()
         inventory.equip_current(self.player)
@@ -399,6 +408,7 @@ class TestRewindScroll(unittest.TestCase):
         self.inventory.pick_up(make_scroll("p"))
         self.inventory.pick_up(make_item("b"))
         self.inventory.pick_up(make_scroll("q"))
+        self.inventory.go_to_start()
         self.inventory.next()
         self.inventory.next()
         self.history.begin_action()
