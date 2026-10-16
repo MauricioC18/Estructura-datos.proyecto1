@@ -4,8 +4,12 @@ from model.enemy import Enemy
 from model.item import Item
 from repository.repositorio_cripta import DatosDePartida
 from repository.traductor import (
+    CLASE_ENEMIGO,
+    CLASE_TRAMPA,
+    CLASES_DE_OBJETO,
     ErrorDatosCripta,
     Traductor,
+    campos_conocidos_de_la_clase,
     id_de_objeto_en_el_suelo,
     id_de_objeto_soltado,
 )
@@ -398,6 +402,72 @@ class TestLlenarSala(unittest.TestCase):
         jugador.equipped_weapon = sala.floor_items[0]
 
         self.assertEqual(jugador.effective_attack, 9)
+
+
+class TestCamposQueElProgramaNoConoce(unittest.TestCase):
+    """El contrato del API no tiene campo de regeneración (S13). Si algún día
+    llega un campo nuevo, se ignora pero queda un aviso para el reporte."""
+
+    HIDRA = {"id": "ent_hidra", "nombre": "Hidra", "clase": "enemigo", "vida_max": 40,
+             "ataque": 6, "defensa": 2, "velocidad": 100, "comportamiento": "guardián",
+             "regeneracion": 3}
+
+    def test_los_datos_reales_no_generan_avisos(self):
+        traductor = nuevo_traductor()
+        mapa = traductor.crear_mapa(SALAS_CRIPTA_01)
+        for id_sala in mapa.room_ids():
+            traductor.llenar_sala(mapa.room(id_sala), contenido_de(id_sala))
+
+        self.assertEqual(traductor.avisos, [])
+
+    def test_la_regeneracion_queda_en_cero(self):
+        rata = nuevo_traductor().crear_enemigo({"instancia": "e-1", "tipo": "ent_rata_gigante"}, 2)
+
+        self.assertEqual(rata.regeneration, 0)
+
+    def test_campo_nuevo_en_una_ficha_avisa_una_sola_vez(self):
+        traductor = nuevo_traductor(FICHAS_CRIPTA_01 + [self.HIDRA])
+
+        primera = traductor.crear_enemigo({"instancia": "e-1", "tipo": "ent_hidra"}, 1)
+        traductor.crear_enemigo({"instancia": "e-2", "tipo": "ent_hidra"}, 1)
+
+        self.assertEqual(primera.regeneration, 0)
+        self.assertEqual(len(traductor.avisos), 1)
+        self.assertIn("ent_hidra", traductor.avisos[0])
+        self.assertIn("'regeneracion'", traductor.avisos[0])
+
+    def test_campo_nuevo_en_colocaciones_y_salidas(self):
+        traductor = nuevo_traductor()
+        salas = [{"id": 1, "nombre": "A", "salidas": {"N": {"sala": 2, "secreta": True}}},
+                 {"id": 2, "nombre": "B", "salidas": {"S": {"sala": 1, "secreta": True}}}]
+
+        traductor.crear_mapa(salas)
+        for instancia in ("e-1", "e-2"):
+            traductor.crear_enemigo({"instancia": instancia, "tipo": "ent_rata_gigante",
+                                     "regeneracion": 1}, 1)
+        traductor.crear_trampa({"instancia": "t-1", "tipo": "trp_dardos", "oculta": True}, 1)
+
+        self.assertEqual(len(traductor.avisos), 3)
+        texto = " ".join(traductor.avisos)
+        for campo in ("'secreta'", "'regeneracion'", "'oculta'"):
+            self.assertIn(campo, texto)
+
+    def test_hay_campos_declarados_para_todas_las_clases(self):
+        for clase in CLASES_DE_OBJETO + (CLASE_ENEMIGO, CLASE_TRAMPA):
+            self.assertIn("id", campos_conocidos_de_la_clase(clase))
+        with self.assertRaises(ValueError):
+            campos_conocidos_de_la_clase("dragon")
+
+    def test_campos_opcionales_del_contrato_no_avisan(self):
+        fichas = [{"id": "itm_pocion_rapida", "nombre": "Poción rápida", "clase": "pocion",
+                   "peso": 1, "valor": 30, "modificador_velocidad": 50, "duracion": 300},
+                  {"id": "trp_foso", "nombre": "Foso", "clase": "trampa", "daño": 6, "rearme": 500}]
+        traductor = nuevo_traductor(fichas)
+
+        traductor.crear_objeto("itm_pocion_rapida", "o-1-0")
+        traductor.crear_trampa({"instancia": "t-1", "tipo": "trp_foso"}, 1)
+
+        self.assertEqual(traductor.avisos, [])
 
 
 class TestIdsEnUso(unittest.TestCase):

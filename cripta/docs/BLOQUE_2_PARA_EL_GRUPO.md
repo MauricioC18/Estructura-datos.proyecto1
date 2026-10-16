@@ -1,6 +1,6 @@
 # Bloque 2 — API, caché y persistencia: guía para el grupo
 
-Responsable: Mauricio (persona 2). Última actualización: 14 de octubre de 2026.
+Responsable: Mauricio (persona 2). Última actualización: 15 de octubre de 2026.
 
 Este documento explica qué está listo en el bloque 2, cómo usarlo desde el resto del
 programa, qué datos entrega y **qué necesita el bloque 2 de cada integrante** para quedar
@@ -28,8 +28,9 @@ terminado.
 | Clases del modelo que faltaban: sala, puerta, salida, mapa | `model/room.py` | Listo (revisar con la persona 1) |
 | Instancia de objeto y de trampa | `model/item.py`, `model/trap.py` | Listo (revisar con la persona 1) |
 
-Pruebas: 286 del bloque 2; con las del resto del grupo son 373 y todas pasan
-(`python -m unittest discover -s tests -t .` desde `cripta/`). Conexión real con el API
+Pruebas: 293 del bloque 2; la rama del bloque 2 tiene 380 y todas pasan
+(`python -m unittest discover -s tests -t .` desde `cripta/`). Unida con las ramas de las
+personas 1 y 4 (revisión del 15 de octubre), el proyecto tiene 528 pruebas y todas pasan. Conexión real con el API
 verificada. Las mediciones están en `docs/mediciones/bloque2/`.
 
 Todo el código del bloque 2 vive dentro de las carpetas que define `docs/ARQUITECTURA.md`
@@ -190,16 +191,18 @@ y `benchmark.bench_precarga_contenido`.
    de `Actor` y `Event` (nombres en inglés, sin reglas del juego). No se modificó ningún
    archivo existente del modelo. Si en tu rama ya tienes tu propio `room.py`, avísame para
    unificar antes de fusionar.
-2. **Usar `cargar_contenido_de_sala` en `move()`**: si lanza `PresupuestoAgotado`, el movimiento
-   se rechaza con `ActionResult` sin consumir tiempo (S1). Los enemigos que devuelve van a
-   `Game.enemies`; al morir uno, sus `drops` pasan a `floor_items` de su sala.
+2. **`Game.move()` ya encaja con el bloque 2.** Rechaza entrar a una sala sin
+   `content_loaded`, y el modelo no llama al repositorio (MVC). Quien carga la sala antes de
+   llamar a `move()` es el controlador (persona 4, punto 1). Al morir un enemigo, sus `drops`
+   ya pasan a `floor_items` de su sala.
 3. Revisar los supuestos S9 a S15 (sección 5), que afectan al motor.
 4. Detalles del modelo frente a los datos reales del API (ya resueltos en el Traductor):
    - `Enemy.GUARDIAN` vale `"guardian"` y el API envía `"guardián"` con tilde. El Traductor
      convierte el texto del API a la constante, así que `decide_action()` puede comparar con
      `Enemy.GUARDIAN` sin problema. No hay que cambiar `Enemy`.
-   - `Enemy` acepta `regeneration`, pero las fichas del API no traen ningún campo de
-     regeneración (S13): el Traductor lo deja en 0.
+   - `Enemy` acepta `regeneration`, pero el contrato del API no tiene ningún campo para
+     declararla (S13, verificado en el Swagger): el Traductor la deja en 0 y, si algún día
+     llega un campo nuevo, lo avisa en el reporte final.
    - `Player` usa `attack_bonus` y `defense_bonus`; `Item` usa esos mismos nombres, así que
      equipar un `Item` funciona sin cambiar `Player`.
 
@@ -215,11 +218,30 @@ y `benchmark.bench_precarga_contenido`.
 4. Recordar que **la caché no entra en el retroceso** (§2.11) y revisar S16 y S17.
 
 ### Persona 4 (MVC, interfaz, replay, bench)
-1. Integrar `RepositorioCripta` como muestra la sección 2.
-2. Pasar `--offline` y `--cache-size`, y armar `consultar_ids_en_uso` con
-   `repositorio.ids_en_uso(...)` (sección 2.1).
-3. Usar `versiones_de_la_partida()` y `versiones_requeridas` en `--replay`.
-4. Incluir en `--bench` el `run()` de los cuatro benchmarks del bloque 2.
+1. **Cargar la sala destino antes de `Game.move()`, también al reproducir.** El controlador
+   debe hacerlo antes de pasarle `mover` al modelo:
+   ```python
+   salida = mapa.room(partida.player.room_id).exit_towards(direccion)
+   if salida is not None and salida.door.is_open:
+       try:
+           partida.enemies.extend(repositorio.cargar_contenido_de_sala(mapa.room(salida.destination)))
+       except PresupuestoAgotado as error:
+           return ActionResult(False, str(error))   # rechazada: no consume tiempo (S1)
+   resultado = partida.move(direccion)
+   ```
+   y, después de cada acción aceptada, llamar a `repositorio.despues_de_accion(sala_actual)`.
+   Si esto vive en `GameController`, `--replay` lo hereda sin cambios. Verificado el 15 de
+   octubre con cripta-01 offline: con el `GameController` actual, `replay_commands()` se
+   detiene en el primer `mover` ("El contenido de la sala 2 todavía no está disponible");
+   con la carga previa, la partida reproducida termina igual que la original.
+2. **`main.py`** (hoy vacío): `--offline` y `--cache-size` para crear el repositorio;
+   `crear_jugador()`, `crear_mapa()` y `cargar_contenido_de_sala()` de la sala inicial;
+   `Game(GameState(semilla), jugador, enemigos, mapa, datos.sala_salida)`; y al terminar,
+   `reporte_de_red().lineas_de_texto()` (§5.1).
+3. Armar `consultar_ids_en_uso` con `repositorio.ids_en_uso(...)` (sección 2.1).
+4. En `--replay`: la cabecera sale de `versiones_de_la_partida()`, y al reproducir se llama a
+   `iniciar_partida(id_cripta, (version_cripta, version_catalogo))`.
+5. Incluir en `--bench` el `run()` de los cuatro benchmarks del bloque 2.
 
 ---
 
@@ -243,7 +265,8 @@ En cada salida, `cerrada` falta = abierta; `llave` es el id de la ficha llave;
 - `objetos`: lista de ids de ficha, **sin id de instancia** (ver S12);
 - `trampas`: `{"instancia", "tipo"}`.
 
-**Fichas del catálogo** (todas traen `id`, `nombre`, `clase`):
+**Fichas del catálogo** (todas traen `id`, `nombre`, `clase`). En el Swagger, cada esquema es
+cerrado (`"additionalProperties": false`): una ficha no puede traer campos fuera de esta tabla.
 
 | `clase` | Campos | Notas |
 |---|---|---|
@@ -299,7 +322,14 @@ el Documento de Decisiones.
 - **S12.** Los objetos del suelo reciben ids deterministas: sala y posición (`o-12-0`). Los
   objetos que suelta un enemigo usan su instancia y posición (`e-201-s0`).
 - **S13.** Veneno y regeneración se implementan y se prueban aunque el API no tenga campos para
-  activarlos. El antídoto se consume aunque no haya veneno activo.
+  activarlos. El antídoto se consume aunque no haya veneno activo. *Verificado en el contrato
+  del API (`/openapi.json`, versión 1.0.0, 15 de octubre de 2026): el esquema `Enemy` solo
+  permite `id`, `nombre`, `clase`, `vida_max`, `ataque`, `defensa`, `velocidad`,
+  `comportamiento` y `suelta`; `EnemyPlacement` solo permite `instancia`, `tipo` y `vida`;
+  los dos son cerrados y la palabra "regenera" no aparece en todo el documento.* Como la
+  cripta de la revisión sale del mismo servicio, tampoco puede declarar regeneración. Si el
+  contrato cambiara, el Traductor ignora cualquier campo que no conoce y lo anota en el
+  reporte final, una vez por campo; leerlo sería una línea en `crear_enemigo`.
 - **S14.** `modificador_velocidad` se suma a la velocidad (mínimo 1) durante `duracion`. La
   cripta publicada no tiene pociones de velocidad.
 - **S15.** La antorcha se consume al encenderla y solo se muestra como efecto activo.
@@ -324,7 +354,7 @@ el Documento de Decisiones.
 Desde la carpeta `cripta/`:
 
 ```
-python -m unittest discover -s tests -t .                     # 373 pruebas (286 del bloque 2)
+python -m unittest discover -s tests -t .                     # 380 pruebas (293 del bloque 2)
 python -m tools.simular_partida_bloque2 --borrar-cache        # recorrido contra el API real, en frío
 python -m tools.simular_partida_bloque2                       # otra vez: arranque en caliente
 python -m tools.simular_partida_bloque2 --offline datos_offline

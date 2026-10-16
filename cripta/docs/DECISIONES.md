@@ -666,13 +666,21 @@ convierte el texto del API a las constantes de `Enemy` antes de que lleguen al m
 así que `decide_action()` compara contra `Enemy.GUARDIAN` sin problema y no hubo que
 cambiar nada.
 
-**Pendiente de coordinar con la Persona 2: la regeneración nunca se llena.** El motor
-implementa la regla de §2.10 y la activa sola cuando `enemy.regeneration` es mayor que
-cero, pero el Traductor no lee ningún campo de regeneración de la ficha del catálogo,
-de modo que ese valor siempre llega en cero. En `cripta-01` no hay ningún enemigo que
-la declare, así que hoy no se nota, pero §9 advierte que la revisión usa una cripta que
-no hemos visto. Si esa cripta trae un enemigo con regeneración, no se curaría nunca y
-nada lo avisaría. Falta averiguar cómo se llama ese campo en el API.
+**La regeneración queda implementada pero el API no puede activarla.** Esto salió de
+una duda nuestra: el motor implementa la regla de §2.10 y la activa sola cuando
+`enemy.regeneration` es mayor que cero, pero el Traductor nunca llena ese campo, así que
+siempre llega en cero. Parecía un hueco que la cripta de la revisión podía destapar.
+
+La Persona 2 lo verificó contra el contrato del servicio (`/openapi.json`, versión 1.0.0,
+15 de octubre de 2026): el esquema de enemigo solo admite `id`, `nombre`, `clase`,
+`vida_max`, `ataque`, `defensa`, `velocidad`, `comportamiento` y `suelta`, el de
+colocación solo `instancia`, `tipo` y `vida`, los dos son cerrados y la palabra
+"regenera" no aparece en todo el documento. Como la cripta de la revisión sale del mismo
+servicio, tampoco puede declararla.
+
+La implementación se mantiene porque §2.10 la exige y está probada. Y el Traductor
+quedó avisando cualquier campo que no reconozca, una vez por campo, de modo que si el
+contrato cambiara no se perdería en silencio.
 
 Los objetos que suelta un enemigo al morir ya se colocan en el suelo de la sala donde
 murió, como pide §2.6. Se verificó contra los datos reales: las dos ratas gigantes de
