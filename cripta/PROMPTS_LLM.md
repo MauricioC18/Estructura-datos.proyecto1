@@ -4,6 +4,12 @@ Este archivo registra los prompts relacionados con el proyecto CRIPTA que se env
 
 El código y el texto generados con ayuda de un modelo de lenguaje son responsabilidad del grupo. Cada integrante debe poder explicar y modificar lo entregado, independientemente de cómo se haya escrito.
 
+Varios de los prompts de la sección 3 se dictaron por voz, de modo que aparecen con los errores de transcripción con los que llegaron. Se reproducen tal cual porque el enunciado pide el texto del prompt enviado.
+
+Cuando un prompt consistió en pegar un documento completo, se describe el documento en lugar de copiarlo, para que este archivo siga siendo legible. Esos documentos están en el repositorio o disponibles si se solicitan.
+
+---
+
 ## 1. Preparación y arquitectura
 
 Herramienta: ChatGPT
@@ -36,26 +42,260 @@ Uso en el proyecto: [Describir cómo se aprovechó la respuesta.]
 
 Cambios realizados por el estudiante: [Indicar las decisiones, modificaciones y pruebas realizadas.]
 
-## 3. Implementación de la agenda de eventos y del reloj virtual
+## 3. Implementación del motor (Persona 1)
 
-Herramienta: Claude Opus, mediante Claude Code
+Todas las entradas de esta sección corresponden a la misma herramienta: **Claude Opus, mediante Claude Code en VS Code**, con acceso a los archivos del repositorio.
+
+### 3.1 Contexto del proyecto e implementación de la agenda de eventos
 
 Fecha: 2026-10-08
 
-Objetivo: Verificar el estado real de los archivos del proyecto, implementar y probar la agenda de eventos, implementar el reloj virtual y la numeración de eventos, y documentar las decisiones correspondientes.
+Objetivo: Trasladar a una herramienta nueva el estado del proyecto, verificar qué había realmente en los archivos e implementar y probar la agenda de eventos.
 
 Prompts utilizados:
 
-- [Pegar aquí el prompt maestro con el contexto del proyecto.]
-- [Pegar aquí la lista de reglas obligatorias.]
-- [Pegar aquí las preguntas sobre el reloj virtual y el contador de secuencia.]
+- Documento titulado "PROMPT MAESTRO — PROYECTO CRIPTA", de unas 500 líneas, con el contexto académico, los requisitos del proyecto, la arquitectura acordada, la distribución del trabajo entre los cuatro integrantes, la metodología de trabajo exigida, las decisiones ya tomadas sobre el montículo binario mínimo, y el código propuesto para `model/event.py`, `structures/event_queue.py` y `tests/test_event_queue.py`. Terminaba indicando: "Tu primera acción debe ser confirmar el estado real de `model/event.py`, `structures/event_queue.py` y `tests/test_event_queue.py`, y continuar desde la agenda de eventos." Se adjuntó además el archivo `cripta/docs/proyecto_cripta.md` con el enunciado oficial.
 
-Uso en el proyecto: Se implementaron `model/event.py`, `structures/event_queue.py` y `model/game_state.py`, junto con sus pruebas en `tests/test_event_queue.py` y `tests/test_game_state.py`. Se redactó `docs/DECISIONES.md` con la sección 4.1 y la sección del reloj virtual, y se actualizó `docs/ARQUITECTURA.md` con las interfaces de `EventQueue` y `GameState`.
+Uso en el proyecto: La herramienta revisó los archivos del repositorio y confirmó que los seis archivos `.py` existentes estaban vacíos, que no existía la carpeta `tests/` ni `docs/DECISIONES.md`, y que por lo tanto nada de lo propuesto previamente estaba implementado ni probado. A partir de ahí se implementaron `model/event.py` y `structures/event_queue.py`, se creó `tests/test_event_queue.py` con 10 pruebas y se redactó la sección 4.1 de `docs/DECISIONES.md`.
 
-Cambios realizados por el estudiante: [Indicar qué se revisó y qué se decidió.] Se corrigieron tres puntos del diseño previo tras consultar el enunciado: los identificadores de instancia pasaron de entero a texto, porque el servicio los entrega en ese formato; `is_empty()` pasó a descartar las raíces canceladas, porque antes podía informar que la agenda no estaba vacía cuando ya no quedaba ningún evento ejecutable; y se descartó restaurar el contador de secuencia al usar un pergamino de retroceso, al comprobar que el orden de los eventos no depende del valor absoluto de ese número.
+Cambios realizados por el estudiante: [Indicar qué se revisó y qué se aceptó.] Se aceptaron tres correcciones al diseño previo, planteadas tras consultar el enunciado: los identificadores de instancia pasaron de entero a texto, porque el servicio los entrega en ese formato según §3.3; `is_empty()` pasó a descartar las raíces canceladas, porque antes podía informar que la agenda no estaba vacía cuando ya no quedaba ningún evento ejecutable; y se señaló que los ids de instancia en texto dejan ambiguo el orden de activación de §2.4.
 
+### 3.2 Estilo de los comentarios en el código
 
---ST--
+Fecha: 2026-10-08
+
+Objetivo: Corregir la forma en que la herramienta estaba documentando el código.
+
+Prompts utilizados:
+
+- "Ocupo que solo pongas comentarios necesarios no que expliques el codigo en comentarios dame las explicaciones en un chat aparte"
+
+Uso en el proyecto: Se rechazó una primera versión de `structures/event_queue.py` cuyos comentarios explicaban el funcionamiento del algoritmo. Se reescribió el archivo sin esos comentarios y las explicaciones pasaron a la conversación. Este criterio se mantuvo en todos los archivos posteriores y quedó anotado como diferencia deliberada respecto del estilo de los ejemplos del curso, que sí llevan docstring en casi todos los métodos.
+
+Cambios realizados por el estudiante: Decisión propia del estudiante, aplicada al resto del proyecto.
+
+### 3.3 Reglas obligatorias de trabajo
+
+Fecha: 2026-10-08
+
+Objetivo: Fijar las reglas de estilo, estructuras de datos, arquitectura, pruebas y documentación que la herramienta debía respetar durante todo el proyecto.
+
+Prompts utilizados:
+
+- Documento titulado "REGLAS OBLIGATORIAS PARA LA IA — PROYECTO CRIPTA", con 72 reglas numeradas agrupadas en ocho apartados: idioma y nombres del código, estilo y calidad, estructuras de datos y restricciones, arquitectura, reglas de funcionamiento, pruebas y rendimiento, documentación y uso de IA, y forma de trabajar. Incluía la aclaración de que, si alguna regla contradecía el enunciado oficial, prevalecía el enunciado.
+- En el mismo mensaje: "Explicame tu duda de otra forma: La incertidumbre que no puedo resolver solo: §2.4 dice que los enemigos activados en el mismo instante se programan 'en orden ascendente de su id de instancia', pero los ids son texto ('e-201')."
+- También en el mismo mensaje, la respuesta del estudiante a una pregunta de comprensión sobre por qué no se puede modificar el tiempo de un evento que ya está en el montículo: "Cancelar el evento anterior y programar uno nuevo: marcamos el evento anterior como cancelado y creamos otro con el nuevo tiempo. Cuando el evento cancelado llegue a la raíz, la cola lo descarta y continúa con el siguiente válido."
+
+Uso en el proyecto: Las reglas se aplicaron al resto del desarrollo. La aclaración sobre los identificadores llevó a revisar el enunciado y a concluir que §2 solo exige que el programa sea reproducible consigo mismo, no que coincida con el de otros grupos, de modo que la comparación lexicográfica del identificador completo es suficiente y además no depende del formato de ids de una cripta concreta, que §9 prohíbe asumir.
+
+Cambios realizados por el estudiante: [Indicar qué reglas se ajustaron después de aplicarlas.]
+
+### 3.4 Reloj virtual y contador de secuencia
+
+Fecha: 2026-10-08
+
+Objetivo: Decidir e implementar el reloj virtual, la numeración de eventos y su comportamiento ante el pergamino de retroceso.
+
+Prompts utilizados:
+
+- "Me gustaría que me explicaras el por qué para mí lo mejor es que con el pergamino se considera también el contador. Pero claro, esto implica tener un registro del contador en tal paso y eso se puede hacer con las sumas. Ya que se puede encontrar las acciones más o menos y tener un dato de cuál era el número del contador. Pero si esto incumple alguna regla o algo más que me está saltando del documento, me lo puedes indicar. Aparte de esto, dime qué opción elegirías tú cómo trabajarías con este reloj y con el pergamino o otros eventos que puedan alterarlo"
+- "Entonces lo que va a hacer con el reloj es no modificarlo, simplemente ir contando la cantidad de eventos o la cantidad de acciones en un contador que siga linealmente"
+- "Ok, perfecto. Y pregunta, ¿el rewind clock cómo se calcula? ¿Cómo es que el reloj va hacia atrás? Escribe todo este código ya simplemente contestando a esta pregunta."
+
+Uso en el proyecto: De este intercambio salieron tres decisiones que están documentadas en `docs/DECISIONES.md`. Primera, que el contador de secuencia **no** necesita restaurarse al retroceder, porque ese número solo se usa para comparar eventos entre sí y los eventos restaurados son todos menores que el valor del contador en ese instante, de modo que el orden resultante es idéntico se restaure o no. Segunda, que el reloj **sí** debe restaurarse, porque su valor se usa en aritmética, en la comparación de antigüedad del rastro y en la tabla de puntajes. Tercera, que `rewind_clock_to()` no calcula el instante de destino sino que lo recibe del historial reversible, lo que impone un requisito a la Persona 3. Se implementó `model/game_state.py` con el reloj de solo lectura y 14 pruebas.
+
+Cambios realizados por el estudiante: [Indicar qué se verificó y qué se aceptó.] En la segunda intervención el estudiante propuso no modificar el reloj y llevar solo un contador lineal; al contrastarlo contra §2.11 y §4.6 del enunciado se comprobó que el reloj sí debe restaurarse, y se separaron los dos conceptos.
+
+### 3.5 Control de versiones
+
+Fecha: 2026-10-08
+
+Objetivo: Crear las ramas del repositorio y subir el trabajo.
+
+Prompts utilizados:
+
+- "Ok, ahora creo quiero que crees eh, dos ramas en el repositorio. La cual la primera sea la rama main y la segunda sea la rama Mauricio y que agregues una palabra que describa como lo que ibas haciendo. [...] Después de esto quisiera que subieses, o sea, que hicieses un push en la rama Mauricio y en la rama main con lo que he trabajado hoy. Eso sin darte algún tipo de como que subo parece que solo lo hice yo no te des ningún reconocimiento para que no salga que lo subiste tú ya que el profe nos pidió que fuese así ya que te estoy ya que tengo que apuntar los prompts que te di en prompts eh, LLM"
+- "Ocupo que agregues ese archivo y suban los archivos para que ellos entiendan la, como dónde trabajar, ya que después puede haber más errores."
+
+Uso en el proyecto: Se configuró la identidad del repositorio con el nombre y el correo institucional del estudiante, se creó la rama `mauricio-logica-juego`, y se hicieron los primeros commits. Los commits no llevan ninguna línea de atribución a la herramienta, por indicación del profesor de que el uso de IA se declara en este archivo y no en el historial de git. Se agregaron archivos `.gitkeep` a las carpetas vacías, porque git no versiona carpetas sin archivos y los demás integrantes no las verían al clonar.
+
+Cambios realizados por el estudiante: Decisión propia sobre el nombre de la rama y la identidad de los commits.
+
+### 3.6 Revisión de los ejemplos del curso
+
+Fecha: 2026-10-12
+
+Objetivo: Comparar el código del proyecto con los ejemplos publicados por el profesor, para seguir su estilo y detectar qué técnicas del curso no se pueden usar en el proyecto.
+
+Prompts utilizados:
+
+- Se adjuntó el archivo `estructuras-de-datos-main.zip`, con el repositorio de ejemplos del curso, junto con siete reglas: respetar el estilo del profesor; usar los ejemplos como base; no complicar el código innecesariamente; respetar los requisitos de CRIPTA aunque un ejemplo difiera; explicar las diferencias cuando haga falta una solución nueva; no afirmar que una técnica se vio en clase sin evidencia en los archivos; y mantener coherencia entre módulos.
+- "Ok, ocupo que borres eso de decisiones y lo del estilo profesor me gustaría que lo tuvieses, pero como para revisarlo y que tuvieses un resumen de, de esto, para que no tengas que revisarlo cada vez, abrir el zip y así. [...] Y Ok, sí, por favor, haz eso de GTNOR para no subirlo a ningún momento al repositorio."
+
+Uso en el proyecto: Se comprobó que el único montículo del curso es la función `heapify` dentro del `heapsort` de la semana 7, y que no existe ninguna cola de prioridad con inserción y cancelación, de modo que esa parte del proyecto no tiene precedente en clase. Se verificó que el estilo del proyecto ya coincidía con el del profesor en el uso de `@dataclass` para los nodos, los métodos auxiliares con guion bajo, el retorno de `None` en estructuras vacías y las propiedades con validación. Se identificaron tres técnicas que el profesor usa en sus ejemplos y que el enunciado prohíbe en el proyecto: `pickle` para el guardado binario, `dict` como índice y `sorted()`. El ZIP se agregó al `.gitignore` para no subir material ajeno al repositorio del grupo.
+
+Cambios realizados por el estudiante: Decisión propia de no incorporar el análisis al Documento de Decisiones y de mantener el material del curso fuera del repositorio.
+
+### 3.7 Plan de trabajo sin depender del resto del grupo
+
+Fecha: 2026-10-13
+
+Objetivo: Definir qué partes del motor se podían implementar y probar mientras los demás integrantes no entregaran sus módulos.
+
+Prompts utilizados:
+
+- "Me gustaría poder seguir avanzando con lo que yo puedo hacer y que de momento no dependa de los demás. [...] Entonces sigamos explícitamente con cosas que podamos probar entre comillas, que podamos avanzar en lo que las demás personas me pasen su parte o la suben al repositorio. Entonces sigamos. Con esas partes, dime cuál es Dame un plan primero"
+
+Uso en el proyecto: Se produjo un plan por pasos. Se decidió no crear `model/room.py` y esperar a la Persona 2, y dejar el rastro del jugador como estructura de la Persona 3. Se identificó que atacar no requiere salas, porque §2.6 solo exige que atacante y objetivo compartan sala y `Actor` ya guarda el identificador de sala, y que por lo tanto el comportamiento guardián sí era implementable. Quedó por escrito qué partes quedaban bloqueadas y por qué.
+
+Cambios realizados por el estudiante: Decisión propia de no definir `Room` ni el rastro, para no invadir el trabajo de los compañeros.
+
+### 3.8 Cambios solicitados por la Persona 4
+
+Fecha: 2026-10-14
+
+Objetivo: Atender los pedidos que la Persona 4 planteó para poder implementar el controlador y la persistencia.
+
+Prompts utilizados:
+
+- Se adjuntaron dos capturas con el documento de la Persona 4, que pedía la interfaz de `Game`, la posibilidad de restaurar el contador de secuencia y el estado del generador aleatorio en `GameState`, un método para listar los eventos activos de `EventQueue`, campos adicionales en `Event` para serializar efectos, y señalaba una posible coma final en `rewind_clock_to`. Acompañadas de: "Que más deberia hacer? Antes de hacer un push ya que mis compañeros me estan pidiendo esto. Y ocupo subirlo para no atrasar a mis compañeros"
+- "De momento pongamos como prioridad esto, que dijiste de la persona 4, eh, hagamos eso. Para que él pueda trabajar."
+
+Uso en el proyecto: Se verificó en el repositorio que la coma final reportada no existía. Se agregaron `GameState.restore()`, `GameState.random_state()`, `EventQueue.active_events()` y los campos `amount`, `room_id`, `direction` e `instance_id` a `Event`. Se cambió `Event` para que guarde la referencia al objeto `Actor` en lugar de su identificador, porque buscarlo costaría O(n) por evento y §7 prohíbe usar `dict` como índice. Se dejó documentado en `docs/ARQUITECTURA.md` el contrato de `Game` con el controlador y la diferencia entre cargar una partida y retroceder, que en el grupo se estaba confundiendo.
+
+Cambios realizados por el estudiante: [Indicar qué se comunicó a la Persona 4 y qué se acordó.]
+
+### 3.9 Bucle del motor, actores y enemigos
+
+Fecha: 2026-10-14
+
+Objetivo: Implementar el motor que coordina reloj, agenda y actores, con las acciones de esperar y atacar.
+
+Prompts utilizados:
+
+- "Ok, está bien, pero a partir de ahora, por favor, trata de recomendarme o de darme opciones de con qué seguir trabajando para no perder el ritmo [...] y cosas por lo general que permitan que mis compañeros avancen en su trabajo, obviamente que solo involucren mi parte."
+- Selección de la opción "El motor corriendo", entre tres opciones propuestas.
+
+Uso en el proyecto: Se implementaron `model/actor.py`, `model/player.py`, `model/enemy.py` y `model/game.py`, con el bucle de eventos, el combate de §2.6, la activación de enemigos de §2.4 y el descarte de eventos de actores muertos. Se verificaron los tiempos contra el ejemplo de §2.13 del enunciado. Durante la escritura de las pruebas se detectó un error: un actor conservaba la referencia a un evento ya ejecutado, de modo que un cambio de velocidad en ese momento lo habría dejado con dos acciones pendientes sin producir ninguna excepción.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó del bucle y del combate.]
+
+### 3.10 Efectos temporales y mediciones de rendimiento
+
+Fecha: 2026-10-14
+
+Objetivo: Implementar los efectos de §2.10 que no dependen de las salas y producir las mediciones que exige el enunciado.
+
+Prompts utilizados:
+
+- "Perfecto, continúa con la parte 1 y 2. Pero en la parte 3 podrías avanzar algo sin tocar lo de la parte de mi compañero. Si esta parte me toca a mí alguna, por más mínima que sea, me gustaría avanzarlo y o terminarlo lo máximo posible. [...] Dime qué puedes hacer y sin tocar ninguna parte de ninguno de mis compañeros. Después de esto, haz un push después de revisar y hacer test de todo. Explícame y pregúntame antes de hacer el push al final."
+
+Uso en el proyecto: Se implementaron el veneno, la regeneración, el cambio de velocidad y la antorcha, más el antídoto. Se decidió que el veneno programe sus cinco activaciones de una vez, porque su duración e intervalo son constantes, lo que evita tener objetos de efecto con estado y vuelve trivial la cancelación. `Game` pasó a recibir la bitácora de mensajes desde fuera, de modo que la bitácora circular de la Persona 3 encaje sin modificar el motor. Se escribió `benchmark/scheduler_bench.py`, que mide el montículo contra una lista sin ordenar y el ciclo completo de eventos, y con esos números se completaron los dos apartados de evidencia empírica que estaban pendientes en `docs/DECISIONES.md`.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó de los efectos y de las mediciones.]
+
+### 3.11 Redacción del Documento de Decisiones
+
+Fecha: 2026-10-14
+
+Objetivo: Reescribir `docs/DECISIONES.md` con una redacción más natural, y producir un documento de estudio personal.
+
+Prompts utilizados:
+
+- "Ocupo que okay, ahorita me concentrémonos en modificar el documento de decisiones. Me gustaría que lo hicieras como un poquito más lenguaje en el tema de común, pero a la vez que no sea predecible. ¿Me entiendes? Ya que la IA se detecta con que sea predecible. Entonces, que no sea así. Después de eso, me gustaría como que me dieras, aparte de esto, un documento que me explique esto de forma muy sencilla y paso a paso."
+- "Ok, me gustaría que metieses eh, mi guía de estudio en el Git Ignore para que no se comité. Y no se suba al repositorio. Después de esto, eh, ocupo que revises prompts LLM y me ayudes a completar ese archivo."
+
+Uso en el proyecto: Se reescribió `docs/DECISIONES.md` conservando íntegros el contenido técnico, las complejidades y todas las mediciones, y cambiando únicamente la redacción. Se produjo además una guía de estudio personal, que por decisión del estudiante no se sube al repositorio y está incluida en el `.gitignore`. Se completó esta sección del registro de prompts.
+
+Cambios realizados por el estudiante: [Indicar qué partes del Documento de Decisiones se reescribieron con palabras propias.]
+
+### 3.12 Frecuencia medida de las operaciones y revisión del motor
+
+Fecha: 2026-10-14
+
+Objetivo: Completar la frecuencia medida que pide §8 del enunciado y revisar el motor contra el enunciado buscando reglas mal implementadas.
+
+Prompts utilizados:
+
+- "Que puedo avanzar de mi parte?"
+- Elección de la opción "Contadores y frecuencias medidas", entre tres propuestas.
+- "La opcion 2", eligiendo la revisión contra el enunciado.
+
+Uso en el proyecto: Se agregaron a `Game` los contadores `player_actions`, `enemies_defeated` y `events_processed`, que §2.12 pide para la tabla de puntajes. `Game` pasó a recibir también la agenda desde fuera, de modo que las mediciones usan una subclase con contadores sin instrumentar la estructura de producción. Se midió la frecuencia real de las operaciones en tres escenarios y se completó el apartado correspondiente de la sección 4.1 del Documento de Decisiones.
+
+La revisión encontró dos errores que no producían ninguna excepción: dos efectos de velocidad encimados dejaban al actor con una velocidad permanente equivocada, y una partida terminada seguía aceptando acciones y sumándolas al contador. Se corrigieron los dos y se agregaron pruebas que los fijan.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó de los contadores y de las correcciones.]
+
+### 3.13 Revisión e integración del bloque 2
+
+Fecha: 2026-10-15
+
+Objetivo: Revisar el trabajo de la Persona 2 antes de integrarlo y fusionar su rama.
+
+Prompts utilizados:
+
+- "Ya mi compañero subio su parte puedes revisar y ver si esta bien, para poder continuar con mi parte"
+- "trae su rama y después de eso revisa si hay alguna incongruencia, si hay algo que moleste. Quisiera resolver esto antes de seguir programando para que no me afecte el futuro."
+
+Uso en el proyecto: Se hizo una fusión de prueba en una rama temporal para comprobar que la integración no rompía nada antes de decidir. Se verificó que las firmas con las que el Traductor crea `Player` y `Enemy` coinciden con las del motor, que el código del bloque 2 no usa `dict` como índice, `sorted()` ni `pickle`, y que las 125 pruebas del motor siguen pasando. Se fusionó la rama resolviendo el único conflicto, en este mismo archivo, y se corrigió el título de la sección 6 de `docs/ARQUITECTURA.md`, que tras la fusión ya no describía su contenido.
+
+Se detectó que el Traductor no lee ningún campo de regeneración de la ficha del catálogo, de modo que `Enemy.regeneration` siempre llega en cero y la regla de §2.10 no se aplicaría si la cripta de la revisión trae un enemigo que la declare.
+
+Cambios realizados por el estudiante: [Indicar qué se comunicó a la Persona 2 sobre la regeneración y qué se acordó.]
+
+### 3.14 Movimiento, puertas, trampas y comportamiento errante
+
+Fecha: 2026-10-15
+
+Objetivo: Implementar lo que al motor le faltaba del enunciado una vez disponibles las clases de sala del bloque 2.
+
+Prompts utilizados:
+
+- "sigamos con el movimiento y las puertas, ya que es creo que lo más importante de momento que nos falta. Y ya sabemos cómo hacerlo."
+- Después, la indicación de continuar con el comportamiento errante y con los objetos que sueltan los enemigos al morir.
+
+Uso en el proyecto: Se implementaron `move()` y `open_door()`, las trampas al entrar a una sala y su rearme, el cierre automático de puertas, la condición de victoria, el comportamiento errante y el paso de los objetos de un enemigo muerto al suelo de su sala.
+
+Jugando la cripta real apareció un error que las pruebas unitarias no habían detectado: el motor comparaba el campo `abre` de la llave contra la llave que pide la puerta, y con los datos reales nunca coincide. §2.7 dice que la coincidencia es contra el id de la ficha. Las pruebas pasaban porque construían la llave con el mismo malentendido que el código.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó y qué se decidió.]
+
+### 3.15 Revisión de la rama de la Persona 4 y coordinación con el grupo
+
+Fecha: 2026-10-15
+
+Objetivo: Revisar el controlador, la vista y la bitácora de reproducción antes de integrarlos, y preparar lo que hay que pedirle al resto del grupo.
+
+Prompts utilizados:
+
+- "Revisemos la rama de mi compañero, de la persona 4, y no hagamos lo del rastro, ya que prefiero esperar a los demás."
+- "dame todo lo que falta de mi módulo, lo que me faltaría a mí por trabajar, sepáralo por lo que no depende de mí y por lo que depende de mí."
+
+Uso en el proyecto: Se fusionaron las tres ramas en una rama temporal, se comprobó que no hay conflictos y se jugó la cripta real a través de su controlador, grabando la bitácora de reproducción y reproduciéndola después; la reproducción dio exactamente la misma partida.
+
+Aparecieron dos errores, los dos del motor y no de su código: escribir cualquiera de los siete comandos que dependen del inventario terminaba el programa con `AttributeError`, y al entrar a una sala con trampa el mensaje del daño se anotaba antes que el de la entrada. Se corrigieron ambos.
+
+Se redactaron además los mensajes de coordinación para la Persona 3 y la Persona 4.
+
+Cambios realizados por el estudiante: [Indicar qué se comunicó al grupo y qué se acordó.]
+
+### 3.16 Nueva medición del presupuesto de procesamiento
+
+Fecha: 2026-10-15
+
+Objetivo: Rehacer la medición de §5.2 con un escenario que recorra una cripta de verdad.
+
+Prompts utilizados:
+
+- "volvamos a medir y hagamos las frecuencias para después subir esto y de momento no revisemos nada, debido a que faltan cosas y siento que es pérdida de tiempo."
+
+Uso en el proyecto: La medición anterior era insuficiente, porque el jugador solo esperaba y los enemigos eran guardianes quietos, sin salas ni trampas ni puertas. El escenario nuevo recorre una cripta en línea con trampas que se rearman, puertas que se cierran solas y enemigos errantes. Se comprobó que ejercita lo que declara contando las activaciones reales.
+
+De los datos salió una conclusión que antes no se podía sacar: lo que llena la agenda es la cantidad de enemigos activos y no el tamaño de la cripta, lo que responde directamente a una de las preguntas de orientación del enunciado.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó de las mediciones.]
+
 ## 4. Revisión de interfaces existentes y contrato de la Persona 4
 
 Herramienta: Claude (Claude Sonnet 5.5), mediante la interfaz de chat de claude.ai
@@ -72,6 +312,8 @@ Uso en el proyecto: Se utilizó la respuesta para identificar huecos que afectan
 
 Cambios realizados por el estudiante: [Indicar qué se verificó en el repositorio (por ejemplo, la coma final en `rewind_clock_to`), qué propuestas se aceptaron o descartaron y qué se acordó con el grupo.]
 
+Nota posterior: la coma final reportada en `rewind_clock_to` se verificó contra el archivo del repositorio y no existe. Los otros cuatro pedidos se implementaron el 2026-10-14, según la entrada 3.8.
+
 ## 5. Resumen de puntos para la reunión del grupo
 
 Herramienta: Claude (Claude Sonnet 5.5), mediante la interfaz de chat de claude.ai
@@ -87,3 +329,576 @@ Prompts utilizados:
 Uso en el proyecto: Se utilizó la respuesta como guía para la reunión del grupo: interfaz pendiente de `Game`, cambios solicitados a `GameState`, `EventQueue` y `Event`, reparto de archivos de persistencia, decisiones abiertas sobre el log de replay y formato de log propuesto.
 
 Cambios realizados por el estudiante: [Indicar qué puntos se discutieron con el grupo y qué se decidió.]
+
+## 6. API, caché y persistencia (Persona 2)
+
+Registro de la Persona 2. Los prompts se reproducen tal cual, incluidos los errores de escritura. En la entrada 6.2 se pegaron dos textos de un compañero, que se describen en lugar de copiarlos. Algunos mensajes de coordinación (por ejemplo, avisos de pausa) no se registraron porque no pidieron nada sobre el proyecto.
+
+### 6.1 Análisis del enunciado y del programa del curso
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-10
+
+Objetivo: Entender el alcance del proyecto y relacionar los problemas de §4 con los temas del curso.
+
+Prompts utilizados:
+
+```text
+Soy estudiante de ingenieria en sistemas,  estoy segundo año de carrera, estoy en el curso de Estructuras de datos, tengo que hacer un proyecto basado en un juego pero lo importante no es el juego sino el sistema que consulta un API para obtener archivos JSON con informacion o indicaciones para avanzar en el juego. El archivo PDF es la descripcion del proyecto dado por el profesor y con indicaciones del profesor para aplicar por parte de la IA para que se hagan las cosas de algunas formas especificas. Necesito que me ayudes a generar los archivos necesarios con el codigo para el proyecto. El lenguaje de programacion es python, del cual tengo conocimiento basico y se pueden utilizar las librerias python game y arcade (creo recordar que asi se llamaban las librerias mencionadas por el profesor) pero de momento necesito primero que analices el documento del proyecto para que te hagas la idea sobre lo que trata el proyecto, luego te paso otra informacion para analizar y cuando te indique, me ayudas con la generacion de codigo y los archivos necesarios para el proyecto. Toma el tiempo que necesites para analizar el proyecto. El segundo PDF que te pasare es la informacion sobre el curso y sobre los temas que se ven en el curso para que tengas mas claro los temas que se ven en el curso y sea mejor para analizar el proyecto con relacion a los temas que se dan en el curso.
+```
+
+Adjuntos: Enunciado del proyecto CRIPTA (PDF) y programa del curso EIF-207 (PDF).
+
+Uso en el proyecto: Se usó para entender el alcance del proyecto y relacionar los problemas de la sección 4 con los temas del curso.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.2 Revisión del flujo de trabajo y de la distribución del grupo
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-10
+
+Objetivo: Crear esta bitácora, comparar alternativas de estructuras de datos y revisar la organización del trabajo y el flujo propuestos por el grupo.
+
+Prompts utilizados:
+
+```text
+Primero, ayudame a llevar el historial de prompt para tenerlo en un documento y poder entregarselo al profesor junto al de mis compañeros ya que es requerido. Por las estructuras de datos, analiza las estructuras de datos que mencionaste como primera y segunda opcion para elegir las que se comporten de manera más estable en el programa y sean las mejores segun rendimiento, complejidad algoritmica y velocidad de procesamiento de los datos. Algunas funciones del juego, segun la explicacion dada por el profesor, hay que elegir algunas cosas del juego como objetos que se encuentran, enemigos que se encuentran en las habitaciones de la masmorra, armas que se encuentren y decisiones sobre si lucha o huye de algun enemigo. Hay una informacion dada por uno de mis compañeros sobre la organizacion del trabajo y como debe ser el flujo de trabajo para realizar el proyecto, ademas de la distribucion de funciones o lo que le corresponde a cada uno realizar. Asi que primero te paso la informacion sobre la estructura del trabajo y el flujo para realizar el trabajo, creo que se realizo con una IA, asi que analiza como esta la informacion y si esta bien estructurado:
+
+[se pegó el prompt de trabajo para la IA propuesto por un compañero: reglas de trabajo y flujo por etapas]
+
+
+Ahora, esta informacion es sobre la distribucion del trabajo entre los integrantes del grupo, el cual me corresponde hacer el punto numero 2:
+
+[se pegó la propuesta de distribución del trabajo en cuatro bloques]
+
+Analiza toda esa informacion y dime que tan bien esta la informacion y sobre ese flujo de trabajo para luego concentrarnos en realizar la parte que me corresponde.
+```
+
+Uso en el proyecto: Se creó el registro de prompts del bloque 2, se compararon las estructuras candidatas de cada problema y se propusieron ajustes al flujo de trabajo y a la distribución del grupo.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.3 Fecha de entrega y plan de trabajo
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-10
+
+Objetivo: Planificar el trabajo del bloque 2 según la fecha de entrega.
+
+Prompts utilizados:
+
+```text
+la fecha de entrega esta en duda ya que la primera fecha dada es para mañana 11 de octubre pero recordamos que el profesor dio tiempo al 18 de octubre
+```
+
+Uso en el proyecto: Plan de trabajo diario del bloque 2 para las dos fechas posibles de entrega.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.4 Análisis del bloque 2
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-10
+
+Objetivo: Analizar los requisitos, decisiones abiertas e interfaces del bloque 2 (API, caché y persistencia).
+
+Prompts utilizados:
+
+```text
+Si, iniciemos con el análisis del bloque 2 que me corresponde y luego vemos la tabla hash ya que anteriormente mencionaste que me debe corresponder a mi
+```
+
+Uso en el proyecto: Lista de requisitos del bloque 2, costo en solicitudes de una partida, decisiones D1 a D9 e interfaces a acordar con el grupo.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.5 Supuestos para lo que el enunciado no define
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Proponer soluciones a los casos que el enunciado no define y confirmar las decisiones de diseño del bloque 2.
+
+Prompts utilizados:
+
+```text
+Sobre las respuestas del punto 7, es complicado contactar al profesor de manera que es mejor plantear una respuesta o una solucion a cada una de las incognitas planteadas en base a la logica implementada en juegos  semejantes a este para deducir la logica que deba seguir 
+
+Sobre las estructuras de datos y demas puntos mencionados, estoy de acuerdo con las decisiones que planteaste como solucion para implementarlas en el proyecto, sobre el punto uno estoy de acuerdo en hacer una implementacion como dijiste y luego, si da tiempo, hacer el cambio para optimizar el programa
+```
+
+Uso en el proyecto: Supuestos documentados en `docs/BLOQUE_2_PARA_EL_GRUPO.md` (sección 5) y aprobación de las decisiones D1 a D9.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.6 `dict` frente a una tabla hash propia
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Comparar la eficiencia del `dict` de Python contra una tabla hash propia, con una medición de prueba.
+
+Prompts utilizados:
+
+```text
+Que tan eficiente es utilizar bibliotecas de python en lugar de tablas hash ya que en si mismas son tablas hash en su funcionamiento?
+```
+
+Uso en el proyecto: Script de comparación `dict` contra tabla propia; confirmó que la restricción de §7 tiene un costo medible y que la función hash es lo que más pesa.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.7 Elección de la función hash e implementación de `TablaHash`
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Comparar las mediciones de dos computadoras, elegir la función hash (crc32 o FNV-1a) e implementar la `TablaHash` con sus pruebas y su benchmark.
+
+Prompts utilizados:
+
+```text
+Aca estan los resultados de los test de velocidad ya probados en mi computadora para que los compares con los obtenidos por ti
+
+En otro punto sobre la duda en si utilizar las bibliotecas, entiendo que no se puedan utilizar asi que sigamos con la tabla hash como esta indicado en el enunciado del proyecto
+
+Revisa los resultados y luego con eso, vemos si se implementa la tabla hash con FNV-1a o con crc32
+```
+
+Adjuntos: Captura de pantalla con los resultados de `comparar_dict_vs_tabla_propia.py` en la computadora de Mauricio.
+
+Uso en el proyecto: `structures/tabla_hash.py` y `structures/funciones_hash.py` con crc32, sus pruebas y su benchmark.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.8 Benchmark de la tabla hash e interfaz `FuenteDatos`
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Interpretar el benchmark de la `TablaHash`, corregir el calentamiento del benchmark y definir la interfaz `FuenteDatos` (contrato común de red y modo offline).
+
+Prompts utilizados:
+
+```text
+Ya estan los resultados ejecutados desde la consola como lo indicaste 
+
+Y si, vamos con la interfaz FuenteDatos
+```
+
+Adjuntos: Captura de pantalla con los resultados de `python -m bench.bench_tabla_hash` en la computadora de Mauricio.
+
+Uso en el proyecto: `adapters/fuente_datos.py` (contrato común, errores y cuenta del presupuesto) y ajuste del benchmark.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.9 Benchmark con calentamiento del procesador
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Interpretar los resultados del benchmark de la `TablaHash` después de agregar el calentamiento.
+
+Prompts utilizados:
+
+```text
+Aca estan los resultados con el nuevo archivo cripta que me pasaste
+```
+
+Adjuntos: Captura de pantalla con los resultados de `python -m bench.bench_tabla_hash` (versión con calentamiento) en la computadora de Mauricio.
+
+Uso en el proyecto: Interpretación de la segunda corrida del benchmark de la tabla hash.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.10 Métodos abstractos de `FuenteDatos`
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Entender qué son los métodos abstractos de `FuenteDatos` y quién los implementa.
+
+Prompts utilizados:
+
+```text
+Del archivo FuenteDatos tengo una duda, los metodos que estan solo con comentarios es porque falta la implementacion y tiene que hacerlo alguno de los compañeros segun la parte que tienen que hacer ?
+```
+
+Uso en el proyecto: Aclaración: `FuenteHttp` y `FuenteOffline` implementan el contrato; son parte del bloque 2.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.11 `FuenteHttp`, `FuenteOffline` y descarga de datos para el modo offline
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Implementar `FuenteHttp` y `FuenteOffline` con sus pruebas, y una herramienta para descargar los datos del modo offline.
+
+Prompts utilizados:
+
+```text
+Si, continuemos con los dos archivos Fuente
+Sigue usando los nombres descriptivos para las clases, funciones y metodos como lo hiciste con el archivo FuenteDatos, me gusta que sea asi
+```
+
+Uso en el proyecto: `adapters/fuente_http.py`, `adapters/fuente_offline.py`, `tools/descargar_datos_offline.py` y sus pruebas.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.12 Carpeta desde la que se ejecutan las pruebas
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Saber desde qué carpeta ejecutar las pruebas y la herramienta de descarga.
+
+Prompts utilizados:
+
+```text
+Para probar con los comandos de test que me diste, los pruebo desde la carpeta cripta que me diste en el zip??
+```
+
+Uso en el proyecto: Instrucciones para ejecutar las pruebas desde la carpeta correcta.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.13 Primera conexión real con el API
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Interpretar el resultado de la primera conexión real con el API y decidir el siguiente paso.
+
+Prompts utilizados:
+
+```text
+Aca esta lo de la consola con test que me diste
+```
+
+Adjuntos: Captura de pantalla de la consola con la instalación de dependencias, las pruebas (106 OK) y la primera descarga real del API.
+
+Uso en el proyecto: Confirmación de la conexión real y de las 7 solicitudes de la descarga completa.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.14 Revisión de los datos reales de `cripta-01`
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Revisar los datos reales para confirmar o corregir los supuestos del diseño (puertas, pociones, presupuesto, campos opcionales).
+
+Prompts utilizados:
+
+```text
+Te adjunto la carpeta que me solicitaste de los datos offline
+```
+
+Adjuntos: `datos_offline.zip`, con los datos de `cripta-01` y el catálogo descargados del API real.
+
+Uso en el proyecto: Hallazgos sobre puertas declaradas desde un solo lado y el campo `abre` de las llaves; descripción de la caché LRU.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.15 Caché LRU del catálogo
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Implementar la caché LRU del catálogo (`CacheCatalogo`) con sus pruebas y su benchmark.
+
+Prompts utilizados:
+
+```text
+Si, implementala asi
+```
+
+Uso en el proyecto: `structures/cache_catalogo.py`, sus pruebas y su benchmark.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.16 Almacén de fichas en disco
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Implementar el almacén de fichas en disco (`AlmacenFichas`, decisión D6) con sus pruebas y su benchmark.
+
+Prompts utilizados:
+
+```text
+Si, sigamos con el almacen en disco de la parte D6
+```
+
+Uso en el proyecto: `adapters/almacen_fichas.py`, sus pruebas y su benchmark.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.17 Proyecto en una sola carpeta, con README y verificación automática
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Ordenar el proyecto en una sola carpeta lista para abrir y ejecutar, con README y un script que corre las pruebas y los benchmarks y guarda los resultados.
+
+Prompts utilizados:
+
+```text
+Dame los archivos ordenados como deberian de estar para abrir la carpeta y ejecutar en consola los comandos que me pides probar y pasarte los resultados
+```
+
+Uso en el proyecto: README, `tools/ejecutar_verificaciones.py` y proyecto ordenado en una sola carpeta.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.18 Resultados de la verificación y diseño del `GestorCatalogo`
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Interpretar los resultados de las pruebas y los benchmarks, y proponer la interfaz del `GestorCatalogo`.
+
+Prompts utilizados:
+
+```text
+Aca esta el txt con los resultados de las verificaciones
+```
+
+Adjuntos: `resultados_verificacion.txt` (pruebas y benchmarks ejecutados en la computadora de Mauricio).
+
+Uso en el proyecto: Interpretación de la primera medición oficial y propuesta de interfaz del `GestorCatalogo`.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.19 Implementación del `GestorCatalogo`
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Implementar el `GestorCatalogo` (memoria, disco y red con lotes de 10) con sus pruebas.
+
+Prompts utilizados:
+
+```text
+Si, me parece bien 
+implementalo de esa manera
+```
+
+Uso en el proyecto: `repository/gestor_catalogo.py`, `structures/lista_sin_repetidos.py` y sus pruebas.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.20 Comprobación de un archivo enviado aparte
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Confirmar que el archivo `gestor_catalogo.py` enviado aparte es idéntico al que viene dentro del zip.
+
+Prompts utilizados:
+
+```text
+Ya hare las pruebas pero tengo la duda si el archivo gestor catalogo que me das es el mismo que esta dentro del zip
+```
+
+Uso en el proyecto: Confirmación de que el archivo enviado aparte era idéntico al del proyecto.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.21 Segunda medición y diseño de la precarga por BFS
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Comparar la segunda medición con la primera y explicar el diseño de la precarga con BFS (`GestorContenido`).
+
+Prompts utilizados:
+
+```text
+Aca estan los resultados de las verificaciones
+```
+
+Adjuntos: `2.resultados_verificacion.txt` (segunda corrida de pruebas y benchmarks en la computadora de Mauricio).
+
+Uso en el proyecto: Comparación de la segunda medición y explicación de la precarga por BFS.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.22 `GestorContenido` con precarga por BFS
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Implementar el `GestorContenido` con la precarga por BFS (grafo de salas, pruebas y benchmark de solicitudes).
+
+Prompts utilizados:
+
+```text
+Continuemos con el proyecto, implementa el GestorContenido con la precarga por BFS y una vez que este listo, corro la tercera medicion de los test para verificar que todo este funcionando correctamente\
+```
+
+Uso en el proyecto: `structures/grafo_salas.py`, `repository/gestor_contenido.py`, sus pruebas y `benchmark/bench_precarga_contenido.py`.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.23 Tercera medición y medianas
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-13
+
+Objetivo: Consolidar las tres corridas en una tabla con el valor del medio de cada medición, para el Documento de Decisiones.
+
+Prompts utilizados:
+
+```text
+Adjunto el txt de los resultados de las verificaciones realizadas
+```
+
+Adjuntos: `3.resultados_verificacion.txt` (tercera corrida de pruebas y benchmarks en la computadora de Mauricio).
+
+Uso en el proyecto: Medianas de las tres corridas en `docs/mediciones/bloque2/`.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.24 `RepositorioCripta`, persistencia por versión y guía para el grupo
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-14
+
+Objetivo: Implementar el `RepositorioCripta` (punto de entrada del bloque 2), la persistencia del esqueleto y del contenido, la verificación de versiones para `--replay`, una herramienta de simulación y un documento de integración para el grupo.
+
+Prompts utilizados:
+
+```text
+Sigamos con el RepositorioCripta, avancemos en los archivos todo lo que sea posible para actualizar el proyecto en github y asi los demas puedan avanzar y con eso pueda yo solicitarle los archivos necesarios para poder terminar este bloque del proyecto
+```
+
+Uso en el proyecto: `repository/repositorio_cripta.py`, `adapters/almacen_cripta.py`, `tools/simular_partida_bloque2.py` y `docs/BLOQUE_2_PARA_EL_GRUPO.md`.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.25 Presupuesto de solicitudes medido contra el API real
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-14
+
+Objetivo: Interpretar el presupuesto de solicitudes medido contra el API real y guardarlo como evidencia.
+
+Prompts utilizados:
+
+```text
+(mensaje sin texto: solo la captura de pantalla con los resultados)
+```
+
+Adjuntos: Captura de pantalla con dos corridas de `herramientas.simular_partida_bloque2` contra el API real (arranque en frío y en caliente).
+
+Uso en el proyecto: Evidencia en `docs/mediciones/bloque2/presupuesto_api_real_2026-10-14.md`.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+
+### 6.26 `Traductor` y clases de sala, objeto y trampa
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-14
+
+Objetivo: Implementar el `Traductor` completo (datos del API → objetos del modelo), crear las clases del modelo que faltaban para salas, puertas, objetos y trampas, e integrarlo al `RepositorioCripta`.
+
+Prompts utilizados:
+
+```text
+Ahora sigamos con el Traductor ya que se tiene lo necesario para poder hacerlo completo y asi añadirlo al proyecto, seguiré trabajando sobre la carpeta del proyecto, nada más pasame los archivos que se creen o modifiquen y la ubicacion dentro de las carpetas del proyecto donde deben ir para ir agregandolos
+```
+
+Respuesta elegida en la pregunta de opciones que hizo Claude, porque las clases de sala, objeto y trampa no existían en ninguna rama:
+
+```text
+Completo con clases propias (Recomendado)
+```
+
+Uso en el proyecto: `repository/traductor.py`, `model/room.py`, `model/item.py`, `model/trap.py`, integración en `repository/repositorio_cripta.py` y `tools/simular_partida_bloque2.py`, pruebas en `tests/test_traductor.py`, `tests/test_room.py` y `tests/test_repositorio_cripta.py`, y actualización de `docs/BLOQUE_2_PARA_EL_GRUPO.md`, `docs/ARQUITECTURA.md` y `README.md`.
+
+Cambios realizados por el estudiante:  Ante la pregunta de cómo hacer el Traductor, se eligió la opción completa con clases propias (`model/room.py`, `model/item.py`, `model/trap.py`), porque las clases de sala, objeto y trampa no existían en ninguna rama y sin ellas el Traductor quedaba a medias. Se aceptaron los acuerdos propuestos: una sola puerta compartida por cada paso entre dos salas, los enemigos fuera de `Room` (en la lista de `Game`), los objetos que suelta un enemigo creados de antemano y el comportamiento del API traducido a las constantes de `Enemy`. Antes de agregar los archivos se comprobó que la rama local estaba igual que la de GitHub (`git rev-parse HEAD^{tree}`), y después se verificaron las 373 pruebas y la simulación sin conexión. Los cambios se subieron en el commit 480e6d2 de la rama `Parte_2-API-cache-persistencia`.
+
+### 6.27 Verificación del `Traductor` contra el API real
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-14
+
+Objetivo: Confirmar que la rama estaba lista para agregar el `Traductor` e interpretar la simulación contra el API real con los objetos del modelo.
+
+Prompts utilizados:
+
+```text
+Utilice los comandos en el git bush y esta limpia la rama, asi que se pueden agregar los cambios. Ya agregue los cambios a la carpeta del proyecto local. 
+
+En la otra imagen es la prueba de los test que corri para verificar que todo funciona bien en el proyecto, limpie la cache y lo corri nuevamente
+```
+
+Adjuntos: Captura de Git Bash con el resultado de `git rev-parse HEAD^{tree}` y captura con dos corridas de `tools.simular_partida_bloque2` contra el API real (arranque en frío y en caliente).
+
+Uso en el proyecto: Evidencia en `docs/mediciones/bloque2/presupuesto_api_real_2026-10-14.md` (segunda medición) y `docs/mediciones/bloque2/presupuesto_api_real_traductor_2026-10-14.png`.
+
+Cambios realizados por el estudiante: Se ejecutó la simulación contra el API real con la caché borrada y después otra vez con la caché llena. Se obtuvieron 7 de 9 solicitudes en frío y 3 de 9 en caliente, y el Traductor creó 6 salas, 3 enemigos, 8 objetos en el suelo, 2 objetos que sueltan los enemigos y 1 trampa. También se verificaron las 373 pruebas. Se decidió guardar esta segunda medición como evidencia junto a la primera, en `docs/mediciones/bloque2/`. Se aclaró cuál de los archivos enviados correspondía al código y cuál a la documentación, y todo se subió en el mismo commit 480e6d2.
+
+### 6.28 Revisión del proyecto integrado y regeneración de enemigos
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-15
+
+Objetivo: Revisar el proyecto con las ramas de las personas 1, 2 y 4 unidas, comprobar que los bloques funcionen juntos y resolver la observación de la persona 1 sobre la regeneración de los enemigos.
+
+Prompts utilizados:
+
+```text
+(mensaje sin texto: solo la captura de pantalla con las 521 pruebas y la simulación offline en la rama de revisión)
+```
+
+Segundo mensaje, con el proyecto adjunto:
+
+```text
+Te adjunto el proyecto para que revises todos los archivos y me ayudes a contrastar que todo funcione bien junto, ademas, te pasare un mensaje de un companero sobre algo que hay que resolver para que una vez revisado el proyecto, hagas la revision del mensaje y poder resolverlo:
+
+El mensaje del companero:
+"La incongruencia que sí importa
+El traductor no lee ningún campo de regeneración. Tu motor la implementa completa y la activa sola cuando enemy.regeneration > 0, pero el traductor nunca llena ese campo, así que siempre llega en cero.
+
+En cripta-01 no hay ningún enemigo con regeneración, así que hoy no se nota. Pero §2.10 dice que un enemigo puede declararla, y §9 avisa que la revisión usa una cripta que nadie vio. Si esa cripta trae uno, no se va a curar nunca y nada lo va a avisar.
+
+No lo arreglé yo porque el traductor es su archivo y, sobre todo, porque no sabemos cómo se llama ese campo en el API. Hay que preguntárselo a él o encontrar una cripta publicada que lo traiga."
+```
+
+Adjuntos: Captura de PowerShell con las pruebas y la simulación en la rama `revision-integracion`, y el zip del repositorio completo en esa rama (con la carpeta `.git`).
+
+Uso en el proyecto: Revisión de la integración (pruebas, simulación y una partida de prueba que une los bloques 1, 2 y 4), verificación del contrato del API en `/openapi.json`, avisos de campos desconocidos en `repository/traductor.py` con sus pruebas, y actualización de S13 y de los pasos de integración para la persona 4 en `docs/BLOQUE_2_PARA_EL_GRUPO.md`.
+
+Cambios realizados por el estudiante: Se unieron en una rama local de revisión (`revision-integracion`) las ramas de las personas 1 y 4 con la del bloque 2, sin conflictos, y se comprobó que pasaban las 521 pruebas y la simulación sin conexión. Sobre la observación de la persona 1, se revisó la evidencia del contrato del API (`/openapi.json`, versión 1.0.0): el esquema `Enemy` es cerrado y no tiene ningún campo de regeneración. Por eso se decidió no adivinar el nombre de un campo y dejar `regeneration` en 0 (S13), agregando en el Traductor un aviso en el reporte final por si el API llega a enviar un campo que el programa no conoce. Los cambios se aplicaron en la rama `Parte_2-API-cache-persistencia` y no en la de revisión, y se verificaron las 380 pruebas antes de subirlos. Los problemas de integración que dependen de otros integrantes (cargar la sala desde el controlador, `main.py`, la vista y el bloque de la persona 3) se comunican al grupo en lugar de modificar sus archivos.
