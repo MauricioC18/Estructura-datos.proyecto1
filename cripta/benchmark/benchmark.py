@@ -21,6 +21,7 @@ SUITES = (
     ("Recuperacion de fichas desde disco", "benchmark.bench_almacen_fichas"),
     ("Precarga de contenido", "benchmark.bench_precarga_contenido"),
     ("Inventario, historial, rastro, bitacora y ordenamientos", "benchmark.persona3_bench"),
+    ("Bitacora de partida y reproduccion", "benchmark.replay_bench"),
 )
 
 
