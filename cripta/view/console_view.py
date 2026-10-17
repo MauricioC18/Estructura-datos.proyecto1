@@ -9,15 +9,15 @@ class ConsoleView:
     Solo lee el VisibleState que entrega Game; nunca modifica el modelo. La
     salida y la entrada se reciben desde fuera para poder probarla sin teclado.
 
-    Las salidas, los objetos del suelo y el inventario se agregaran cuando
-    VisibleState los incluya.
+    Las salidas, el suelo y el inventario llegan como RoomView e ItemView,
+    que arma la aplicacion porque VisibleState todavia no los incluye.
     """
 
     PROMPT = "> "
 
     def __init__(self, output=None, read_line=input):
         self.output = sys.stdout if output is None else output
-        self.read_line = read_line
+        self.read_line_function = read_line
 
     def show_state(self, state):
         self._print("")
@@ -38,10 +38,62 @@ class ConsoleView:
         for line in HELP_LINES:
             self._print(f"  {line}")
 
+    def show_crypts(self, crypts):
+        self._print("Criptas publicadas:")
+
+        for number, crypt in enumerate(crypts, start=1):
+            self._print(
+                f"  {number}. {crypt['id']}  {crypt.get('nombre', '')}  "
+                f"({crypt.get('salas', '?')} salas, dificultad "
+                f"{crypt.get('dificultad', '?')})"
+            )
+
+    def show_room(self, room):
+        self._print(f"Estas en: {room.name}")
+
+        if room.exits:
+            exits = []
+
+            for exit_ in room.exits:
+                state = "" if exit_.is_open else " (cerrada)"
+                exits.append(f"{exit_.direction}->{exit_.destination}{state}")
+
+            self._print("Salidas: " + ", ".join(exits))
+        else:
+            self._print("No hay salidas.")
+
+        if room.floor:
+            self._print("En el suelo:")
+
+            for position, item in enumerate(room.floor):
+                self._print(f"  {position}. {item.name} ({item.item_class})")
+
+    def show_inventory(self, items, criterion=None):
+        if not items:
+            self._print("El inventario esta vacio.")
+            return
+
+        title = "Inventario" if criterion is None else f"Inventario por {criterion}"
+        self._print(f"{title}:")
+
+        for item in items:
+            marks = ("> " if item.current else "  ") + ("[E] " if item.equipped else "")
+            self._print(
+                f"  {marks}{item.name} ({item.item_class}) "
+                f"peso {item.weight}, valor {item.value}"
+            )
+
+    def read_line(self, prompt):
+        """Lee una linea con un mensaje propio, o None si la entrada se cerro."""
+        try:
+            return self.read_line_function(prompt)
+        except EOFError:
+            return None
+
     def read_command(self):
         """Devuelve la linea escrita, o None si la entrada se cerro."""
         try:
-            return self.read_line(self.PROMPT)
+            return self.read_line_function(self.PROMPT)
         except EOFError:
             return None
 
