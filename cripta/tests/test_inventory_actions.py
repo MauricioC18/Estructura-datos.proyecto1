@@ -89,6 +89,29 @@ class TestPickUp(unittest.TestCase):
         self.assertEqual(room_map.room(1).floor_items, [])
         self.assertIs(game.player.inventory.current(), item)
 
+    def test_what_is_picked_up_stays_selected(self):
+        """Permite recoger y equipar sin navegar en el medio."""
+        game, _ = make_game(
+            floor=[weapon(instance_id="i-1"), armor(instance_id="i-2", name="Coraza")]
+        )
+        game.pick_up(0)
+        second = game.room_map.room(1).floor_items[0]
+
+        game.pick_up(0)
+
+        self.assertIs(game.player.inventory.current(), second)
+
+    def test_a_rejected_pick_up_leaves_the_cursor_alone(self):
+        game, _ = make_game(
+            capacity=1, floor=[weapon(instance_id="i-1"), armor(instance_id="i-2")]
+        )
+        game.pick_up(0)
+        selected = game.player.inventory.current()
+
+        game.pick_up(0)
+
+        self.assertIs(game.player.inventory.current(), selected)
+
     def test_picking_up_costs_twenty_five(self):
         game, _ = make_game(floor=[weapon()])
 
@@ -200,7 +223,6 @@ class TestEquip(unittest.TestCase):
         game.pick_up(0)
         game.equip_item()
         game.pick_up(0)
-        game.inventory_next()
         game.equip_item()
 
         self.assertEqual(game.player.effective_attack, game.player.attack + 7)
@@ -337,8 +359,8 @@ class TestInventoryNavigation(unittest.TestCase):
         game = self.game_with_two_items()
         clock_before = game.state.clock
 
-        game.inventory_next()
         game.inventory_previous()
+        game.inventory_next()
 
         self.assertEqual(game.state.clock, clock_before)
 
@@ -346,7 +368,7 @@ class TestInventoryNavigation(unittest.TestCase):
         game = self.game_with_two_items()
         actions_before = game.player_actions
 
-        game.inventory_next()
+        game.inventory_previous()
 
         self.assertEqual(game.player_actions, actions_before)
 
@@ -354,7 +376,7 @@ class TestInventoryNavigation(unittest.TestCase):
         game = self.game_with_two_items()
         current = game.player.inventory.current()
 
-        game.inventory_next()
+        game.inventory_previous()
 
         self.assertIsNot(game.player.inventory.current(), current)
 
@@ -367,7 +389,7 @@ class TestInventoryNavigation(unittest.TestCase):
 
     def test_dropping_acts_on_what_the_cursor_shows(self):
         game = self.game_with_two_items()
-        game.inventory_next()
+        game.inventory_previous()
         shown = game.player.inventory.current()
 
         game.drop()

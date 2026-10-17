@@ -15,6 +15,7 @@ def filled(capacity, *item_names):
     inventory = Inventory(capacity)
     for name in item_names:
         inventory.pick_up(make_item(name))
+    inventory.go_to_start()
     return inventory
 
 
@@ -92,6 +93,25 @@ class TestInventoryBasics(unittest.TestCase):
         self.assertEqual(inventory.current().name, "c")
         self.assertTrue(inventory.previous())
         self.assertEqual(inventory.current().name, "b")
+
+    def test_pick_up_moves_cursor_to_the_new_item(self):
+        inventory = filled(5, "a", "b")
+        inventory.pick_up(make_item("c"))
+        self.assertEqual(inventory.current().name, "c")
+        self.assertEqual(names(inventory), ["a", "b", "c"])
+
+    def test_pick_up_then_equip_without_next(self):
+        player = make_player()
+        inventory = filled(5, "pocion")
+        inventory.pick_up(make_weapon("daga", attack_bonus=3))
+        self.assertTrue(inventory.can_equip_current())
+        inventory.equip_current(player)
+        self.assertEqual(player.equipped_weapon.name, "daga")
+
+    def test_rejected_pick_up_keeps_cursor(self):
+        inventory = filled(1, "a")
+        self.assertFalse(inventory.pick_up(make_item("b")))
+        self.assertEqual(inventory.current().name, "a")
 
     def test_iterates_like_player_inventory(self):
         player = make_player()

@@ -578,16 +578,20 @@ para los consumibles.
 Las armas, las armaduras y las llaves no se pueden usar, y un pergamino de retroceso se
 rechaza indicando que tiene su propia acción. Los tres rechazos no consumen tiempo.
 
-### El cursor no se mueve al recoger
+### Recoger deja el objeto seleccionado
 
-Vale dejarlo anotado porque sorprende y afecta a la vista. `Inventory.pick_up()` agrega
-el objeto al final y solo mueve el cursor si el inventario estaba vacío. O sea que
-recoger un arma y equiparla necesita una navegación en el medio.
+El enunciado no define dónde queda el cursor después de recoger. §4.5 solo pide poder
+recorrer el inventario "desde la posición actual", así que es una decisión de
+implementación.
 
-Es una decisión de la Persona 3 y es defendible, porque el cursor es un concepto
-separado del orden real. Pero conviene que la vista lo tenga en cuenta, y que el grupo
-sepa que cada secuencia de recoger y equipar deja un comando más en la bitácora de
-reproducción.
+La primera versión dejaba el cursor donde estaba, de modo que recoger un arma y
+equiparla necesitaba una navegación en el medio. Se cambió para que el objeto recogido
+quede seleccionado: es lo que el jugador espera y evita un comando extra en cada
+secuencia de la bitácora de reproducción. Si recoger se rechaza porque el inventario
+está lleno, el cursor no se mueve.
+
+El motor depende de ese comportamiento en `pick_up()` seguido de `equip_item()` o
+`use_item()`, así que hay dos pruebas que lo fijan.
 
 ### Las acciones que dependen de otro integrante rechazan, no revientan
 
@@ -1056,10 +1060,10 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_game.py` | 36 |
 | `tests/test_effects.py` | 33 |
 | `tests/test_movement.py` | 61 |
-| `tests/test_inventory_actions.py` | 32 |
-| **Total del motor** | **223** |
+| `tests/test_inventory_actions.py` | 34 |
+| **Total del motor** | **225** |
 
-Con las del bloque 2 integradas, el proyecto tiene 618 pruebas y todas pasan en
+Con las del bloque 2 integradas, el proyecto tiene 631 pruebas y todas pasan en
 Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
 `cripta/`, con las dependencias de `requirements.txt` instaladas.
 
