@@ -91,9 +91,8 @@ class Game:
     inventario esperan a que existan las salas y el inventario.
 
     message_log se recibe desde fuera. Cualquier estructura con append() y que
-    se pueda recorrer sirve, de modo que la bitacora circular del proyecto
-    encaje sin modificar esta clase. Si no se pasa ninguna se usa una list, que
-    es provisional porque no cumple el limite de memoria de la seccion 4.8.
+    se pueda recorrer sirve. Si no se pasa ninguna se usa un CircularLog, que
+    cumple el limite de 20 mensajes de la seccion 4.8.
     """
 
     def __init__(

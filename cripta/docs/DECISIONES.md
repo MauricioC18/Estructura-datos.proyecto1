@@ -835,9 +835,8 @@ producen exactamente los mismos mensajes.
 
 ## Efectos temporales
 
-Estado: andan el veneno, la regeneración, el cambio de velocidad y la antorcha, que
-son los cuatro de §2.10 que no necesitan salas. Faltan las trampas y el cierre
-automático de puertas.
+Estado: los seis efectos de §2.10 están implementados y probados, incluidas las
+trampas y el cierre automático de puertas.
 
 ### El veneno programa todos sus pulsos de una vez
 
