@@ -289,7 +289,7 @@ Acuerdos que esta interfaz impone al resto del modelo:
 
 **Lo que ya funciona:** `wait()`, `attack(enemy_id)`, `move(direction)`, `open_door(direction)`, `visible_state()`, `change_actor_speed(actor, new_speed)` y el bucle de eventos completo, con el combate de §2.6, las trampas y el cierre automático de puertas de §2.10, la victoria de §2.12 y el azar reproducible. Faltan las acciones de inventario y el pergamino, que dependen de la Persona 3.
 
-`Game` se construye ahora con `room_map` y `exit_room_id`. Sin `room_map` no hay movimiento: `move()` y `open_door()` se rechazan. `exit_room_id` sale de `DatosDePartida.sala_salida`.
+`Game` se construye con `room_map`, `exit_room_id`, `trail`, `history`, `message_log` y `event_queue`, todos opcionales. Para una partida completa se le pasan los seis; sin `history` el motor aplica los cambios sin anotarlos y el retroceso no funciona, y sin `trail` el rastreador espera. Sin `room_map` no hay movimiento: `move()` y `open_door()` se rechazan. `exit_room_id` sale de `DatosDePartida.sala_salida`.
 
 **El controlador carga el contenido antes de mover.** `move()` exige que la sala destino tenga `content_loaded` en verdadero y, si no, rechaza el movimiento sin consumir tiempo. El motor no puede pedirlo él mismo porque §6 le prohíbe conocer HTTP. El orden es: llamar a `RepositorioCripta.cargar_contenido_de_sala()` con la sala destino, agregar los enemigos que devuelve a `Game.enemies`, y recién entonces llamar a `move()`.
 
@@ -325,7 +325,9 @@ Acuerdos que esta interfaz impone al resto del modelo:
 
 `rewind()` no consume tiempo virtual y no cuenta como acción del jugador (§2.11).
 
-**Los once métodos existen y se pueden llamar.** Los siete que dependen del inventario y del historial reversible todavía no hacen nada: devuelven un `ActionResult` rechazado que dice qué estructura falta, por ejemplo "Todavía no se puede soltar objetos: falta el inventario". Así el controlador despacha los once comandos del enunciado sin que el programa se caiga. Cuando lleguen esas estructuras se reemplaza el cuerpo de cada método y esta interfaz no cambia.
+**Los once métodos están implementados.** Si el jugador todavía no tiene inventario asignado, los siete que lo necesitan devuelven un `ActionResult` rechazado que lo dice, en lugar de reventar.
+
+`rewind()` es la única acción que funciona con la partida terminada: §2.11 no pone esa condición y el resultado se restaura como cualquier otro cambio, así que un jugador muerto puede volver.
 
 **La partida terminada rechaza todo.** `Game.is_over` es `True` cuando el resultado ya no es "en curso". Toda acción pública lo revisa como primera línea, antes de validar cualquier otra cosa, y devuelve un `ActionResult` rechazado sin tocar nada. Las acciones que falten deben seguir el mismo patrón.
 

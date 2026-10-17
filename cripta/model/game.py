@@ -21,6 +21,8 @@ from model.item import Item
 from model.room import DIRECTIONS
 from structures.circular_log import CircularLog
 from structures.event_queue import EventQueue
+from structures.history import use_rewind_scroll
+from structures.inventory import is_rewind_scroll
 from structures.sorting import sort
 
 
@@ -41,6 +43,29 @@ DEFEAT = "derrota"
 
 INVENTORY = "el inventario"
 REVERSIBLE_HISTORY = "el historial reversible"
+
+
+class _NoHistory:
+    """Aplica los cambios sin anotarlos, para una partida sin retroceso.
+
+    Evita tener que preguntar por el historial en cada uno de los lugares
+    donde el motor cambia el estado.
+    """
+
+    def begin_action(self):
+        pass
+
+    def assign(self, target, attribute, value):
+        setattr(target, attribute, value)
+
+    def list_append(self, items, element):
+        items.append(element)
+
+    def list_pop(self, items, index):
+        return items.pop(index)
+
+    def can_undo(self):
+        return False
 
 
 @dataclass
@@ -103,6 +128,7 @@ class Game:
         room_map=None,
         exit_room_id=None,
         trail=None,
+        history=None,
         message_log=None,
         event_queue=None,
     ):
@@ -112,6 +138,7 @@ class Game:
         self.room_map = room_map
         self.exit_room_id = exit_room_id
         self.trail = trail
+        self.history = _NoHistory() if history is None else history
         self.events = EventQueue() if event_queue is None else event_queue
         self.messages = CircularLog() if message_log is None else message_log
         self.effects = []
@@ -130,6 +157,8 @@ class Game:
         if self.is_over:
             return self._game_already_ended()
 
+        self.history.begin_action()
+
         return self._player_acts(WAIT_COST, "Esperas.")
 
     def attack(self, enemy_id):
@@ -146,8 +175,9 @@ class Game:
         if target.room_id != self.player.room_id:
             return ActionResult(False, f"{target.name} no esta en esta sala.")
 
+        self.history.begin_action()
         damage = self._damage_from(self.player, target)
-        target.take_damage(damage)
+        self.history.assign(target, "health", target.health - damage)
         message = f"Atacas a {target.name} y le quitas {damage} de vida."
 
         if not target.is_alive:
@@ -185,22 +215,23 @@ class Game:
                 "disponible.",
             )
 
-        self.player.room_id = destination.room_id
+        self.history.begin_action()
+        self.history.assign(self.player, "room_id", destination.room_id)
         self._activate_enemies_in(destination.room_id)
         message = f"Entras a {destination.name}."
         self._log(message)
 
         if destination.room_id == self.exit_room_id:
-            self.result = VICTORY
+            self.history.assign(self, "result", VICTORY)
             self._log("Has encontrado la salida de la cripta.")
-            self.player_actions += 1
+            self.history.assign(self, "player_actions", self.player_actions + 1)
 
             return ActionResult(True, message)
 
         self._trigger_traps(destination)
 
         if self.is_over:
-            self.player_actions += 1
+            self.history.assign(self, "player_actions", self.player_actions + 1)
 
             return ActionResult(True, message)
 
@@ -232,7 +263,8 @@ class Game:
                 False, f"No tienes la llave de la puerta hacia {direction}."
             )
 
-        door.closed = False
+        self.history.begin_action()
+        self.history.assign(door, "closed", False)
         message = f"Abres la puerta hacia {direction}."
 
         if door.auto_close is not None:
@@ -264,7 +296,8 @@ class Game:
                 False, "El inventario esta lleno. Tenes que soltar algo primero."
             )
 
-        item = floor.pop(floor_index)
+        self.history.begin_action()
+        item = self._take_from_floor(floor, floor_index)
         self.player.inventory.pick_up(item)
 
         return self._player_acts(PICK_UP_COST, f"Recoges {item.name}.")
@@ -281,8 +314,9 @@ class Game:
         if floor is None:
             return ActionResult(False, "La cripta todavia no esta cargada.")
 
+        self.history.begin_action()
         dropped = self.player.inventory.drop_current(self.player)
-        floor.append(dropped)
+        self._put_on_floor(floor, dropped)
 
         return self._player_acts(DROP_COST, f"Sueltas {dropped.name}.")
 
@@ -298,11 +332,11 @@ class Game:
                 False, "Un pergamino de retroceso se usa con la accion de retroceder."
             )
 
-        message = self._apply_item_effect(item)
-
-        if message is None:
+        if not self._can_use(item):
             return ActionResult(False, f"{item.name} no se puede usar.")
 
+        self.history.begin_action()
+        message = self._apply_item_effect(item)
         self.player.inventory.drop_current(self.player)
 
         return self._player_acts(USE_ITEM_COST, message)
@@ -317,6 +351,7 @@ class Game:
         if not self.player.inventory.can_equip_current():
             return ActionResult(False, f"{item.name} no se puede equipar.")
 
+        self.history.begin_action()
         replaced = self.player.inventory.equip_current(self.player)
         message = f"Equipas {item.name}."
 
@@ -332,7 +367,34 @@ class Game:
         return self._move_cursor(False)
 
     def rewind(self):
-        return self._not_available_yet("usar un pergamino", REVERSIBLE_HISTORY)
+        """Revierte la ultima accion del jugador y todo lo que paso despues.
+
+        No consume tiempo virtual y no cuenta como accion del jugador (§2.11),
+        asi que no pasa por el ciclo de eventos ni abre un intervalo nuevo.
+
+        El pergamino se consume despues de deshacer, no antes: si se consumiera
+        primero, ese consumo quedaria dentro del intervalo revertido y el
+        retroceso devolveria el pergamino, de modo que una sola unidad
+        permitiria retroceder sin fin.
+
+        Es la unica accion que funciona con la partida terminada. §2.11 no pone
+        esa condicion, el resultado se anota en el historial como cualquier otro
+        cambio, y un pergamino que no sirviera justo cuando al jugador lo matan
+        no serviria para nada.
+        """
+        if self.player.inventory is None:
+            return self._not_available_yet("usar un pergamino", INVENTORY)
+
+        if self.player.inventory.scroll_count() == 0:
+            return ActionResult(False, "No tenes ningun pergamino de retroceso.")
+
+        if not self.history.can_undo():
+            return ActionResult(False, "No hay ninguna accion que revertir.")
+
+        use_rewind_scroll(self.player.inventory, self.history)
+        self._log("Usas un pergamino de retroceso. El tiempo vuelve atras.")
+
+        return ActionResult(True, "Usas un pergamino de retroceso.")
 
     def apply_poison(self, target, damage):
         """Programa de una vez todas las activaciones del veneno (seccion 2.10).
@@ -353,7 +415,7 @@ class Game:
             pulse_time += POISON_PULSE_INTERVAL
 
         effect = ActiveEffect(POISON, target, events, end_time)
-        self.effects.append(effect)
+        self.history.list_append(self.effects, effect)
 
         return effect
 
@@ -398,16 +460,16 @@ class Game:
         end_time = self.state.clock + duration
         event = self._schedule_effect(SPEED_END, actor, end_time, previous_speed)
         effect = ActiveEffect(SPEED, actor, [event], end_time)
-        self.effects.append(effect)
+        self.history.list_append(self.effects, effect)
 
         return effect
 
     def light_torch(self, duration):
-        self.torch_lit = True
+        self.history.assign(self, "torch_lit", True)
         end_time = self.state.clock + duration
         event = self._schedule_effect(TORCH_END, self.player, end_time)
         effect = ActiveEffect(TORCH, self.player, [event], end_time)
-        self.effects.append(effect)
+        self.history.list_append(self.effects, effect)
 
         return effect
 
@@ -421,6 +483,7 @@ class Game:
         No modifica el evento que ya esta en la agenda: lo cancela e inserta uno
         nuevo con un numero de secuencia nuevo, como exige la seccion 2.3.
         """
+        self.history.assign(actor, "speed", actor.speed)
         rescheduled = actor.change_speed(self.state.clock, new_speed)
 
         if rescheduled is None:
@@ -485,7 +548,7 @@ class Game:
         disparar las trampas, para que el jugador lea primero que entro a la
         sala y despues lo que le paso adentro.
         """
-        self.player_actions += 1
+        self.history.assign(self, "player_actions", self.player_actions + 1)
         self._mark_trail()
         self._schedule(
             self.player,
@@ -522,11 +585,11 @@ class Game:
 
     def _run_effect(self, event):
         if event.event_type == POISON_PULSE:
-            event.actor.take_damage(event.amount)
+            self.history.assign(event.actor, "health", event.actor.health - event.amount)
             self._log(f"El veneno le quita {event.amount} de vida a {event.actor.name}.")
             self._check_death(event.actor)
         elif event.event_type == REGENERATION_PULSE:
-            event.actor.heal(event.amount)
+            self.history.assign(event.actor, "health", event.actor.health + event.amount)
             self._schedule_effect(
                 REGENERATION_PULSE,
                 event.actor,
@@ -536,7 +599,7 @@ class Game:
         elif event.event_type == SPEED_END:
             self.change_actor_speed(event.actor, event.amount)
         elif event.event_type == TORCH_END:
-            self.torch_lit = False
+            self.history.assign(self, "torch_lit", False)
             self._log("La antorcha se apaga.")
         elif event.event_type == DOOR_CLOSE:
             self._close_door(event.room_id, event.direction)
@@ -554,7 +617,7 @@ class Game:
 
         if action == Enemy.ATTACK:
             damage = self._damage_from(enemy, self.player)
-            self.player.take_damage(damage)
+            self.history.assign(self.player, "health", self.player.health - damage)
             self._log(f"{enemy.name} te ataca y te quita {damage} de vida.")
             self._check_death(self.player)
 
@@ -563,7 +626,7 @@ class Game:
 
             cost = ATTACK_COST
         elif action == Enemy.MOVE:
-            enemy.room_id = chosen_exit.destination
+            self.history.assign(enemy, "room_id", chosen_exit.destination)
             cost = MOVE_COST
         else:
             cost = WAIT_COST
@@ -581,11 +644,11 @@ class Game:
             return
 
         if actor is self.player:
-            self.result = DEFEAT
+            self.history.assign(self, "result", DEFEAT)
             self._log("Has muerto.")
             return
 
-        self.enemies_defeated += 1
+        self.history.assign(self, "enemies_defeated", self.enemies_defeated + 1)
         self._drop_what_it_carries(actor)
         self._remove_from_play(actor)
 
@@ -594,7 +657,11 @@ class Game:
         if not enemy.drops or self.room_map is None:
             return
 
-        self.room_map.room(enemy.room_id).floor_items.extend(enemy.drops)
+        floor = self.room_map.room(enemy.room_id).floor_items
+
+        for item in enemy.drops:
+            self._put_on_floor(floor, item)
+
         names = ", ".join(item.name for item in enemy.drops)
         self._log(f"{enemy.name} suelta: {names}.")
 
@@ -664,6 +731,20 @@ class Game:
 
         return item
 
+    def _take_from_floor(self, floor, index):
+        """Quita un objeto del suelo. Un pergamino no se anota (§2.11)."""
+        if is_rewind_scroll(floor[index]):
+            return floor.pop(index)
+
+        return self.history.list_pop(floor, index)
+
+    def _put_on_floor(self, floor, item):
+        """Deja un objeto en el suelo. Un pergamino no se anota (§2.11)."""
+        if is_rewind_scroll(item):
+            floor.append(item)
+        else:
+            self.history.list_append(floor, item)
+
     def _player_floor(self):
         if self.room_map is None:
             return None
@@ -690,6 +771,17 @@ class Game:
 
         return ActionResult(True, f"Ves {inventory.current().name}.")
 
+    def _can_use(self, item):
+        """Si el objeto tiene un efecto que aplicar.
+
+        Se pregunta antes de abrir el intervalo del historial, para que una
+        accion rechazada no gaste uno de los cinco que guarda §4.6.
+        """
+        if item.item_class == Item.POTION:
+            return item.heal > 0 or bool(item.speed_modifier)
+
+        return item.item_class in (Item.ANTIDOTE, Item.TORCH)
+
     def _apply_item_effect(self, item):
         """Aplica el efecto del objeto y devuelve el mensaje, o None si no sirve.
 
@@ -699,7 +791,7 @@ class Game:
         """
         if item.item_class == Item.POTION:
             if item.heal > 0:
-                self.player.heal(item.heal)
+                self.history.assign(self.player, "health", self.player.health + item.heal)
                 return f"Bebes {item.name} y recuperas vida."
 
             if item.speed_modifier:
@@ -781,8 +873,8 @@ class Game:
             if not trap.armed:
                 continue
 
-            trap.armed = False
-            self.player.take_damage(trap.damage)
+            self.history.assign(trap, "armed", False)
+            self.history.assign(self.player, "health", self.player.health - trap.damage)
             self._log(f"{trap.name} te quita {trap.damage} de vida.")
             self._schedule_effect(
                 TRAP_REARM,
@@ -811,13 +903,13 @@ class Game:
         if exit_ is None or exit_.door.closed:
             return
 
-        exit_.door.closed = True
+        self.history.assign(exit_.door, "closed", True)
         self._log(f"La puerta hacia {direction} se cierra sola.")
 
     def _rearm_trap(self, room_id, instance_id):
         for trap in self.room_map.room(room_id).traps:
             if trap.instance_id == instance_id:
-                trap.armed = True
+                self.history.assign(trap, "armed", True)
                 return
 
     def _end_previous_speed_effect(self, actor):
@@ -838,15 +930,19 @@ class Game:
         for event in effect.events:
             self.events.cancel(event)
 
-        effect.cancelled = True
+        self.history.assign(effect, "cancelled", True)
 
     def _forget_finished_effects(self):
-        self.effects = [
-            effect
-            for effect in self.effects
-            if not effect.cancelled
-            and (effect.ends_at is None or effect.ends_at > self.state.clock)
-        ]
+        self.history.assign(
+            self,
+            "effects",
+            [
+                effect
+                for effect in self.effects
+                if not effect.cancelled
+                and (effect.ends_at is None or effect.ends_at > self.state.clock)
+            ],
+        )
 
     def _remove_from_play(self, actor):
         if actor.scheduled_event is not None:
@@ -868,7 +964,7 @@ class Game:
         ]
 
         for enemy in self._by_ascending_id(pending):
-            enemy.is_active = True
+            self.history.assign(enemy, "is_active", True)
             self._schedule(
                 enemy,
                 enemy.next_time_after(self.state.clock, WAIT_COST),

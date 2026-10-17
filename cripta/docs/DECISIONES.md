@@ -641,6 +641,74 @@ partida y pasaba por la razón equivocada: el errante se movía a la sala del ju
 su primer turno y a partir de ahí atacaba en vez de moverse, así que nunca llegaba a
 probar la puerta cerrada.
 
+### El pergamino de retroceso
+
+El motor no guarda copias del estado, que es lo que §2.11 prohíbe. Lo que hace es
+anotar, por cada cambio, cómo deshacerlo. El historial reversible de la Persona 3 guarda
+esas anotaciones agrupadas por intervalo, y un intervalo va desde una acción del jugador
+hasta la siguiente.
+
+**El motor abre el intervalo, no el historial.** `history.begin_action()` se llama en
+cada acción **aceptada**, después de validarla y antes de tocar nada. Las rechazadas no
+lo llaman, porque §4.6 solo guarda cinco acciones y una acción que no hizo nada no debe
+gastar una de esas cinco. Por eso `use_item()` comprueba primero si el objeto tiene un
+efecto que aplicar y recién después abre el intervalo.
+
+**Todo cambio de estado pasa por el historial.** Son veintisiete lugares en `game.py`:
+vida, sala, velocidad, resultado, contadores, puertas, trampas, antorcha, activación de
+enemigos, efectos y objetos del suelo. En lugar de `actor.take_damage(x)` se escribe
+`history.assign(actor, "health", actor.health - x)`, que cambia el valor y anota el
+anterior. Funciona con las propiedades, así que el recorte de la vida sigue ocurriendo
+en su setter.
+
+La agenda y el inventario se revierten solos: `ReversibleEventQueue` anota sus propias
+operaciones y `Inventory` las suyas.
+
+**Cuando no hay historial no hay que preguntar.** `Game` recibe uno opcional y, si no se
+lo dan, usa un objeto que aplica los cambios sin anotarlos. Así los veintisiete lugares
+no llevan un `if` cada uno.
+
+**El pergamino se consume después de deshacer, no antes.** Si se consumiera primero, ese
+consumo quedaría dentro del intervalo que se está revirtiendo y el retroceso lo
+devolvería, de modo que una sola unidad permitiría retroceder sin fin. Es la trampa que
+el propio §2.11 advierte. Lo mismo vale para los pergaminos del suelo: recogerlos o
+soltarlos no se anota.
+
+**El retroceso funciona con la partida terminada**, y es la única acción que lo hace.
+§2.11 no pone esa condición, el resultado se anota en el historial como cualquier otro
+cambio, y un pergamino que no sirviera justo cuando al jugador lo matan no serviría para
+nada. Es una interpretación declarada.
+
+#### Cómo sabemos que no falta nada
+
+Acá estaba el riesgo real: un cambio que el motor olvide anotar no lanza ninguna
+excepción, simplemente no se deshace. Encontrarlo leyendo el código es poco confiable.
+
+La Persona 3 escribió `tests/verificar_retroceso.py`, que toma una foto de todo lo que
+§2.11 exige revertir, ejecuta una acción, usa el pergamino y compara, nombrando el campo
+exacto que quedó distinto. La foto vive solo dentro de la prueba y nunca restaura nada,
+de modo que no es la copia de estado que §2.11 prohíbe.
+
+`tests/test_rewind.py` lo aplica a dieciséis situaciones: esperar, atacar, matar a un
+enemigo que suelta objetos, moverse, pisar una trampa, abrir una puerta con cierre
+automático, recoger, soltar, equipar, beber una poción de curación, beber una de
+velocidad, encender una antorcha, usar un antídoto, el turno de un errante, el de un
+rastreador y ganar la partida.
+
+#### Verificado contra la cripta real
+
+| | reloj | vida | sala | rata | trampa | pergaminos |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| Inicio | 0 | 30/30 | 1 | 12/12 | armada | 2 |
+| Entra a la sala 2 | 100 | 18/30 | 2 | 12/12 | desarmada | 2 |
+| Ataca a la rata | 198 | 0/30 | 2 | 3/12 | desarmada | 2 |
+| Usa un pergamino | 100 | 18/30 | 2 | 12/12 | desarmada | 1 |
+| Usa el segundo | 0 | 30/30 | 1 | 12/12 | armada | 0 |
+
+El jugador muere en el instante 198 y el primer pergamino lo devuelve vivo al 100, con
+la vida de la rata restaurada. El segundo lo lleva al principio, con la trampa rearmada.
+Los pergaminos no vuelven.
+
 ### El rastreador usa el rastro, no lo reimplementa
 
 `PlayerTrail.freshest_exit(room, instante)` ya aplica las tres reglas de §2.9: examina
@@ -1061,9 +1129,10 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_effects.py` | 33 |
 | `tests/test_movement.py` | 61 |
 | `tests/test_inventory_actions.py` | 34 |
-| **Total del motor** | **225** |
+| `tests/test_rewind.py` | 25 |
+| **Total del motor** | **250** |
 
-Con las del bloque 2 integradas, el proyecto tiene 631 pruebas y todas pasan en
+Con las del bloque 2 integradas, el proyecto tiene 656 pruebas y todas pasan en
 Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
 `cripta/`, con las dependencias de `requirements.txt` instaladas.
 

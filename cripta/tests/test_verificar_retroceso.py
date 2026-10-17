@@ -38,17 +38,18 @@ def build_game():
         player,
         [rat],
         room_map=rooms,
+        history=history,
         event_queue=ReversibleEventQueue(history),
     )
     return game, history
 
 
 class RewindableGame(Game):
-    """Game con rewind() conectado, solo para probar el verificador."""
+    """Game con rewind() conectado, solo para probar el verificador.
 
-    def __init__(self, history, *args, **kwargs):
-        self.history = history
-        super().__init__(*args, **kwargs)
+    Game ya recibe el historial por su parametro history, asi que esta
+    subclase solo agrega rewind().
+    """
 
     def rewind(self):
         if use_rewind_scroll(self.player.inventory, self.history):
@@ -97,9 +98,9 @@ class TestAssertRewindRestores(unittest.TestCase):
         self.player.inventory = Inventory(5, self.history)
         self.player.inventory.pick_up(make_scroll())
         self.game = RewindableGame(
-            self.history,
             state,
             self.player,
+            history=self.history,
             event_queue=ReversibleEventQueue(self.history),
         )
 

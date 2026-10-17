@@ -365,7 +365,13 @@ class TestCounters(unittest.TestCase):
 
 
 
-class TestActionsThatNeedAnotherModule(unittest.TestCase):
+class TestActionsWithoutAnInventory(unittest.TestCase):
+    """Un jugador sin inventario rechaza, no revienta.
+
+    Ocurre antes de que el controlador le asigne uno. Las siete acciones
+    existen y responden; ninguna lanza AttributeError.
+    """
+
 
     def setUp(self):
         self.game = make_game(enemies=[make_enemy()])
@@ -416,9 +422,9 @@ class TestActionsThatNeedAnotherModule(unittest.TestCase):
 
                 self.assertEqual(self.game.state.random_state(), state_before)
 
-    def test_the_message_names_the_missing_module(self):
+    def test_the_message_names_what_is_missing(self):
         self.assertIn("inventario", self.game.drop().message)
-        self.assertIn("historial reversible", self.game.rewind().message)
+        self.assertIn("inventario", self.game.rewind().message)
 
 
 if __name__ == "__main__":
