@@ -83,6 +83,26 @@ class ConsoleView:
                 f"peso {item.weight}, valor {item.value}"
             )
 
+    def show_scores(self, entries, crypt_id=None):
+        title = "Puntajes" if crypt_id is None else f"Puntajes de {crypt_id}"
+
+        if not entries:
+            self._print(f"{title}: todavia no hay partidas.")
+            return
+
+        self._print(f"{title}:")
+        self._print(
+            f"  {'#':>2}  {'Jugador':<16} {'Cripta':<12} {'Resultado':<9} "
+            f"{'Reloj':>7} {'Acciones':>8} {'Enemigos':>8}"
+        )
+
+        for place, entry in enumerate(entries, start=1):
+            self._print(
+                f"  {place:>2}  {entry.player_name[:16]:<16} {entry.crypt_id[:12]:<12} "
+                f"{entry.result:<9} {entry.final_clock:>7} "
+                f"{entry.player_actions:>8} {entry.enemies_defeated:>8}"
+            )
+
     def read_line(self, prompt):
         """Lee una linea con un mensaje propio, o None si la entrada se cerro."""
         try:

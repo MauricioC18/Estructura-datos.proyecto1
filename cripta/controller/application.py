@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from adapters.almacen_fichas import ErrorAlmacenDisco
 from adapters.fuente_datos import ErrorFuenteDatos
+from adapters.scoreboard import ScoreboardError, ScoreEntry
 from controller.commands import (
     HELP,
     LOAD,
@@ -219,11 +220,24 @@ def choose_crypt(repository, view, crypt_id=None):
         view.show_message(f"No hay ninguna cripta '{text}'.")
 
 
+def ask_player_name(view):
+    """Nombre para la tabla de puntajes, o None para el nombre por defecto."""
+    text = view.read_line("Nombre del jugador (vacio para el de siempre): ")
+
+    if text is None or not text.strip():
+        return None
+
+    return text.strip()
+
+
 def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
-         log_directory=LOG_DIRECTORY):
+         log_directory=LOG_DIRECTORY, scoreboard=None):
     """Juega una partida completa con la vista de consola.
 
-    Devuelve el Game al terminar, o None si no se llego a empezar.
+    Devuelve el Game al terminar, o None si no se llego a empezar. Si la
+    partida termina en victoria o derrota y hay tabla de puntajes, la registra
+    y muestra el ranking de esa cripta (§2.12). Una partida interrumpida con
+    salir no entra en la tabla.
     """
     repository.empezar_conteo_de_partida()
     crypt_id = choose_crypt(repository, view, crypt_id)
@@ -250,7 +264,28 @@ def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
 
     view.show_message(_ending_text(game))
 
+    if scoreboard is not None and game.result in (VICTORY, DEFEAT):
+        record_score(scoreboard, game, crypt, crypt_version, view)
+
     return game
+
+
+def record_score(scoreboard, game, crypt_id, crypt_version, view, limit=10):
+    entry = ScoreEntry(
+        game.player.name,
+        crypt_id,
+        crypt_version,
+        game.result,
+        game.player_actions,
+        game.enemies_defeated,
+        game.state.clock,
+    )
+
+    try:
+        scoreboard.add(entry)
+        view.show_scores(scoreboard.ranking(crypt_id, limit), crypt_id)
+    except (OSError, ScoreboardError) as error:
+        view.show_message(f"No se pudo registrar el puntaje: {error}")
 
 
 def _command_loop(controller, view):
