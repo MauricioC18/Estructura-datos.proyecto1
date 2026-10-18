@@ -192,13 +192,13 @@ puertas; el último es una partida de combate donde el jugador mata 500 enemigos
 | | Estático, 5 | Estático, 50 | Recorrido, 6 salas | Recorrido, 40 salas | Combate, 500 |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Decisiones del jugador | 1 000 | 1 000 | 1 000 | 1 000 | 500 |
-| Eventos procesados | 11 081 | 101 756 | 11 235 | 90 504 | 189 310 |
-| Eventos por decisión | 11.1 | 101.8 | 11.2 | 90.5 | 378.6 |
-| Inserciones | 11 092 | 101 857 | 11 247 | 90 607 | 190 010 |
-| Extracciones | 11 081 | 101 756 | 11 235 | 90 504 | 189 310 |
+| Eventos procesados | 11 081 | 101 756 | 13 081 | 90 504 | 189 310 |
+| Eventos por decisión | 11.1 | 101.8 | 13.1 | 90.5 | 378.6 |
+| Inserciones | 11 092 | 101 857 | 13 095 | 90 607 | 190 010 |
+| Extracciones | 11 081 | 101 756 | 13 081 | 90 504 | 189 310 |
 | Inserciones por extracción | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
 | Cancelaciones | 0 | 0 | 0 | 0 | 750 |
-| Tamaño máximo de la agenda | 17 | 107 | 19 | 109 | 506 |
+| Tamaño máximo de la agenda | 17 | 107 | 21 | 109 | 506 |
 
 Cuatro conclusiones.
 
@@ -1002,7 +1002,9 @@ De 100 a 1 000 cambios, el tiempo se multiplica por 11: es el crecimiento lineal
 | `EventQueue` | 0.0842 s |
 | `ReversibleEventQueue`, anotando cada cambio | 0.1243 s |
 
-Anotar cuesta un 48 % más en la agenda. Es el precio de no copiar el estado. El grupo midió 0.3302 ms por ciclo con 50 errantes; aun si ese ciclo completo costara un 48 % más, seguiría muy lejos del límite.
+Anotar cuesta un 48 % más en la agenda. Es el precio de no copiar el estado.
+
+Esa estimación se pudo reemplazar por una medición real cuando el motor quedó anotando sus propios cambios. El ciclo completo de §5.2 pasó de 0.3302 ms a 0.4403 ms con 50 enemigos, un 33 % más, y ese aumento incluye además la decisión del rastreador, que antes no existía. Sigue a sesenta veces del límite de 20 ms.
 
 **Corrección con el motor real.** Las pruebas `TestReversibleQueueWithTheEngine` usan el `Game` real y verifican que después de deshacer queden idénticos el reloj, los eventos activos de la agenda con su `time` y `sequence`, y el `scheduled_event` de cada actor. Los casos son: un `wait()`, dos retrocesos seguidos, un cambio de velocidad y la cancelación por muerte.
 
@@ -2212,32 +2214,38 @@ La primera versión de esta medición era floja: el jugador solo esperaba, los e
 eran guardianes que no se movían y no había ni salas ni trampas ni puertas. Daba
 0.1705 ms por ciclo, pero no probaba casi nada de lo que el motor hace.
 
-El escenario actual recorre una cripta de verdad. El jugador camina de punta a punta y
-vuelve, cada sala tiene una trampa que se rearma, una de cada tres puertas está cerrada
-y se cierra sola después de abrirla, y los enemigos son errantes que se reparten por la
-cripta mientras el jugador la recorre. Además hay un veneno y una antorcha corriendo, y
-todos los enemigos tienen regeneración.
+El escenario actual recorre una cripta de verdad, con el motor completo. El jugador
+camina de punta a punta y vuelve, cada sala tiene una trampa que se rearma, una de cada
+tres puertas está cerrada y se cierra sola después de abrirla, y la mitad de los
+enemigos son errantes y la otra mitad rastreadores. Hay además un veneno y una antorcha
+corriendo, todos los enemigos regeneran, y **el historial del retroceso está conectado**,
+de modo que el motor anota cada cambio como en una partida real.
 
-Que el escenario ejercita lo que dice está comprobado: en la corrida de la cripta
+Que el escenario ejercita lo que dice está comprobado. En la corrida de la cripta
 pequeña hubo 833 entradas a salas con sus 833 activaciones de trampa, 167 aperturas de
-puerta y 167 cierres automáticos.
+puerta y 167 cierres automáticos. Los rastreadores rastrean de verdad: en una corrida de
+control los tres terminaron en la sala del jugador, habiendo arrancado repartidos por la
+cripta. Y el historial anotó 199 cambios en sus cinco intervalos.
 
-| | 6 salas, 5 errantes | 40 salas, 50 errantes |
+| | 6 salas, 6 enemigos | 40 salas, 50 enemigos |
 | --- | ---: | ---: |
 | Decisiones del jugador | 1 000 | 1 000 |
-| Eventos por decisión | 11.2 | 90.5 |
-| Tamaño máximo de la agenda | 19 | 109 |
-| **Tiempo por ciclo** | **0.0357 ms** | **0.3302 ms** |
+| Eventos por decisión | 13.1 | 90.5 |
+| Tamaño máximo de la agenda | 21 | 109 |
+| **Tiempo por ciclo** | **0.0596 ms** | **0.4403 ms** |
 | Lo que permite §5.2 | 20 ms | 20 ms |
 
-En el caso grande usamos el 1.7 % del presupuesto. El margen sigue siendo enorme, pero
-conviene notar que el ciclo se volvió casi diez veces más caro al pasar de 5 a 50
-enemigos, y que el costo crece con la cantidad de enemigos activos y no con el tamaño
-de la cripta: lo que pesa es cuántos actores programan eventos, no cuántas salas hay.
+En el caso grande usamos el 2.2 % del presupuesto.
 
-Falta una sola cosa por medir: la decisión de un rastreador, que es la más cara de §2.8
-porque examina las salas vecinas y consulta el rastro. Cuando exista hay que repetir
-esta medición.
+Dos cosas que vale leer de estos números. El costo crece con la cantidad de enemigos
+activos y no con el tamaño de la cripta: lo que pesa es cuántos actores programan
+eventos, no cuántas salas hay.
+
+Y la segunda sale de comparar contra la medición anterior, cuando el motor todavía no
+tenía rastreadores ni anotaba para el retroceso: el mismo escenario grande daba 0.3302 ms
+por ciclo y ahora da 0.4403, un 33 % más caro. Ese es el precio de la decisión del
+rastreador, que examina las salas vecinas y consulta el rastro, y de anotar cada cambio
+de estado. Sigue a sesenta veces del límite.
 
 ### Pruebas
 

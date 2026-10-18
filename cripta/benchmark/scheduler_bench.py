@@ -23,6 +23,8 @@ from model.player import Player
 from model.room import Door, Exit, Room, RoomMap
 from model.trap import Trap
 from structures.event_queue import EventQueue
+from structures.history import History, ReversibleEventQueue
+from structures.trail import PlayerTrail
 
 
 PENDING_EVENTS = 300
@@ -281,36 +283,58 @@ def walk_the_crypt(game, target_actions):
         direction = "S" if direction == "N" else "N"
 
 
-def measure_full_cycle(room_count, wanderers, decisions, seed):
+class CountingReversibleQueue(ReversibleEventQueue, CountingEventQueue):
+    """Agenda que anota para el retroceso y ademas lleva los contadores.
+
+    Hereda de las dos para medir el motor tal como corre una partida real,
+    con el historial conectado.
+    """
+
+    def __init__(self, history):
+        ReversibleEventQueue.__init__(self, history)
+        self.pushes = 0
+        self.pops = 0
+        self.cancels = 0
+        self.discarded = 0
+        self.max_size = 0
+
+
+def measure_full_cycle(room_count, enemy_count, decisions, seed):
     """Mide el ciclo de eventos con todo lo que el motor hace hoy.
 
-    A diferencia del escenario anterior, el jugador se mueve de verdad, dispara
-    trampas que se rearman, abre puertas que se cierran solas, y los enemigos
-    errantes recorren la cripta en lugar de quedarse quietos.
+    El jugador se mueve de verdad, dispara trampas que se rearman y abre
+    puertas que se cierran solas. La mitad de los enemigos son errantes y la
+    otra mitad rastreadores, que es la decision mas cara de §2.8 porque examina
+    las salas vecinas y consulta el rastro. El historial del retroceso esta
+    conectado, de modo que el motor anota cada cambio como en una partida real.
     """
     room_map = build_synthetic_crypt(room_count)
     player = Player("p-1", "Heroe", 100_000_000, 6, 100, 100, 1)
     enemies = [
         Enemy(
             f"e-{index:04}",
-            "Errante",
+            "Errante" if index % 2 == 0 else "Rastreador",
             1_000_000,
             5,
             1,
             150,
             1 + index % room_count,
-            Enemy.WANDERER,
+            Enemy.WANDERER if index % 2 == 0 else Enemy.TRACKER,
             regeneration=1,
         )
-        for index in range(wanderers)
+        for index in range(enemy_count)
     ]
 
-    agenda = CountingEventQueue()
+    state = GameState(seed=seed)
+    history = History(state)
+    agenda = CountingReversibleQueue(history)
     game = Game(
-        GameState(seed=seed),
+        state,
         player,
         enemies,
         room_map=room_map,
+        trail=PlayerTrail(history),
+        history=history,
         event_queue=agenda,
     )
 
@@ -432,15 +456,17 @@ def main():
             FREQUENCY_DECISIONS,
         )
 
-    for label, rooms, wanderers in (
-        ("cripta pequena", 6, 5),
+    for label, rooms, enemy_count in (
+        ("cripta pequena", 6, 6),
         ("cripta grande", 40, 50),
     ):
         seconds, walk_game, walk_agenda = measure_full_cycle(
-            rooms, wanderers, FREQUENCY_DECISIONS, SEED
+            rooms, enemy_count, FREQUENCY_DECISIONS, SEED
         )
+        half = enemy_count // 2
         report_frequency(
-            f"Partida completa, {label} ({rooms} salas, {wanderers} errantes)",
+            f"Partida completa, {label} ({rooms} salas, "
+            f"{half} errantes y {enemy_count - half} rastreadores)",
             walk_game,
             walk_agenda,
             walk_game.player_actions,
