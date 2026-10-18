@@ -295,40 +295,488 @@ escribir uno sea un riesgo real, lo pasamos a constantes.
 
 ---
 
-## 4.2, 4.3 y 4.4 — Precarga, catálogo y caché persistente
+## 4.2 Traer el contenido antes de que haga falta (precarga)
 
-**Pendientes.** Estas tres secciones corresponden a la Persona 2 y todavía no están
-escritas. El código existe y funciona, con sus propias mediciones en
-`docs/mediciones/bloque2/`, pero §8 pide por cada problema el enunciado con su
-frecuencia medida, las alternativas consideradas, la decisión, el análisis de
-complejidad, la evidencia empírica y los límites conocidos. Lo que hay hoy en
-`docs/BLOQUE_2_PARA_EL_GRUPO.md` es una guía de integración, no eso.
+Estado: implementado, probado y medido.
+
+### Problema
+
+Antes de confirmar que el jugador entra a una sala, su contenido (enemigos, objetos y
+trampas) tiene que estar en memoria (§2.5). Si lo pedimos justo al cruzar la puerta, el
+jugador espera unos 400 ms en cada movimiento (§3.4). Pero cada solicitud gasta
+presupuesto, y el presupuesto es por partida: cripta-01 tiene 9 solicitudes para todo,
+incluida la lista de criptas y el catálogo.
+
+Lo que juega a favor: el esqueleto se descarga completo al empezar, así que conocemos el
+mapa entero, y una solicitud de contenido cuesta lo mismo con 1 sala que con 10 (§3.4).
+El problema es decidir **cuándo** pedir y **qué salas** meter en cada lote.
+
+Las cifras que siguen están **medidas** con `benchmark/bench_frecuencia_bloque2.py`, que
+recorre la cripta como lo hace el controlador y cuenta cada operación. Son conteos con
+semilla fija, así que dan lo mismo en cualquier computadora. La salida completa está en
+`docs/mediciones/bloque2/frecuencias_2026-10-18.txt`.
+
+| Operación | Cuándo ocurre | cripta-01 real (20 acciones) | Cripta sintética de 900 salas (300 acciones) |
+| --- | --- | ---: | ---: |
+| Revisar si hace falta precargar | al empezar y después de cada acción | 21 | 301 |
+| Armar y pedir un lote con BFS | cuando a la sala actual o a una vecina le falta contenido | 1 (6 salas) | 33 (330 salas) |
+| Esperar en una puerta | se entra a una sala que la precarga no trajo | 0 | 0 |
+
+La revisión ocurre en cada acción y casi nunca hace nada: en cripta-01 hubo 21 revisiones
+y un solo lote. Por eso la revisión tiene que ser barata, y el BFS, que es lo caro, puede
+costar más porque ocurre pocas veces.
+
+### Alternativas consideradas
+
+Comparamos tres estrategias sobre el mismo recorrido del jugador. Las tres están
+implementadas en `benchmark/bench_precarga_contenido.py`.
+
+**Sin precarga.** Pedir cada sala cuando el jugador intenta entrar. Es lo más simple y
+nunca descarga una sala de más, pero hace esperar en todas las puertas y gasta una
+solicitud por sala visitada. En cripta-01 serían 6 solicitudes solo de contenido, de 9
+que hay para toda la partida.
+
+**Solo vecinos directos.** Cuando el jugador llega a una sala, pedir esa sala y sus
+vecinas sin contenido (a lo sumo 5 por lote). Elimina las esperas, pero desperdicia el
+lote: como cada sala tiene como mucho 4 salidas, nunca llena las 10 posiciones que
+permite el API, así que vuelve a pedir apenas el jugador da un par de pasos.
+
+**Precarga en segundo plano.** Pedir con hilos mientras el jugador piensa. La descartamos
+sin implementarla: el orden en que llegan las respuestas no puede cambiar la partida
+(§2.4) y la reproducción tiene que ser fiel (§4.11). Con solicitudes síncronas nunca hay
+una respuesta pendiente y ese problema desaparece (decisión D1). `adapters/fuente_datos.py`
+deja anotado qué habría que cambiar si algún día se hiciera.
+
+### Decisión
+
+**Precarga por BFS con lotes llenos**, en `repository/gestor_contenido.py`, sobre el grafo
+de `structures/grafo_salas.py`.
+
+- **Cuándo:** al empezar la partida y después de cada acción, `despues_de_accion()`
+  revisa la sala actual y sus vecinas directas. Si todas tienen contenido, no hace nada.
+- **Qué:** si a alguna le falta, recorre el mapa en anchura (BFS) desde la sala del
+  jugador y junta las 10 salas más cercanas que todavía no tienen contenido. Se piden en
+  una sola solicitud.
+- **Antes de entrar:** `cargar_contenido_de_sala()` verifica que la sala destino esté
+  cargada. Si la precarga no la trajo, la pide ahí mismo y lo cuenta como una "espera en
+  la puerta" en el reporte.
+- **Reserva:** si quedan 2 solicitudes o menos, la precarga se detiene (supuesto S3). Esas
+  últimas quedan para entrar a una sala a la que el jugador de verdad se mueve.
+- **Determinismo:** las solicitudes son síncronas y el contenido entra al modelo cuando el
+  jugador entra a la sala (D2). Como `--replay` pasa por el mismo controlador, reproducir
+  un log pide las mismas salas en el mismo orden.
+
+El grafo es una lista de adyacencia sobre `TablaHash`, con los vecinos siempre en el orden
+N, S, E, O. Incluye las salidas cerradas, porque el jugador puede abrirlas. La cola del
+BFS es una `list` con un índice que marca el frente: sacar de la cola es avanzar el
+índice, sin desplazar elementos.
+
+El contenido descargado también se guarda en disco por versión de la cripta
+(`adapters/almacen_cripta.py`). Eso se cuenta en la sección 4.4.
+
+### Análisis de complejidad
+
+Con V salas y E salidas (E ≤ 4V):
+
+| Operación | Costo | Frecuencia |
+| --- | --- | --- |
+| Revisar si hace falta precargar | O(1) promedio por sala, a lo sumo 5 salas | una por acción |
+| Comprobar que la sala destino esté cargada | O(1) | uno por movimiento |
+| BFS para armar un lote | O(V + E) en el peor caso, pero se detiene al juntar 10 salas | solo cuando falta contenido cerca |
+| Sacar de la cola del BFS | O(1) | una por sala visitada por el BFS |
+
+En la práctica el BFS se detiene enseguida, porque las salas sin contenido están cerca
+del borde de lo ya descargado. El costo que importa no es de CPU: una solicitud son unos
+400 ms, mucho más que recorrer cualquier cripta en memoria.
+
+### Evidencia empírica
+
+**Mismo recorrido, tres estrategias** (`python -m benchmark.bench_precarga_contenido`).
+Cuenta solicitudes y esperas, no tiempo, así que el resultado es exacto y se repite igual
+en cualquier computadora. Coincide con la tercera corrida oficial del 13 de octubre
+(`docs/mediciones/bloque2/medianas_2026-10-13.md`).
+
+| Escenario | BFS (decisión) | Solo vecinos directos | Sin precarga |
+| --- | --- | --- | --- |
+| cripta-01 real, recorrido completo | 1 solicitud, 0 esperas | 4 solicitudes, 0 esperas | 6 solicitudes, 6 esperas |
+| Cuadrícula 10×10, 300 pasos al azar | 10, 0 esperas | 57, 0 esperas | 81, 81 esperas |
+| Cuadrícula 20×20, 300 pasos al azar | 31, 0 esperas | 117, 0 esperas | 130, 130 esperas |
+| Cuadrícula 30×30, 300 pasos al azar | 33, 0 esperas | 125, 0 esperas | 135, 135 esperas |
+
+El BFS gasta entre 3,8 y 5,7 veces menos solicitudes que pedir solo los vecinos, y
+ninguna estrategia con precarga hace esperar al jugador. Sin precarga, el jugador espera
+en cada sala nueva que visita.
+
+**Contra el API real** (14 de octubre, `docs/mediciones/bloque2/presupuesto_api_real_2026-10-14.md`):
+recorriendo cripta-01 con `tools.simular_partida_bloque2`, todo el contenido de la cripta llegó en
+**un solo lote** de 6 salas, y hubo 0 esperas en la puerta. La partida completa usó 7 de
+las 9 solicitudes.
+
+### Límites conocidos
+
+- **Descarga salas que el jugador nunca visita.** En la cuadrícula de 20×20 se descargaron
+  310 salas para 130 visitadas. No cuesta presupuesto, porque se cuentan solicitudes y no
+  salas, pero ocupa memoria con contenido que tal vez no se use.
+- **No sabe hacia dónde va el jugador.** El BFS trata igual todas las direcciones, incluidas
+  las puertas cerradas con llave. En una cripta con muchas puertas cerradas puede traer
+  salas a las que el jugador tarda en llegar.
+- **Si el presupuesto se agota, el jugador puede quedar encerrado.** Con 2 solicitudes o
+  menos la precarga se detiene, y si después se gastan esas últimas, entrar a una sala sin
+  contenido se rechaza sin consumir tiempo (S1). El juego no se cae, pero esa sala queda
+  inaccesible. Con cripta-01 sobran 2 solicitudes, y no sabemos el presupuesto de la cripta
+  de la revisión.
+- **Las mediciones grandes son sintéticas.** Las cuadrículas tienen todas las puertas
+  abiertas y salas de hasta 4 salidas. Una cripta real con pasillos largos haría que el BFS
+  llegue más lejos para juntar 10 salas, sin cambiar la cantidad de solicitudes.
+
+### Pruebas
+
+`tests/test_grafo_salas.py` (13 pruebas) cubre el BFS: orden por distancia en cripta-01 y
+en una cuadrícula grande, vecinos en orden N, S, E, O, salidas cerradas incluidas y que el
+recorrido sea determinista. `tests/test_gestor_contenido.py`
+(17) cubre la precarga, la reserva de solicitudes, las esperas en la puerta y el contenido
+recuperado de disco. `tests/test_repositorio_cripta.py` (26) verifica el presupuesto real
+de cripta-01 de punta a punta: 7 solicitudes en frío, con 1 lote de contenido.
 
 ---
 
-## Dónde salen las cifras
+## 4.3 Resolución de referencias del catálogo
 
-Ninguna cifra es inventada.
+Estado: implementado, probado y medido.
 
-- **Tiempos:** `python -m benchmark.persona3_bench`, corrido tres veces. Se reporta la mediana. Las tres corridas y las medianas están en `docs/mediciones/persona3/`.
-- **Frecuencias:** `python -m benchmark.persona3_frecuencias`. Recorre con el motor real la misma cripta sintética de `benchmark/scheduler_bench.py`, sin modificar `Game`.
-- **Entorno:** Python 3.13.16 sobre Linux x86_64, no en la máquina del grupo (Python 3.14.6 sobre Windows 11). Hay que repetir las mediciones ahí antes de entregar. Lo que importa son las proporciones y cómo crece cada columna; eso no debería cambiar, pero los valores absolutos sí.
+### Problema
 
-| Escenario de frecuencia | 6 salas, 5 errantes | 40 salas, 50 errantes |
+Antes de mostrar o simular un enemigo, un objeto o una trampa, su id de tipo tiene que
+convertirse en una ficha del catálogo (§4.3). Esos ids aparecen en el contenido de cada
+sala, en un orden que no controlamos, y se repiten mucho: dos ratas de la misma sala son
+el mismo `ent_rata_gigante`. Además, un enemigo puede soltar objetos cuyas fichas tampoco
+tenemos todavía.
+
+Pedir cada id por separado no entra en el presupuesto, y un id que ya está en memoria o en
+disco no se debe volver a pedir.
+
+Medido con `benchmark/bench_frecuencia_bloque2.py`, en arranque en frío:
+
+| Operación | Cuándo ocurre | cripta-01 real (20 acciones) | Cripta sintética de 900 salas (300 acciones) |
+| --- | --- | ---: | ---: |
+| Consultar si una ficha ya está (memoria o disco) | al preparar cada sala y en la precarga de fichas | 57 (2,9 por acción) | 4 853 (16,2 por acción) |
+| Ficha que hacía falta y no estaba (fallo) | primera vez que se necesita un tipo | 2 | 20 |
+| Pedir un lote al catálogo | cuando falta alguna ficha | 2 lotes, 11 fichas | 11 lotes, 60 fichas |
+
+Lo que muestra la tabla: preguntar "¿esta ficha ya está?" es lo que más se repite, y pedir
+fichas al API casi no ocurre. En cripta-01 hicieron falta 11 fichas, pero solo 2 fueron
+fallos: las otras 9 ya habían llegado de relleno en un lote anterior, como se explica en
+la decisión.
+
+### Alternativas consideradas
+
+Implementamos las tres estrategias sobre el mismo `GestorCatalogo`, y las medimos en el
+mismo recorrido (`CatalogoUnaFichaPorSolicitud` y `CatalogoLotesSinRelleno`, en
+`benchmark/bench_frecuencia_bloque2.py`).
+
+**Una ficha por solicitud** (lo que haría `GET /catalogo/<id>`). Es lo más directo. Pero
+§3.4 dice que una solicitud con 10 ids cuesta lo mismo que con 1, así que cada solicitud
+de una sola ficha desperdicia nueve lugares. En cripta-01, con su presupuesto real de 9,
+el jugador **no logra salir de la sala inicial**: se gasta el presupuesto antes de tener
+las fichas de la sala 2.
+
+**Lotes de 10 solo con lo necesario.** Junta en un lote los ids que hacen falta en ese
+momento. Mejora mucho, pero en cripta-01 cada sala pide pocas fichas nuevas, y los lotes
+salen casi vacíos: el presupuesto se agota a mitad de la partida y 7 de los 20 movimientos
+se rechazan.
+
+Para saber si un id ya está disponible también comparamos estructuras: tabla hash, lista
+ordenada con búsqueda binaria y búsqueda lineal. Esa comparación está en la sección 4.4,
+porque es la misma búsqueda que usa la caché.
+
+### Decisión
+
+**Lotes de 10 rellenos con ids conocidos** (decisión D4), en `repository/gestor_catalogo.py`.
+
+- Para cada id busca primero en memoria (`CacheCatalogo`), después en disco
+  (`AlmacenFichas`) y solo al final en el API. `obtener_ficha()` nunca usa la red; antes de
+  usar una ficha hay que llamar a `asegurar_fichas()`.
+- **Ids conocidos.** Cada vez que llega contenido, sus tipos se anotan como conocidos en una
+  `ListaSinRepetidos` (`structures/lista_sin_repetidos.py`): una `list` en orden de llegada
+  más una `TablaHash` para descartar repetidos en O(1). Lo mismo con el campo `suelta` de
+  cada enemigo que llega.
+- **Armado del lote.** Primero van los ids que hacen falta ahora. Si queda espacio, el lote
+  se completa con ids conocidos que todavía no se descargaron, en el orden en que se
+  descubrieron. Una solicitud con 10 ids cuesta lo mismo que con 1, así que el relleno
+  adelanta fichas que se van a necesitar después sin gastar nada extra.
+- **Determinismo.** El orden de descubrimiento depende solo del orden en que se pidió el
+  contenido, que es síncrono. Por eso los lotes son siempre los mismos, también al
+  reproducir.
+- **Objetos que suelta un enemigo.** Se aseguran antes de entrar a la sala, nunca a mitad
+  de un combate, y normalmente ya llegaron con la precarga.
+- **Respuestas incompletas.** Si el API no devuelve un id pedido, se informa con
+  `FichaNoDisponible`.
+
+### Análisis de complejidad
+
+Con k ids pedidos, n fichas guardadas en disco y p ids conocidos:
+
+| Operación | Costo | Frecuencia |
+| --- | --- | --- |
+| Consultar si una ficha está | O(1) promedio en memoria; si no está, O(log n) en el índice del disco | la más frecuente: 2,9 a 16,2 por acción |
+| Anotar un id conocido | O(1) promedio (`ListaSinRepetidos`) | una vez por tipo en cada lote de contenido |
+| `asegurar_fichas(k ids)` sin descargar | O(k) consultas | una por sala preparada y en cada precarga |
+| Armar un lote | O(p) para recorrer los conocidos | solo cuando hay que descargar |
+| Descargar un lote | una solicitud de red (~400 ms) | 2 por partida en cripta-01 |
+
+Recorrer los ids conocidos para armar un lote es lineal, pero ocurre pocas veces (11 lotes
+en 300 acciones en la cripta sintética), y es despreciable frente a los 400 ms de la
+solicitud que se ahorra.
+
+### Evidencia empírica
+
+**Las tres estrategias en el mismo recorrido** (`python -m benchmark.bench_frecuencia_bloque2`,
+salida completa en `docs/mediciones/bloque2/frecuencias_2026-10-18.txt`):
+
+| Escenario | Lotes con relleno (decisión) | Lotes sin relleno | Una ficha por solicitud |
+| --- | --- | --- | --- |
+| cripta-01 real, presupuesto 9, 20 pasos | 2 solicitudes de catálogo, 7 en total, 20 movimientos | 4 de catálogo, 9 en total, presupuesto agotado: 7 movimientos rechazados | 4 de catálogo, 9 en total: no sale de la sala inicial |
+| Sintética 30×30, 60 tipos, 300 pasos | 11 de catálogo, 65 en total | 29 de catálogo, 83 en total | 60 de catálogo, 114 en total |
+
+En la cripta sintética, que tiene presupuesto ilimitado, el relleno gasta 2,6 veces menos
+solicitudes de catálogo que los lotes sin relleno y 5,5 veces menos que pedir de a una. En
+cripta-01 la diferencia es más grave: con el presupuesto real, solo la decisión permite
+terminar el recorrido.
+
+**Contra el API real** (14 de octubre, medido dos veces: antes y después de integrar el
+Traductor): las 11 fichas de cripta-01 llegaron en 2 lotes con solo 2 fallos de caché, y la
+partida usó 7 de 9 solicitudes.
+
+### Límites conocidos
+
+- **El relleno puede traer fichas que no se usen.** Solo rellena con ids que aparecieron
+  en contenido ya descargado, así que es probable que se usen, pero no seguro: el jugador
+  puede no llegar nunca a esa sala. El costo es memoria y disco, no presupuesto.
+- **Depende de la precarga de contenido.** El relleno solo puede adelantar ids que ya se
+  conocen. Si la precarga se detiene por presupuesto, los lotes de catálogo vuelven a salir
+  más vacíos.
+- **Una cripta con muchos tipos no entra en un presupuesto chico.** Con 10 fichas por
+  solicitud, un catálogo de t tipos necesita al menos t/10 solicitudes. Si la cripta de la
+  revisión tuviera muchos más tipos que solicitudes disponibles, la caché en disco de una
+  partida anterior sería la única forma de completarla.
+- **Lo que suelta un enemigo se conoce tarde.** Se sabe recién cuando llega la ficha del
+  enemigo. Si no queda presupuesto para un lote más, esa ficha se pide al entrar a la sala.
+
+### Pruebas
+
+`tests/test_gestor_catalogo.py` (21 pruebas) cubre que lo ya disponible no se vuelva a
+pedir, los ids repetidos, el relleno con ids conocidos (también lo que suelta un enemigo),
+que cripta-01 quepa en dos lotes, que los lotes sean deterministas, la recuperación desde
+disco con una caché chica y el id que el API no devuelve.
+`tests/test_lista_sin_repetidos.py` (3) cubre el orden de llegada sin repetidos.
+`tests/test_bench_frecuencia_bloque2.py` (7) fija los conteos de esta sección: si cambia
+el comportamiento del catálogo, la prueba falla y hay que actualizar estas cifras.
+
+---
+
+## 4.4 Reutilización y caché persistente
+
+Estado: implementado, probado y medido.
+
+### Problema
+
+En memoria caben como mucho `--cache-size` fichas (25 por defecto). Al llegar al tope hay
+que liberar alguna, pero nunca una que esté en uso: la de un enemigo vivo, un objeto del
+inventario, o un objeto o una trampa de la sala actual (§4.4). Una ficha liberada tiene que
+seguir en disco, de modo que volver a necesitarla cueste una lectura de disco y no una
+solicitud. Y la caché tiene que sobrevivir al cierre del programa, validada por la versión
+del catálogo. Lo mismo vale, por versión de la cripta, para el esqueleto y el contenido.
+
+Medido con `benchmark/bench_frecuencia_bloque2.py`, en arranque en frío:
+
+| Operación | cripta-01, caché 25 | cripta-01, caché 5 | Sintética, caché 25 | Sintética, caché 5 |
+| --- | ---: | ---: | ---: | ---: |
+| Acciones del jugador | 20 | 20 | 300 | 300 |
+| Búsquedas en memoria (¿está esta ficha?) | 57 | 57 | 4 853 | 4 853 |
+| Lecturas de una ficha (aciertos en memoria) | 16 (16) | 16 (6) | 389 (258) | 389 (195) |
+| Inserciones en memoria | 11 | 21 | 191 | 254 |
+| Fichas liberadas | 0 | 16 | 160 | 223 |
+| Lecturas de disco | 0 | 10 | 131 | 194 |
+| Solicitudes de red | 7 | 7 | 65 | 65 |
+
+Tres cosas salen de esa tabla:
+
+- **Se busca muchísimo más de lo que se inserta**: con la caché por defecto, 5 veces más en
+  cripta-01 y 25 veces más en la cripta sintética. Lo que cueste buscar es lo que cuesta la caché.
+- **Liberar memoria nunca cuesta red.** Con caché de 5 en cripta-01 se liberaron 16 fichas y
+  se leyeron 10 del disco, y la partida siguió usando las mismas 7 solicitudes.
+- Con caché de 25 en la cripta sintética, la caché llegó a tener 6 fichas más que el tope
+  porque todas las candidatas estaban en uso. Eso se explica en la decisión.
+
+### Alternativas consideradas
+
+**Para buscar por id** comparamos cinco opciones (`benchmark/bench_tabla_hash.py`):
+
+| Estructura | Búsqueda | Por qué no |
+| --- | --- | --- |
+| `dict` de Python | O(1) | §7 lo prohíbe como caché o tabla de búsqueda; está medido solo como referencia |
+| Búsqueda lineal en una `list` | O(n) | con 10 000 claves es más de 400 veces más lenta que la tabla |
+| `list` ordenada + búsqueda binaria | O(log n) | más lenta que la tabla desde 25 claves, y cada inserción desplaza elementos |
+| Tabla hash propia con FNV-1a | O(1) | unas 5 veces más lenta que con crc32: calcula el hash en Python |
+| **Tabla hash propia con crc32** | O(1) | decisión |
+
+**Para decidir qué liberar** consideramos FIFO (libera la que entró primero, aunque se use
+todo el tiempo), LFU (la menos usada en total, que necesita contadores y tarda en olvidar
+fichas muy usadas al principio) y LRU (la usada hace más tiempo). Elegimos LRU porque el
+jugador vuelve a salas cercanas y ve otra vez los mismos tipos. **No medimos FIFO ni LFU**:
+la decisión entre políticas es razonada, no medida.
+
+**Para llevar el orden de uso del LRU** comparamos una lista doblemente enlazada contra una
+`list` de Python en la que la ficha usada se mueve al final (`benchmark/bench_cache_catalogo.py`).
+
+**Para guardar en disco** comparamos tres formatos (`benchmark/bench_almacen_fichas.py`): un
+solo JSON con todas las fichas, un archivo JSON por ficha, y nuestro almacén con un índice
+binario ordenado.
+
+**Para saber qué fichas están en uso** consideramos llevar un contador de referencias en cada
+ficha, que habría que actualizar cada vez que un enemigo muere, un objeto se recoge o el
+jugador cambia de sala. En cambio, la caché le pregunta al modelo qué está en uso solo
+cuando necesita liberar, que es mucho menos frecuente (decisión D5).
+
+### Decisión
+
+**Memoria: `CacheCatalogo`** (`structures/cache_catalogo.py`). Una `TablaHash` de id a nodo
+dice en O(1) promedio si la ficha está, y una lista doblemente enlazada con dos nodos
+centinela lleva el orden de uso: la más reciente al frente y la usada hace más tiempo al
+final. Mover un nodo al frente no recorre nada, porque cada nodo conoce a su anterior y a su
+siguiente.
+
+- **Al liberar**, la caché llama a `consultar_ids_en_uso`, que arma el controlador con
+  `RepositorioCripta.ids_en_uso(...)`: enemigos vivos y lo que sueltan, inventario, y suelo y
+  trampas de la sala actual. Recorre desde el final y salta las fichas en uso.
+- **Tope flexible** (D9): si todas las candidatas están en uso, la caché excede el tope por
+  un momento, lo registra, y en la siguiente inserción vuelve a intentar bajar.
+- **La caché no entra en el retroceso** (§2.11): es infraestructura, no estado del juego.
+
+**La tabla hash** (`structures/tabla_hash.py`) usa encadenamiento, capacidad en potencias de
+2 y se duplica cuando pasa de 0,75 entradas por cubeta. La función hash es crc32
+(`structures/funciones_hash.py`): es determinista entre ejecuciones, a diferencia de `hash()`
+de Python, que cambia el resultado para los textos en cada ejecución. Es la misma tabla que
+usa todo el proyecto en lugar de `dict`.
+
+**Disco: `AlmacenFichas`** (`adapters/almacen_fichas.py`, decisión D6). Dos archivos:
+`fichas.datos`, con las fichas una tras otra en JSON, y `fichas.indice`, binario con
+`struct`: firma, versión del formato, versión del catálogo y una entrada por ficha
+**ordenada por id** con su posición y su tamaño. Para leer una ficha, una búsqueda binaria en
+el índice y luego se leen solo sus bytes. Al guardar, el índice se escribe en un temporal y se
+reemplaza de una vez (`os.replace`), así un cierre a medio guardar nunca deja un índice que
+apunte a datos incompletos. Si la versión del catálogo no coincide, todo se descarta.
+
+**Esqueleto y contenido: `AlmacenCripta`** (`adapters/almacen_cripta.py`). Un archivo por sala
+dentro de la carpeta de cada cripta, validados por la versión de la cripta. Con eso, una
+segunda partida en la misma cripta no vuelve a pedir páginas ni contenido.
+
+Si el disco falla, el juego sigue sin persistencia y el reporte final lo avisa (S8).
+
+### Análisis de complejidad
+
+Con n fichas en memoria, N fichas en disco y u fichas en uso que hay que saltar:
+
+| Operación | Costo | Frecuencia medida |
+| --- | --- | --- |
+| ¿Está en memoria? (`contiene_ficha`) | O(1) promedio | la más frecuente: 57 en 20 acciones, 4 853 en 300 |
+| Obtener de memoria y moverla al frente | O(1) promedio | 16 en 20 acciones, 389 en 300 |
+| Insertar sin liberar | O(1) promedio | entre 11 y 254 inserciones por partida |
+| Insertar liberando | O(u + 1) más lo que cueste `consultar_ids_en_uso` | entre 0 y 223 fichas liberadas por partida |
+| Buscar en el índice del disco | O(log N) | 26 a 2 351 por partida |
+| Leer una ficha del disco | O(log N) más leer sus bytes | 0 a 194 por partida |
+| Guardar un lote de k fichas | O(k·N) por las inserciones ordenadas, más reescribir el índice O(N) | una vez por lote descargado |
+| Abrir el almacén | O(N) | una vez por partida |
+
+Lo que domina es la primera fila, y es O(1). Liberar es lo único que puede costar más, porque
+pregunta qué está en uso. Con la caché por defecto no ocurrió nunca en cripta-01; en la cripta
+sintética se liberaron 160 fichas en 191 inserciones, pero aun así se buscó 25 veces más de lo
+que se insertó.
+
+### Evidencia empírica
+
+Mediana de 3 corridas en la computadora de Mauricio (Python 3.13.14 en Windows), 13 de
+octubre. Cada benchmark calienta el procesador antes de medir. Detalle y rangos en
+`docs/mediciones/bloque2/medianas_2026-10-13.md`.
+
+**Buscar por id**, nanosegundos por búsqueda con acierto:
+
+| Claves | TablaHash crc32 (decisión) | TablaHash FNV-1a | Lista ordenada + binaria | Lineal | `dict` (referencia) |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 25 | 163 | 800 | 226 | 283 | 13 |
+| 100 | 163 | 831 | 329 | 894 | 14 |
+| 1 000 | 179 | 826 | 575 | 8 543 | 18 |
+| 10 000 | 190 | 872 | 800 | 80 495 | 21 |
+
+La tabla con crc32 es casi plana: con 400 veces más claves pasa de 163 a 190 ns. Le gana a
+todas las alternativas permitidas en todos los tamaños, también con 25 claves, que es el tope
+por defecto. Las búsquedas con fallo dan lo mismo (154 a 175 ns).
+
+**Orden de uso del LRU**, caché llena, nanosegundos por operación:
+
+| Capacidad | Obtener: lista doble (decisión) | Obtener: `list` | Insertar liberando: lista doble | Insertar liberando: `list` |
+| ---: | ---: | ---: | ---: | ---: |
+| 25 | 291 | 331 | 996 | 670 |
+| 100 | 291 | 535 | 1 003 | 692 |
+| 1 000 | 303 | 3 214 | 1 047 | 829 |
+| 5 000 | 315 | 20 968 | 1 069 | 1 387 |
+
+Obtener es plano con la lista doble; con la `list` crece con la cantidad de fichas y con 5 000
+es 67 veces más lento.
+
+**Recuperar una ficha liberada**, microsegundos por lectura:
+
+| Fichas | AlmacenFichas (decisión) | Un JSON por ficha | Un solo JSON |
+| ---: | ---: | ---: | ---: |
+| 25 | 31,5 | 44,4 | 58,3 |
+| 100 | 31,6 | 44,8 | 116,3 |
+| 1 000 | 32,0 | 45,5 | 778,2 |
+
+El almacén no depende de la cantidad de fichas; un solo JSON es 24 veces más lento con 1 000.
+Un archivo por ficha se acerca, pero con 1 000 fichas son 1 000 archivos. La búsqueda binaria
+en el índice cuesta entre 0,29 y 0,60 µs, apenas el 1 o 2 % de la lectura: lo que cuesta es ir
+al disco. Aun así, leer del disco es unas 12 700 veces más rápido que una solicitud de ~400 ms.
+
+**Persistencia contra el API real** (14 de octubre, `docs/mediciones/bloque2/presupuesto_api_real_2026-10-14.md`):
+
+| | Arranque en frío | Segunda partida, misma caché en disco |
 | --- | ---: | ---: |
-| Decisiones del jugador | 1 000 | 1 000 |
-| Eventos procesados | 8 940 | 68 549 |
-| Turnos de enemigos | 6 940 (6.94 por decisión) | 66 550 (66.55 por decisión) |
-| Mensajes escritos en la bitácora | 3 380 (3.38 por decisión) | 3 710 (3.71 por decisión) |
-| Marcas de rastro | 1 001 (1.00 por decisión) | 1 001 (1.00 por decisión) |
-| Anotaciones en el historial | 18 879 (18.88 por decisión) | 138 098 (138.10 por decisión) |
-| Intervalo más grande, en anotaciones | 26 | 206 |
+| Solicitudes realizadas | 7 de 9 | 3 de 9 |
+| Fichas descargadas | 11 (2 lotes) | 0 |
+| Salas descargadas | 6 (1 lote) | 0 (6 leídas del disco) |
+| Fallos de caché | 2 | 0 |
 
-Las anotaciones del historial son una **cota inferior**. Solo cuentan lo que anotan solas la agenda reversible y el rastro: el motor todavía no anota sus cambios de vida, puertas y trampas.
+En la segunda partida solo se piden la lista de criptas, los datos generales (que traen la
+versión de la cripta) y la versión del catálogo. Todo lo demás sale del disco, validado por
+versión.
 
----
+### Límites conocidos
 
----
+- **`dict` sería 9 a 12 veces más rápido** que nuestra tabla. Es el costo de cumplir §7.
+- **Insertar liberando es más lento con la lista doble que con una `list`** hasta unas 1 000
+  fichas, porque la `list` desplaza sus elementos en C. Lo aceptamos porque buscar es entre 5 y
+  25 veces más frecuente que insertar.
+- **Preguntar qué está en uso puede salir caro.** Hoy cuenta todos los enemigos cargados que
+  siguen vivos, también los dormidos de salas que el jugador no visitó. En una cripta muy grande
+  esa lista crece, y por eso la caché de 25 llegó a pasarse en 6 fichas en la cripta sintética.
+- **No medimos FIFO ni LFU.** Las mediciones comparan las estructuras, no las políticas.
+- **La tabla hash no se encoge** al eliminar, y el índice de disco se carga completo en memoria.
+  Para el tamaño del catálogo de este juego no importa.
+- **`fichas.datos` acumula bytes sin uso** si una ficha se vuelve a guardar. Se reinicia cuando
+  cambia la versión del catálogo.
+- **Los tiempos son de una sola computadora** (Windows, Python 3.13). Los conteos de frecuencia y
+  de solicitudes no dependen del equipo.
+
+### Pruebas
+
+`tests/test_tabla_hash.py` (50 pruebas) cubre inserción, reemplazo, eliminación,
+redimensionamiento, claves con tildes, 10 000 claves y las dos funciones hash contra valores
+de referencia. `tests/test_cache_catalogo.py` (17) cubre el orden LRU, las fichas en uso y
+el tope flexible. `tests/test_almacen_fichas.py` (19) cubre el formato, la búsqueda binaria, el
+cambio de versión, los archivos dañados y el reemplazo atómico. `tests/test_almacen_cripta.py`
+(9) cubre el esqueleto y el contenido por versión. `tests/test_repositorio_cripta.py` (26)
+verifica de punta a punta 7 solicitudes en frío y 3 en caliente.
+
 
 ## 4.5 Inventario
 

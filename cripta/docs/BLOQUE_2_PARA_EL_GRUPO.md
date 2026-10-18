@@ -1,6 +1,6 @@
 # Bloque 2 — API, caché y persistencia: guía para el grupo
 
-Responsable: Mauricio (persona 2). Última actualización: 15 de octubre de 2026.
+Responsable: Mauricio (persona 2). Última actualización: 18 de octubre de 2026.
 
 Este documento explica qué está listo en el bloque 2, cómo usarlo desde el resto del
 programa, qué datos entrega y **qué necesita el bloque 2 de cada integrante** para quedar
@@ -23,12 +23,14 @@ terminado.
 | Esqueleto y contenido en disco por versión | `adapters/almacen_cripta.py` | Listo |
 | Fichas: memoria → disco → API en lotes de 10 | `repository/gestor_catalogo.py` | Listo |
 | Contenido con precarga BFS | `repository/gestor_contenido.py` | Listo |
+| Frecuencia medida de las operaciones (§8.1) y estrategias del catálogo | `benchmark/bench_frecuencia_bloque2.py` | Listo |
+| Secciones 4.2, 4.3 y 4.4 del Documento de Decisiones | `docs/DECISIONES.md` | Listo |
 | **Punto de entrada para el controlador** | `repository/repositorio_cripta.py` | Listo |
 | `Traductor` (JSON → objetos del modelo) | `repository/traductor.py` | Listo |
 | Clases del modelo que faltaban: sala, puerta, salida, mapa | `model/room.py` | Listo (revisar con la persona 1) |
 | Instancia de objeto y de trampa | `model/item.py`, `model/trap.py` | Listo (revisar con la persona 1) |
 
-Pruebas: 293 del bloque 2; la rama del bloque 2 tiene 380 y todas pasan
+Pruebas: 300 del bloque 2; la rama del bloque 2 tiene 387 y todas pasan
 (`python -m unittest discover -s tests -t .` desde `cripta/`). Unida con las ramas de las
 personas 1 y 4 (revisión del 15 de octubre), el proyecto tiene 528 pruebas y todas pasan. Conexión real con el API
 verificada. Las mediciones están en `docs/mediciones/bloque2/`.
@@ -168,8 +170,10 @@ Cada benchmark del bloque 2 expone `run()`, igual que `benchmark/scheduler_bench
 una lista de `Measurement` con `name`, `seconds` y `detail`. En la precarga, que cuenta
 solicitudes y no mide tiempo, `seconds` es `None` y los números van en `detail`. Además tienen
 `ejecutar()` e `imprimir()` para correrlos sueltos. Los módulos son
-`benchmark.bench_tabla_hash`, `benchmark.bench_cache_catalogo`, `benchmark.bench_almacen_fichas`
-y `benchmark.bench_precarga_contenido`.
+`benchmark.bench_tabla_hash`, `benchmark.bench_cache_catalogo`, `benchmark.bench_almacen_fichas`,
+`benchmark.bench_precarga_contenido` y `benchmark.bench_frecuencia_bloque2`. El último cuenta
+cuántas veces se ejecuta cada operación del bloque 2 en una partida y compara tres formas de
+pedir el catálogo; sus cifras son las de las secciones 4.2 a 4.4 del Documento de Decisiones.
 
 ### Errores que el controlador debe atrapar
 
@@ -241,7 +245,7 @@ y `benchmark.bench_precarga_contenido`.
 3. Armar `consultar_ids_en_uso` con `repositorio.ids_en_uso(...)` (sección 2.1).
 4. En `--replay`: la cabecera sale de `versiones_de_la_partida()`, y al reproducir se llama a
    `iniciar_partida(id_cripta, (version_cripta, version_catalogo))`.
-5. Incluir en `--bench` el `run()` de los cuatro benchmarks del bloque 2.
+5. Incluir en `--bench` el `run()` de los cinco benchmarks del bloque 2.
 
 ---
 
@@ -354,7 +358,8 @@ el Documento de Decisiones.
 Desde la carpeta `cripta/`:
 
 ```
-python -m unittest discover -s tests -t .                     # 380 pruebas (293 del bloque 2)
+python -m unittest discover -s tests -t .                     # 387 pruebas (300 del bloque 2)
+python -m benchmark.bench_frecuencia_bloque2                  # frecuencias de las secciones 4.2 a 4.4
 python -m tools.simular_partida_bloque2 --borrar-cache        # recorrido contra el API real, en frío
 python -m tools.simular_partida_bloque2                       # otra vez: arranque en caliente
 python -m tools.simular_partida_bloque2 --offline datos_offline
