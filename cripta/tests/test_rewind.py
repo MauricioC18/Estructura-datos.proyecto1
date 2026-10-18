@@ -253,6 +253,33 @@ class TestTheScrollItself(unittest.TestCase):
         self.assertEqual(game.player.inventory.scroll_count(), 0)
         self.assertFalse(game.rewind().accepted)
 
+    def test_a_scroll_picked_up_in_the_interval_is_not_given_back(self):
+        """Apendice B: la cantidad refleja solo la unidad consumida."""
+        game, _ = build_game(floor=[scroll("i-pergamino-suelo")], scrolls=1)
+
+        game.pick_up(0)
+
+        self.assertEqual(game.player.inventory.scroll_count(), 2)
+
+        game.rewind()
+
+        self.assertEqual(game.player.inventory.scroll_count(), 1)
+        self.assertEqual(list(game.room_map.room(1).floor_items), [])
+
+    def test_a_scroll_dropped_in_the_interval_stays_on_the_floor(self):
+        """La excepcion de la seccion 2.11 aplica en los dos sentidos."""
+        game, _ = build_game(scrolls=2)
+
+        game.drop()
+        floor = game.room_map.room(1).floor_items
+
+        self.assertEqual(len(floor), 1)
+
+        game.rewind()
+
+        self.assertEqual(game.player.inventory.scroll_count(), 0)
+        self.assertEqual(len(floor), 1)
+
     def test_without_a_scroll_it_is_rejected(self):
         game, _ = build_game(enemies=[make_enemy()], scrolls=0)
         game.wait()
