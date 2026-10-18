@@ -327,6 +327,8 @@ Acuerdos que esta interfaz impone al resto del modelo:
 
 **Los once métodos están implementados.** Si el jugador todavía no tiene inventario asignado, los siete que lo necesitan devuelven un `ActionResult` rechazado que lo dice, en lugar de reventar.
 
+**Cargar una partida: `Game.load()`.** El constructor normal hace el trabajo de inicio de §2.4 (programa la primera acción, activa enemigos, corre el ciclo). Al cargar nada de eso debe pasar, así que existe `Game.load()`, que recibe los mismos objetos más `events`, `effects`, `torch_lit`, `result`, `player_actions` y `enemies_defeated`. Deja además apuntando a cada actor su acción pendiente. Si no se le pasan los efectos, los deduce de la agenda, de modo que el archivo de guardado no necesita guardarlos.
+
 `rewind()` es la única acción que funciona con la partida terminada: §2.11 no pone esa condición y el resultado se restaura como cualquier otro cambio, así que un jugador muerto puede volver.
 
 **La partida terminada rechaza todo.** `Game.is_over` es `True` cuando el resultado ya no es "en curso". Toda acción pública lo revisa como primera línea, antes de validar cualquier otra cosa, y devuelve un `ActionResult` rechazado sin tocar nada. Las acciones que falten deben seguir el mismo patrón.

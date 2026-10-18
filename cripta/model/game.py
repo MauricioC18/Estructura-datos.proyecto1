@@ -131,6 +131,7 @@ class Game:
         history=None,
         message_log=None,
         event_queue=None,
+        start=True,
     ):
         self.state = state
         self.player = player
@@ -148,10 +149,91 @@ class Game:
         self.enemies_defeated = 0
         self.events_processed = 0
 
+        if start:
+            self._begin_new_game()
+
+    def _begin_new_game(self):
+        """Trabajo de inicio de una partida nueva (§2.4).
+
+        Marca el rastro de la sala inicial, programa la primera accion del
+        jugador en el instante 0, activa los enemigos de esa sala y procesa
+        eventos hasta que le toque decidir.
+
+        Una partida cargada de un archivo no pasa por aca: su agenda viene del
+        archivo, sus enemigos ya tienen su estado y el reloj no esta en cero.
+        """
         self._mark_trail()
         self._schedule(self.player, self.state.clock)
         self._activate_enemies_in(self.player.room_id)
         self._advance_to_player_turn()
+
+    @classmethod
+    def load(
+        cls,
+        state,
+        player,
+        enemies=None,
+        room_map=None,
+        exit_room_id=None,
+        trail=None,
+        history=None,
+        message_log=None,
+        event_queue=None,
+        events=(),
+        effects=None,
+        torch_lit=False,
+        result=IN_PROGRESS,
+        player_actions=0,
+        enemies_defeated=0,
+    ):
+        """Arma una partida guardada en disco, para el guardado de §4.10.
+
+        Los objetos del modelo llegan ya armados, igual que en el constructor.
+        Lo que cambia es que no se hace el trabajo de inicio de partida: usar
+        el constructor normal para cargar dejaria la partida mal sin producir
+        ningun error.
+
+        events son los eventos que estaban pendientes. Se vuelven a insertar
+        con su mismo time y sequence, de modo que el monticulo recupera el
+        mismo orden, y se deja apuntando a cada actor su accion pendiente.
+
+        Los efectos activos no hace falta guardarlos: si no se pasan, se
+        deducen de los eventos cargados, porque un veneno es sus pulsos
+        pendientes y un cambio de velocidad o una antorcha son su evento de
+        fin. Sin eso, un antidoto no podria cancelar un veneno cargado de un
+        archivo y la interfaz no mostraria nada, sin que diera ningun error.
+
+        El historial del retroceso no se carga: al abrir una partida guardada
+        el de la sesion anterior ya no aplica.
+        """
+        game = cls(
+            state,
+            player,
+            enemies,
+            room_map,
+            exit_room_id,
+            trail,
+            history,
+            message_log,
+            event_queue,
+            start=False,
+        )
+
+        for event in events:
+            game.events.push(event)
+
+            if event.event_type == ACTOR_ACTION and event.actor is not None:
+                event.actor.scheduled_event = event
+
+        game.effects = (
+            game._effects_from_events() if effects is None else list(effects)
+        )
+        game.torch_lit = torch_lit
+        game.result = result
+        game.player_actions = player_actions
+        game.enemies_defeated = enemies_defeated
+
+        return game
 
     def wait(self):
         if self.is_over:
@@ -925,6 +1007,45 @@ class Game:
             original_speed = effect.events[0].amount
             self.change_actor_speed(actor, original_speed)
             self._cancel_effect(effect)
+
+    EFFECT_OF_EVENT = (
+        (POISON_PULSE, POISON),
+        (SPEED_END, SPEED),
+        (TORCH_END, TORCH),
+    )
+
+    def _effects_from_events(self):
+        """Reconstruye los efectos activos a partir de la agenda cargada.
+
+        Un veneno son sus pulsos pendientes; un cambio de velocidad y una
+        antorcha, su evento de fin. La regeneracion no entra porque no se
+        registra como efecto cancelable.
+        """
+        rebuilt = []
+
+        for event_type, name in self.EFFECT_OF_EVENT:
+            for target in self._targets_of(event_type):
+                events = [
+                    event
+                    for event in self.events.active_events()
+                    if event.event_type == event_type and event.actor is target
+                ]
+                ends_at = max(event.time for event in events)
+                rebuilt.append(ActiveEffect(name, target, events, ends_at))
+
+        return rebuilt
+
+    def _targets_of(self, event_type):
+        targets = []
+
+        for event in self.events.active_events():
+            if event.event_type != event_type or event.actor is None:
+                continue
+
+            if event.actor not in targets:
+                targets.append(event.actor)
+
+        return targets
 
     def _cancel_effect(self, effect):
         for event in effect.events:

@@ -709,6 +709,40 @@ El jugador muere en el instante 198 y el primer pergamino lo devuelve vivo al 10
 la vida de la rata restaurada. El segundo lo lleva al principio, con la trampa rearmada.
 Los pergaminos no vuelven.
 
+### Cargar una partida es un camino aparte del constructor
+
+El constructor de `Game` hace trabajo de inicio de partida: marca el rastro de la sala
+inicial, programa la primera acción del jugador en el instante 0, activa los enemigos de
+esa sala y procesa eventos hasta la primera decisión (§2.4).
+
+Al cargar una partida guardada nada de eso debe ocurrir, porque la agenda viene del
+archivo, los enemigos ya tienen su estado y el reloj no está en cero. Si se usara el
+constructor normal, la partida cargada quedaría mal **sin producir ningún error**: el
+jugador tendría dos acciones programadas y los enemigos se reactivarían.
+
+Por eso existe `Game.load()`, un constructor alternativo que recibe los mismos objetos
+que el normal más lo que cambia durante la partida, y que no hace ese trabajo. Se
+descartó una bandera en el constructor porque un parámetro que cambia lo que hace el
+método es fácil de pasar mal, y acá pasarlo mal no da error.
+
+`load()` también deja apuntando a cada actor su acción pendiente a partir de los eventos
+cargados, que es un detalle que el código de guardado tendría que recordar.
+
+**Los efectos activos no hace falta guardarlos.** Si no se pasan, `load()` los deduce de
+la agenda: un veneno son sus pulsos pendientes, y un cambio de velocidad o una antorcha
+son su evento de fin.
+
+Esto salió de una prueba. Al reconstruir una partida sin pasar los efectos, el daño del
+veneno seguía ocurriendo, porque viene de los eventos, pero la lista de efectos quedaba
+vacía. La consecuencia habría aparecido mucho después: un antídoto no habría podido
+cancelar un veneno cargado de un archivo, y la interfaz no habría mostrado nada, sin que
+nada diera error. Deducirlos de la agenda elimina esa clase de fallo y le ahorra trabajo
+al archivo.
+
+El historial del retroceso no se carga, porque el de la sesión anterior ya no aplica.
+Tampoco la bitácora de los 20 mensajes, que es presentación, ni `events_processed`, que
+es una medición.
+
 ### El rastreador usa el rastro, no lo reimplementa
 
 `PlayerTrail.freshest_exit(room, instante)` ya aplica las tres reglas de §2.9: examina
@@ -1367,9 +1401,10 @@ sin reproducir ninguna acción.
 | `tests/test_movement.py` | 61 |
 | `tests/test_inventory_actions.py` | 34 |
 | `tests/test_rewind.py` | 25 |
-| **Total del motor** | **250** |
+| `tests/test_save_load.py` | 20 |
+| **Total del motor** | **270** |
 
-Con las del bloque 2 integradas, el proyecto tiene 656 pruebas y todas pasan en
+Con las del bloque 2 integradas, el proyecto tiene 761 pruebas y todas pasan en
 Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
 `cripta/`, con las dependencias de `requirements.txt` instaladas.
 
