@@ -296,6 +296,42 @@ De los datos salió una conclusión que antes no se podía sacar: lo que llena l
 
 Cambios realizados por el estudiante: [Indicar qué se revisó de las mediciones.]
 
+### 3.17 Integración del bloque de la Persona 3 y el pergamino de retroceso
+
+Fecha: 2026-10-16
+
+Objetivo: Conectar las estructuras de la Persona 3 al motor e implementar el pergamino de retroceso, que era lo último que faltaba del módulo.
+
+Prompts utilizados:
+
+- "haz los puntos 1 al 4 primero, y explícame todo sobre cómo lo vas a hacer"
+- "se continúa con el inventario para ya terminar lo intermedio y dejar para mañana el 6, que es el retroceso y lo complicado"
+
+Uso en el proyecto: Se conectaron la bitácora circular, el módulo de ordenamiento, el rastro y el inventario, con lo que quedaron completos los tres comportamientos de enemigo de §2.8 y las acciones de inventario de §2.7. Después se implementó el retroceso: el motor anota en veintisiete lugares cómo deshacer cada cambio, en lugar de copiar el estado, que es lo que §2.11 prohíbe.
+
+Aparecieron dos cosas al probar. La respuesta a una pregunta que la Persona 3 había dejado abierta: la sala destino se marca con el reloj del instante de la acción y no al terminar su costo, porque §2.5 dice que el jugador aparece en la sala al ejecutarla y el ejemplo de §2.13 lo confirma. Y una decisión propia que se corrigió: el retroceso funciona con la partida terminada, porque §2.11 no pone esa condición y un pergamino que no sirva cuando al jugador lo matan no sirve para nada.
+
+Cambios realizados por el estudiante: [Indicar qué se revisó y qué se decidió.]
+
+### 3.18 Integración final y carga de partidas guardadas
+
+Fecha: 2026-10-18
+
+Objetivo: Integrar el trabajo de los otros tres integrantes, dejar resuelto lo que el guardado necesita del motor y unificar el Documento de Decisiones.
+
+Prompts utilizados:
+
+- "toma tú las decisiones que creas mejores y si ocupas específicamente que le diga algo a mis compañeros, dímelo primero"
+- "unifica el documento de decisiones, y después registra los prompts"
+
+Uso en el proyecto: Se fusionaron las cuatro partes del proyecto sin conflictos y se comprobó que el juego se ejecuta jugando `cripta-01` sin conexión. Se implementó `Game.load()`, que arma una partida guardada sin hacer el trabajo de inicio de §2.4; usar el constructor normal para cargar dejaría la partida mal sin producir ningún error.
+
+Probando apareció que los efectos activos se pueden deducir de la agenda, porque un veneno son sus pulsos pendientes. Sin eso, un antídoto no habría podido cancelar un veneno cargado de un archivo y la interfaz no habría mostrado nada, sin que nada avisara.
+
+Se unificó el Documento de Decisiones en un solo archivo con las secciones en el orden del §4, y quedó a la vista que faltan las secciones 4.2, 4.3, 4.4 y 4.10.
+
+Cambios realizados por el estudiante: [Indicar qué se comunicó al grupo y qué se acordó.]
+
 ## 4. Revisión de interfaces existentes y contrato de la Persona 4
 
 Herramienta: Claude (Claude Sonnet 5.5), mediante la interfaz de chat de claude.ai
