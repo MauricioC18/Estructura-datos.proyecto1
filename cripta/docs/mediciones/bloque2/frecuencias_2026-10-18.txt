@@ -1,0 +1,55 @@
+Frecuencia de las operaciones del bloque 2 — 18 de octubre de 2026
+
+Comando, desde la carpeta cripta/:  python -m benchmark.bench_frecuencia_bloque2
+Python 3.13.16 en Linux x86_64
+Son conteos con semilla fija: dan exactamente lo mismo en cualquier computadora.
+
+Frecuencia de las operaciones del bloque 2 (arranque en frío)
+
+cripta-01 real (presupuesto 9), 20 pasos, --cache-size 25: 20 acciones del jugador, 0 movimientos rechazados por presupuesto
+  4.3 consultas de disponibilidad (¿memoria o disco?): 57 (2.9 por acción)
+  4.4 búsquedas en memoria (TablaHash de la caché): 57 (2.9 por acción)
+  4.4 lecturas de fichas desde memoria: 16 (aciertos 16)
+  4.4 inserciones en memoria: 11; desalojos: 0; exceso máximo sobre el tope: 0
+  4.4 búsquedas binarias en el índice de disco: 26; lecturas de disco: 0
+  4.2 revisiones de precarga: 21; lotes de contenido: 1 (6 salas); esperas en la puerta: 0
+  4.3 lotes de catálogo: 2 (11 fichas); fallos de caché: 2; solicitudes en total: 7
+
+cripta-01 real (presupuesto 9), 20 pasos, --cache-size 5: 20 acciones del jugador, 0 movimientos rechazados por presupuesto
+  4.3 consultas de disponibilidad (¿memoria o disco?): 57 (2.9 por acción)
+  4.4 búsquedas en memoria (TablaHash de la caché): 57 (2.9 por acción)
+  4.4 lecturas de fichas desde memoria: 16 (aciertos 6)
+  4.4 inserciones en memoria: 21; desalojos: 16; exceso máximo sobre el tope: 0
+  4.4 búsquedas binarias en el índice de disco: 47; lecturas de disco: 10
+  4.2 revisiones de precarga: 21; lotes de contenido: 1 (6 salas); esperas en la puerta: 0
+  4.3 lotes de catálogo: 2 (11 fichas); fallos de caché: 2; solicitudes en total: 7
+
+cripta sintética 30x30 (900 salas, 60 tipos), 300 pasos, --cache-size 25: 300 acciones del jugador, 0 movimientos rechazados por presupuesto
+  4.3 consultas de disponibilidad (¿memoria o disco?): 4853 (16.2 por acción)
+  4.4 búsquedas en memoria (TablaHash de la caché): 4853 (16.2 por acción)
+  4.4 lecturas de fichas desde memoria: 389 (aciertos 258)
+  4.4 inserciones en memoria: 191; desalojos: 160; exceso máximo sobre el tope: 6
+  4.4 búsquedas binarias en el índice de disco: 1831; lecturas de disco: 131
+  4.2 revisiones de precarga: 301; lotes de contenido: 33 (330 salas); esperas en la puerta: 0
+  4.3 lotes de catálogo: 11 (60 fichas); fallos de caché: 20; solicitudes en total: 65
+
+cripta sintética 30x30 (900 salas, 60 tipos), 300 pasos, --cache-size 5: 300 acciones del jugador, 0 movimientos rechazados por presupuesto
+  4.3 consultas de disponibilidad (¿memoria o disco?): 4853 (16.2 por acción)
+  4.4 búsquedas en memoria (TablaHash de la caché): 4853 (16.2 por acción)
+  4.4 lecturas de fichas desde memoria: 389 (aciertos 195)
+  4.4 inserciones en memoria: 254; desalojos: 223; exceso máximo sobre el tope: 26
+  4.4 búsquedas binarias en el índice de disco: 2351; lecturas de disco: 194
+  4.2 revisiones de precarga: 301; lotes de contenido: 33 (330 salas); esperas en la puerta: 0
+  4.3 lotes de catálogo: 11 (60 fichas); fallos de caché: 20; solicitudes en total: 65
+
+Resolución del catálogo (§4.3): solicitudes de catálogo en el mismo recorrido
+
+cripta-01 real (presupuesto 9), 20 pasos
+    lotes de 10 con relleno (decisión) |    2 solicitudes de catálogo |    7 en total |  20 movimientos hechos, 0 rechazados por presupuesto
+               lotes de 10 sin relleno |    4 solicitudes de catálogo |    9 en total |  13 movimientos hechos, 7 rechazados por presupuesto
+               una ficha por solicitud |    4 solicitudes de catálogo |    9 en total |   0 movimientos hechos, 20 rechazados por presupuesto
+
+cripta sintética 30x30 (900 salas, 60 tipos), 300 pasos
+    lotes de 10 con relleno (decisión) |   11 solicitudes de catálogo |   65 en total | 300 movimientos hechos, 0 rechazados por presupuesto
+               lotes de 10 sin relleno |   29 solicitudes de catálogo |   83 en total | 300 movimientos hechos, 0 rechazados por presupuesto
+               una ficha por solicitud |   60 solicitudes de catálogo |  114 en total | 300 movimientos hechos, 0 rechazados por presupuesto

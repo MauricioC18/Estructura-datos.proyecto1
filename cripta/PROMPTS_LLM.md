@@ -974,3 +974,89 @@ Por favor sube mi rama y sigue con puntajes y readme
 Uso en el proyecto: Se usó la revisión para listar los pendientes de la Persona 4 y repartir el trabajo restante con el compañero (él hace el guardado binario completo y `Game.load()`; la Persona 4, la integración). Después, con ayuda del modelo: se fusionó `mauricio-logica-juego` en la rama de la Persona 4; `GameController` carga la sala destino antes de `move()` y precarga después de cada acción aceptada, con lo que `--replay` ya no se detiene en el primer `mover`; se escribieron `main.py`, `controller/application.py`, `benchmark/benchmark.py` y `adapters/scoreboard.py`; la vista muestra salidas, suelo, inventario y puntajes; y se actualizó el README.
 
 Cambios realizados por el estudiante: Se revisó la propuesta del compañero sobre el guardado y se decidió que él lo implemente completo, porque depende de los internos del motor. Se verificó con `cripta-01` sin conexión que una partida registrada se reproduce igual (muerte en el instante 198 con semilla 5), que un log con otra versión se rechaza y que `--bench` corre las seis suites. Se subió la rama `Parte_4-MVC-replay-bench`.
+
+### 6.29 Revisión del proyecto completo y secciones 4.2 a 4.4 del Documento de Decisiones
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-10-18
+
+Objetivo: Revisar el proyecto con las ramas de los cuatro integrantes unidas, y escribir las secciones 4.2, 4.3 y 4.4 del Documento de Decisiones con los seis apartados de §8, a partir del mensaje del grupo.
+
+Prompts utilizados:
+
+```text
+(mensaje sin texto: solo la captura de pantalla con las 741 pruebas y la salida de python main.py --help en la rama de revisión)
+```
+
+Segundo mensaje, con el proyecto adjunto:
+
+```text
+Haz la revision del proyecto completo con todo el analisis de los archivos, verificando que este todo completo
+Solo que te pasare un mensaje de parte del grupo que de la parte 2 falta algo en la documentacion que necesito que se complete: 
+
+"Muchachos, les paso el estado y lo que falta, que es menos de lo que parece pero hay algo urgente.
+
+LO QUE YA ESTÁ
+
+Fusioné las cuatro partes en mi rama (mauricio-logica-juego). Cero conflictos, 761 pruebas pasando, y el juego corre: lo probé con main.py --offline jugando cripta-01, con la trampa, las ratas, el replay y la tabla de puntajes.
+
+Mi módulo está terminado, incluido el retroceso. También dejé listo Game.load(), que es lo que el guardado va a necesitar del motor.
+
+Unifiqué el Documento de Decisiones en un solo archivo. Erick, tus secciones 4.5 a 4.9 ya están adentro de DECISIONES.md y borré DECISIONES_PERSONA3.md. Ahora las secciones van en el orden del enunciado, de la 4.1 a la 4.11.
+
+LO URGENTE: FALTAN CUATRO SECCIONES DEL DOCUMENTO
+
+Al unificar quedó a la vista que faltan cuatro de los once problemas del §4:
+
+- 4.2 Precarga de contenido
+- 4.3 Resolución del catálogo
+- 4.4 Caché persistente
+- 4.10 Guardado binario
+
+Mauricio A., las tres primeras son tuyas. Y ojo que no es que estén a medias: no existen en ningún lado. BLOQUE_2_PARA_EL_GRUPO.md es una guía de integración buenísima, pero no tiene ni una mención de alternativas consideradas, análisis de complejidad ni evidencia empírica, que son tres de los seis apartados que pide §8.
+
+La buena noticia es que el trabajo difícil ya lo hiciste. Tenés las mediciones corridas en docs/mediciones/bloque2/ y los cuatro benchmarks. Lo que falta es escribir las secciones con los seis apartados:
+
+1. El problema en tus palabras, y qué operaciones ejecuta el programa con qué frecuencia medida
+2. Al menos dos alternativas y por qué descartaste una
+3. La decisión
+4. El análisis de complejidad de las operaciones más frecuentes
+5. La evidencia empírica con tus mediciones
+6. Los límites conocidos
+
+Esto pesa el doble de lo que parece. Son 15% de Decisiones, pero esas tres secciones son el corazón del 25% de API y red: ahí va tu tabla hash contra el dict, la caché LRU y la precarga por lotes. Tenés los números, solo falta contarlos.
+
+LA 4.10 NO TIENE DUEÑO
+
+Steven me dijo que el guardado binario le toca a "mi compañero". Pero el 13 de octubre vos mismo habías propuesto hacer save_file.py y json_save.py, y la tabla de ARQUITECTURA.md pone la persistencia del lado de Mauricio A. O sea que cada uno puede estar esperando al otro.
+
+Decidan entre ustedes dos quién lo toma, hoy. Es lo único del enunciado sin responsable y arrastra también su sección del documento, incluida la comparación contra JSON.
+
+De mi lado ya está resuelto: Game.load() arma una partida guardada sin hacer el trabajo de inicio. Lo importante es que NO usen el constructor normal de Game para cargar: programa la primera acción del jugador en el instante 0 y activa enemigos, así que la partida cargada quedaría mal sin dar ningún error. Game.load() también deja bien el scheduled_event de cada actor, y si no le pasan los efectos los deduce de la agenda, así que el archivo ni siquiera tiene que guardarlos.
+
+Lo que el archivo sí tiene que guardar: reloj, contador de secuencia y estado del generador; vida, sala, velocidad, equipo e inventario del jugador; vida, sala y si está activo de cada enemigo; puertas, trampas y suelo de cada sala; la agenda; el rastro; antorcha, resultado y los dos contadores de puntajes.
+Lo que NO: el historial del retroceso, la bitácora de 20 mensajes y events_processed.
+
+DOS COSAS MÁS, MENORES
+
+Steven, dale al PR a main cuando quieras. Ya verifiqué que las cuatro partes fusionan limpio.
+
+Erick, en tus pendientes decís que la frecuencia del historial es una cota inferior porque el motor no anotaba sus cambios. Ya los anota, son 27 lugares. Cuando repitas esa medición te va a dar bastante más alto. Y tus cifras están corridas en Python 3.13 sobre Linux; conviene repetirlas en la máquina del grupo antes de entregar, como vos mismo anotaste."
+```
+
+Mensajes del 15 de octubre que completan la entrada 6.28:
+
+```text
+Ayudame a llenar esa parte con la explicacion necesaria de acuerdo a lo realizado en el proyecto y los cambios
+```
+
+```text
+si, redacta esas partes tambien
+```
+
+Adjuntos: Captura de PowerShell con las pruebas y `python main.py --help`, y el zip del repositorio completo en la rama `revision-integracion` (con la carpeta `.git`).
+
+Uso en el proyecto: Revisión del proyecto integrado (pruebas, una partida con `main.py --offline`, su reproducción con `--replay`, `--bench` y la tabla de puntajes); secciones 4.2, 4.3 y 4.4 de `docs/DECISIONES.md`; `benchmark/bench_frecuencia_bloque2.py` con su prueba `tests/test_bench_frecuencia_bloque2.py` y la medición `docs/mediciones/bloque2/frecuencias_2026-10-18.txt`; actualización de `docs/BLOQUE_2_PARA_EL_GRUPO.md`.
+
+Cambios realizados por el estudiante: Se unieron las ramas de los cuatro integrantes en la rama local de revisión y se verificaron las 741 pruebas y las opciones de `main.py`. A partir del mensaje del grupo, se pidió escribir las secciones 4.2 a 4.4 con los seis apartados de §8 usando las mediciones del 13 y 14 de octubre. Como §8.1 pide la frecuencia medida de las operaciones y no la teníamos, se decidió agregar un benchmark que la cuenta, y se aceptó que la comparación de políticas FIFO y LFU quede razonada y declarada como no medida. Las secciones se pegaron en el `DECISIONES.md` unificado por la persona 1, después de la 4.1.
