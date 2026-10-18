@@ -1,0 +1,18 @@
+Recorrido, 6 salas, 5 errantes
+  Decisiones del jugador                      1,000
+  Eventos procesados                          8,940
+  Mensajes en la bitacora                     3,380   3.38 por decision
+  Anotaciones de la agenda en historial      18,879   18.88 por decision
+  Mayor intervalo (anotaciones)                  26
+  Marcas de rastro                            1,001   1.00 por decision
+  Turnos de enemigos                          6,940   6.94 por decision
+
+Recorrido, 40 salas, 50 errantes
+  Decisiones del jugador                      1,000
+  Eventos procesados                         68,549
+  Mensajes en la bitacora                     3,710   3.71 por decision
+  Anotaciones de la agenda en historial     138,098   138.10 por decision
+  Mayor intervalo (anotaciones)                 206
+  Marcas de rastro                            1,001   1.00 por decision
+  Turnos de enemigos                         66,550   66.55 por decision
+
