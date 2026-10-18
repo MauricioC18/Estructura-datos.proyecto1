@@ -902,3 +902,39 @@ Adjuntos: Captura de PowerShell con las pruebas y la simulación en la rama `rev
 Uso en el proyecto: Revisión de la integración (pruebas, simulación y una partida de prueba que une los bloques 1, 2 y 4), verificación del contrato del API en `/openapi.json`, avisos de campos desconocidos en `repository/traductor.py` con sus pruebas, y actualización de S13 y de los pasos de integración para la persona 4 en `docs/BLOQUE_2_PARA_EL_GRUPO.md`.
 
 Cambios realizados por el estudiante: Se unieron en una rama local de revisión (`revision-integracion`) las ramas de las personas 1 y 4 con la del bloque 2, sin conflictos, y se comprobó que pasaban las 521 pruebas y la simulación sin conexión. Sobre la observación de la persona 1, se revisó la evidencia del contrato del API (`/openapi.json`, versión 1.0.0): el esquema `Enemy` es cerrado y no tiene ningún campo de regeneración. Por eso se decidió no adivinar el nombre de un campo y dejar `regeneration` en 0 (S13), agregando en el Traductor un aviso en el reporte final por si el API llega a enviar un campo que el programa no conoce. Los cambios se aplicaron en la rama `Parte_2-API-cache-persistencia` y no en la de revisión, y se verificaron las 380 pruebas antes de subirlos. Los problemas de integración que dependen de otros integrantes (cargar la sala desde el controlador, `main.py`, la vista y el bloque de la persona 3) se comunican al grupo en lugar de modificar sus archivos.
+
+## 7. Integración, `main.py`, reproducción y puntajes (Persona 4)
+
+Herramienta: Claude Code (Claude Opus 5.5), en la terminal sobre el repositorio local
+
+Fecha: 2026-10-17
+
+Objetivo: Revisar todas las ramas para saber qué le faltaba a la Persona 4, integrar la rama del grupo, conectar el controlador con el repositorio del bloque 2, escribir `main.py`, el ejecutor de `--bench` y la tabla de puntajes, y actualizar el README.
+
+Prompts utilizados:
+
+```text
+Hola claude, puedes por favor revisar todas las ramas y el proyecto para ver que falta de la P4 y que agregaron nuevo para ir trabajando? Me puso esto mi companero:
+```
+
+(Seguido del mensaje de un compañero sobre el guardado binario: el constructor de `Game` hace trabajo de inicio de partida, la propuesta de un `Game.load()` aparte, qué debe y qué no debe ir en el archivo, y el aviso de que `main.py` seguía vacío.)
+
+```text
+Cual me recomiendas mejor? Necesitamos terminar este proyecto rapido, tenemos 1 dia par asubirlo y estudiarlo
+```
+
+```text
+Si, dale con el punto 1 y 2
+```
+
+```text
+Si, dale con main por favor
+```
+
+```text
+Por favor sube mi rama y sigue con puntajes y readme
+```
+
+Uso en el proyecto: Se usó la revisión para listar los pendientes de la Persona 4 y repartir el trabajo restante con el compañero (él hace el guardado binario completo y `Game.load()`; la Persona 4, la integración). Después, con ayuda del modelo: se fusionó `mauricio-logica-juego` en la rama de la Persona 4; `GameController` carga la sala destino antes de `move()` y precarga después de cada acción aceptada, con lo que `--replay` ya no se detiene en el primer `mover`; se escribieron `main.py`, `controller/application.py`, `benchmark/benchmark.py` y `adapters/scoreboard.py`; la vista muestra salidas, suelo, inventario y puntajes; y se actualizó el README.
+
+Cambios realizados por el estudiante: Se revisó la propuesta del compañero sobre el guardado y se decidió que él lo implemente completo, porque depende de los internos del motor. Se verificó con `cripta-01` sin conexión que una partida registrada se reproduce igual (muerte en el instante 198 con semilla 5), que un log con otra versión se rechaza y que `--bench` corre las seis suites. Se subió la rama `Parte_4-MVC-replay-bench`.

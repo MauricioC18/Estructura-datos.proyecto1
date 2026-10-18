@@ -1118,6 +1118,243 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 
 ---
 
+## 4.11 Bitácora de partida y reproducción
+
+Estado: implementado, probado y medido. Responsable principal: Persona 4.
+
+### Problema
+
+Cada partida tiene que dejar un archivo de texto al que solo se le agregan líneas,
+con una por cada acción del jugador. La cabecera lleva por lo menos el id de la
+cripta, su versión, la versión del catálogo y la semilla. Con `--replay partida.log`
+el programa tiene que volver a jugar la partida entera sin preguntarle nada a nadie.
+Si las versiones del log ya no están disponibles, tiene que decirlo y no reproducir.
+
+El enunciado aclara que la reproducción es el mecanismo principal para reportar y
+repetir errores durante la evaluación. O sea que no es un extra: si el replay falla,
+el profesor no puede mostrarnos un error ni comprobar que lo arreglamos.
+
+Las operaciones que ejecuta el programa, y cuántas veces:
+
+| Operación | Cuándo ocurre | Medido |
+| --- | --- | ---: |
+| Anotar una línea | una vez por acción aceptada del jugador | 2 000 líneas en una partida de 2 000 acciones |
+| Leer e interpretar el log | una vez por `--replay` | 2 000 líneas en 2.5 a 5.0 ms |
+| Comprobar las versiones | una vez por `--replay`, antes de cargar nada | 1 |
+| Volver a simular | una vez por línea del log | lo mismo que cuesta jugar la acción |
+
+La operación frecuente es la primera, y además ocurre **dentro** del ciclo que §5.2
+limita a 20 ms por decisión del jugador. Lo que cueste anotar se suma a cada acción.
+
+Lo que de verdad condiciona el diseño es otra cosa: el log solo sirve si el modelo es
+determinista. §2.6 garantiza que misma versión de cripta, misma semilla y mismas
+acciones dan la misma partida. La bitácora se apoya por completo en esa garantía.
+
+### Alternativas consideradas
+
+**Qué se anota.** Miramos tres opciones.
+
+| Opción | Qué guarda | Reproducir | Tamaño medido por acción |
+| --- | --- | --- | ---: |
+| Comandos aceptados | lo que escribió el jugador | vuelve a simular todo | 8.1 bytes |
+| Eventos procesados | cada evento que sacó la agenda, con su resultado | lee los resultados | 41.8 líneas por cada línea de comandos |
+| Foto del estado | actores, puertas, trampas y suelo después de cada acción | lee las fotos | 4 274 bytes, 530 veces más |
+
+Las otras dos tienen una ventaja: no dependen de que el modelo sea determinista,
+porque no vuelven a simular nada. Las descartamos por tres razones.
+
+1. **No sirven para lo que pide la evaluación.** Un replay que solo lee resultados no
+   ejecuta el código del motor. Si el error está en el motor, reproducir el log no lo
+   repite, solo lo muestra. Con los comandos el motor vuelve a correr, el error vuelve
+   a pasar, y después de arreglarlo se puede ver que ya no pasa.
+2. **Crecen con lo que no controla el jugador.** Un log de eventos crece con la
+   cantidad de enemigos y efectos; una foto, con el tamaño de la cripta. El de
+   comandos depende solo de cuántas acciones hizo el jugador.
+3. **La foto se parece demasiado a lo que §2.11 prohíbe** para el retroceso: guardar
+   copias completas del estado. No es la misma regla, pero no queríamos defender esa
+   cercanía.
+
+**Cuándo se escribe al disco.** También tres opciones: dejar que el sistema junte
+las escrituras sin forzarlas, hacer `flush` en cada línea, o hacer `flush` y además
+`fsync` en cada línea. Sin `flush`, si el programa se cae, las últimas acciones se
+pierden, y son justo las que llevaron al error que se quería reportar. Con `fsync`
+la línea queda en el disco aunque se caiga el sistema operativo, pero cuesta mucho
+más (ver la evidencia).
+
+**Formato.** Texto plano con una acción por línea frente a JSON o binario. El binario
+ahorraría poco, porque una acción ya ocupa 8 bytes. El texto se puede leer y editar a
+mano, y eso importa para reportar un error: se puede recortar el log hasta la acción
+que falla o anotar un comentario con `#`. Además cada línea se interpreta con el mismo
+`parse_command()` que lee el teclado, así que no hay un segundo intérprete que pueda
+diferir del primero.
+
+**Qué pasa si las versiones no coinciden.** Reproducir igual mostrando un aviso, o
+negarse. §4.11 prohíbe reproducir en silencio contra datos distintos, y un aviso que
+nadie lee termina siendo lo mismo. Nos negamos.
+
+### Decisión
+
+Un log de comandos, en texto, con `flush` en cada línea:
+
+```text
+# CRIPTA replay
+formato=1
+cripta=cripta-01
+version_cripta=fd58f7743b9e
+version_catalogo=be68d322d2f5
+semilla=5
+---
+mover N
+esperar
+```
+
+- **Cabecera.** Lleva `formato` para detectar un log de otra versión del programa, y
+  los cuatro datos que exige el enunciado. Las versiones salen de
+  `RepositorioCripta.versiones_de_la_partida()`. La semilla la elige `main.py`, fuera
+  del modelo, con `random.SystemRandom`, o la fija `--semilla`. El modelo solo usa su
+  propio `random.Random(semilla)`.
+- **Escritura** (`replay/replay_log.py`). `ReplayLogWriter` abre el archivo en modo
+  `"x"`, para no pisar nunca un log que ya existe, y escribe cada línea con `flush`.
+  Cada comando se escribe en su forma canónica (`Command.to_text()`), y
+  `parse_command(c.to_text())` devuelve un comando igual a `c`. Los logs quedan en
+  `partidas/<cripta>-<fecha>-<hora>.log`.
+- **Quién anota.** `GameController` anota solo las acciones que el modelo **aceptó**.
+  Teclado y replay pasan por el mismo `execute()`, así que el replay ejecuta
+  exactamente el mismo código que la partida original.
+- **Carga de salas.** Antes de `mover`, el controlador carga la sala destino con el
+  repositorio, y después de cada acción aceptada pide la precarga. Como eso vive en el
+  controlador, el replay carga las mismas salas en el mismo orden. Sin esto la
+  reproducción se detenía en el primer `mover`.
+- **Reproducción** (`replay/replay.py`, `controller/application.py`). `--replay` lee
+  la cabecera y llama a `iniciar_partida(id, (version_cripta, version_catalogo))`. Si
+  la fuente tiene otras versiones, `VersionesIncompatibles` se lanza **antes** de cargar
+  nada y el programa muestra el mensaje y termina. Si coinciden, arma la partida con la
+  semilla del log y ejecuta cada línea. No se crea la vista interactiva (§6): la salida
+  es una función que se le pasa.
+- **Divergencias.** Como el log solo tiene acciones aceptadas, si una de ellas se
+  rechaza al reproducir, la partida ya no es la misma. `replay_commands()` se detiene
+  con `ReplayDivergence` e indica la línea. Lo mismo hace si la partida termina y al
+  log todavía le quedan acciones.
+
+Qué se anota y qué no, como lo acordó el grupo (ARQUITECTURA, sección 6):
+
+| Comando | ¿Se anota? | Por qué |
+| --- | --- | --- |
+| Mover, abrir, atacar, esperar, recoger, soltar, usar, equipar | Sí | Cambian el estado |
+| `sig` y `ant` | Sí | `soltar`, `usar` y `equipar` actúan sobre el objeto del cursor; sin la navegación, el replay elegiría otro objeto |
+| `retroceder` | Sí | §2.11 lo excluye del historial reversible, no de la bitácora. Si no se anotara, la partida reproducida sería otra |
+| Una acción rechazada | No | No consume tiempo, no cambia el estado y no consulta el azar: omitirla no cambia nada |
+| `ver` y las vistas ordenadas | No | No alteran el orden real ni el estado (§4.5) |
+| `ayuda`, `guardar`, `cargar`, `salir` | No | Los atiende la aplicación, no el modelo |
+
+### Análisis de complejidad
+
+Con `L` acciones en el log:
+
+| Operación | Costo | Comentario |
+| --- | --- | --- |
+| Anotar una acción | O(1) | Una línea corta y un `flush`. No depende de cuánto lleva la partida |
+| Memoria del escritor | O(1) | No guarda las acciones: van directo al archivo |
+| Comprobar versiones | O(1) | Dos comparaciones de texto, antes de cargar nada |
+| Leer el log | O(L) | Una pasada por las líneas |
+| Reproducir | O(L) ciclos del motor | Cuesta lo mismo que jugar la partida, porque es jugarla otra vez |
+
+El costo de reproducir es el mismo que el de jugar, y eso es intencional: es lo que
+hace que el replay pase por el mismo código. El tope de §5.2 por ciclo vale igual.
+
+### Evidencia empírica
+
+Medido con `benchmark/replay_bench.py`, que también corre dentro de `--bench`. Python
+3.13.2 sobre Windows 11, en la máquina de la Persona 4. Las secciones anteriores se
+midieron con Python 3.14.6 en otra máquina, así que los números no se comparan entre
+secciones. Una corrida completa quedó en `docs/mediciones/replay/corrida_2026-10-17.txt`.
+Los rangos salen de todas las corridas que hicimos: cuatro para la escritura sola y siete para la partida.
+
+El escenario es la cripta sintética de `scheduler_bench`: 50 salas en línea con
+trampas que se rearman, una puerta de cada tres con cierre automático y 30 enemigos
+errantes. El jugador hace 2 000 acciones a través del controlador de verdad.
+
+**Costo de anotar, solo la escritura**, 2 000 líneas, mejor de 5 repeticiones:
+
+| Forma de escribir | Por línea |
+| --- | ---: |
+| Sin `flush` (descartada) | 0.57 a 0.79 µs |
+| `flush` por línea (elegida) | 4.2 a 4.8 µs |
+| `flush` y `fsync` por línea (descartada) | 683 a 1 655 µs |
+
+**Lo mismo, dentro de una partida.** Sin bitácora, una acción con su ciclo de eventos
+costó entre 237 y 332 µs. Con `flush` por línea, entre 256 y 355 µs. La diferencia
+entre las dos queda dentro de la variación de una corrida a otra: hubo corridas en que
+la versión sin `flush` fue más lenta que la elegida. Con `fsync`, en cambio, la acción
+subió a entre 1 048 y 1 937 µs.
+
+Leído en términos del tope de §5.2: el `flush` agrega unos 4.5 µs a cada acción, el
+0.02 % de los 20 ms. El `fsync` agrega entre 0.7 y 1.7 ms, entre el 3 y el 8 % del
+tope, y variable, porque depende del disco. Pagar eso en cada acción para protegerse
+de una caída del sistema operativo no nos pareció razonable. Frente a una caída del
+programa, que es lo que nos preocupa, el `flush` ya alcanza.
+
+**Tamaño**, misma partida:
+
+| Qué se anota | Medido |
+| --- | --- |
+| Comandos (elegido) | 16 117 bytes para 2 000 acciones: 8.1 bytes por acción |
+| Eventos procesados (descartado) | 41.8 eventos por acción: 41.8 veces más líneas |
+| Foto del estado (descartado) | 4 274 bytes por acción con 50 salas y 30 enemigos: 530 veces más |
+
+Esas dos alternativas no están implementadas como bitácora. Se midió lo que tendrían
+que anotar en la misma partida: los eventos con el contador `events_processed` del
+motor, y la foto serializando a JSON los actores, puertas, trampas y suelo, igual que
+lo haría esa bitácora.
+
+**Reproducir.** Leer e interpretar las 2 000 líneas tomó entre 1.2 y 2.5 µs por
+línea. Ejecutarlas tomó entre 0.23 y 0.34 ms por acción, lo mismo que jugarlas. En
+todas las corridas la partida reproducida terminó en el mismo reloj, la misma sala y
+la misma vida que la original.
+
+**Contra la cripta real.** Con `cripta-01` sin conexión y semilla 5, una partida de
+`mover N` y `esperar` termina en derrota en el instante 198. Reproducida con
+`--replay` termina igual, con cero solicitudes de red. El mismo log con
+`version_cripta` cambiada a mano se rechaza con el mensaje de versiones incompatibles,
+sin reproducir ninguna acción.
+
+### Límites conocidos
+
+- **La fidelidad depende de que el modelo sea determinista.** Si alguien usa el
+  generador global de `random`, la hora del sistema o el orden de llegada de una
+  respuesta HTTP para decidir algo, el replay deja de ser fiel. `ReplayDivergence`
+  solo detecta una acción rechazada o un final anticipado, no una diferencia más
+  sutil, por ejemplo un daño distinto que no cambia ninguna decisión. Para detectar eso
+  habría que anotar también un control del estado después de cada acción, por ejemplo
+  el reloj, y compararlo al reproducir. No lo hicimos.
+- **Una versión que ya no existe.** Si el API publica una versión nueva de la cripta y
+  no hay copia local de la anterior, sus logs no se pueden reproducir. El programa lo
+  informa (supuesto S18) y la salida es usar `--offline` con una copia de esos datos.
+- **Partidas cargadas desde un guardado.** Un log empieza en la semilla y en el
+  instante 0, así que no reproduce una partida que se cargó de un archivo a mitad de
+  camino. Queda por decidir junto con el guardado de §4.10, que todavía no está
+  integrado.
+- **El nombre del jugador no va en la cabecera.** Hoy no afecta: ningún mensaje del
+  motor lo usa y el replay no registra puntajes. Si algún mensaje empezara a usarlo, el
+  texto reproducido cambiaría aunque la partida fuera la misma.
+- **El `flush` no protege contra un corte del sistema operativo**, solo contra la
+  caída del programa. Lo aceptamos por el costo medido del `fsync`.
+- **Tamaño.** A 8 bytes por acción, un megabyte alcanza para unas 125 000 acciones. No
+  esperamos que eso sea un problema.
+
+### Pruebas
+
+| Archivo | Qué cubre | Pruebas |
+| --- | --- | ---: |
+| `tests/test_replay_log.py` | Cabecera, formato, modo `"x"`, comentarios, errores con número de línea | 16 |
+| `tests/test_replay.py` | Misma semilla y mismas acciones dan la misma partida; divergencias | 6 |
+| `tests/test_commands.py` | `parse_command()` y la forma canónica que se escribe en el log | 20 |
+| `tests/test_game_controller.py` | Se anotan solo las acciones aceptadas | 8 |
+| `tests/test_controller_repository.py` | Carga de la sala antes de mover; partida en `cripta-01` grabada y reproducida con una caché nueva | 9 |
+| `tests/test_application.py` | Flujo completo: jugar, grabar y reproducir; log con otra versión rechazado | 9 |
+
+---
+
 ## Resumen del estado de las pruebas
 
 | Archivo | Pruebas |

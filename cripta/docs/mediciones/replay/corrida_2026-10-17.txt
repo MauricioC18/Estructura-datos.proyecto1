@@ -1,0 +1,13 @@
+Python 3.13.2 en Windows AMD64
+Solo escribir: flush por linea (elegida)              9.550e-03 s  2000 lineas, 4.77 us por linea
+Solo escribir: sin flush (descartada)                 1.578e-03 s  2000 lineas, 0.79 us por linea
+Solo escribir: fsync por linea (descartada)           1.366e+00 s  2000 lineas, 683.17 us por linea
+Grabar: Partida sin bitacora                          6.630e-01 s  2000 acciones, 331.5 us por accion
+Grabar: Bitacora con flush por linea (elegida)        7.095e-01 s  2000 acciones, 354.7 us por accion
+Grabar: Bitacora sin flush (descartada)               5.547e-01 s  2000 acciones, 277.4 us por accion
+Grabar: Bitacora con fsync por linea (descartada)     3.757e+00 s  2000 acciones, 1878.4 us por accion
+Tamano: log de comandos (elegido)                               -  16117 bytes, 2000 lineas, 8.1 bytes por accion
+Tamano: log de eventos (descartado)                             -  41.8 eventos procesados por accion: 41.8 veces mas lineas
+Tamano: foto del estado por accion (descartado)                 -  4274 bytes por accion con 50 salas y 30 enemigos, 530 veces mas
+Reproducir: leer e interpretar el log                 2.489e-03 s  2000 lineas, 1.2 us por linea
+Reproducir: ejecutar las acciones                     4.669e-01 s  0.233 ms por accion, termina igual que la original: si
