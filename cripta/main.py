@@ -49,6 +49,11 @@ def parse_arguments(argv=None):
         help=f"carpeta de la cache persistente (por defecto {DEFAULT_CACHE_DIRECTORY})",
     )
     parser.add_argument("--replay", metavar="LOG", help="reproducir una partida registrada")
+    parser.add_argument(
+        "--cargar",
+        metavar="ARCHIVO",
+        help="continuar una partida guardada con el comando guardar",
+    )
     parser.add_argument("--bench", action="store_true", help="medir los subsistemas")
     parser.add_argument("--cripta", metavar="ID", help="id de la cripta, sin preguntar")
     parser.add_argument("--semilla", type=int, help="semilla de la partida")
@@ -147,6 +152,7 @@ def run_replay(arguments):
 
 
 def run_game(arguments):
+    from adapters.almacen_partida import ArchivoDePartidaDanado, PartidaIncompatible
     from adapters.scoreboard import Scoreboard
     from controller.application import DATA_ERRORS, InUseIds, ask_player_name, play
     from view.console_view import ConsoleView
@@ -162,13 +168,24 @@ def run_game(arguments):
 
     try:
         repository = make_repository(arguments, in_use)
-        name = arguments.nombre if arguments.nombre else ask_player_name(view)
+        name = None
+
+        if arguments.cargar is None:
+            name = arguments.nombre if arguments.nombre else ask_player_name(view)
+
         game = play(
             repository, view, seed, arguments.cripta, name, in_use,
             scoreboard=Scoreboard(DEFAULT_SCORES_PATH),
+            load_path=arguments.cargar,
         )
     except DATA_ERRORS as error:
         print(f"Error: {error}")
+        return 1
+    except (PartidaIncompatible, ArchivoDePartidaDanado) as error:
+        print(f"Error: {error}")
+        return 1
+    except OSError as error:
+        print(f"Error: no se pudo leer {arguments.cargar}: {error}")
         return 1
     except KeyboardInterrupt:
         print("\nSesion terminada.")

@@ -1479,6 +1479,27 @@ inicio de partida: programa la primera acción del jugador en el instante 0 y ac
 los enemigos de la sala inicial. Una partida cargada con el constructor quedaría mal
 sin dar ningún error.
 
+**Guardar se hace dentro de la partida; cargar, al arrancar.** El comando
+`guardar <archivo>` funciona en cualquier momento, porque no cambia el estado: §4.11
+ya lo dejaba fuera de la bitácora de reproducción. Cargar es distinto, y acá §4.10 y
+§4.11 se estorban. La bitácora de una sesión guarda la semilla en su encabezado y las
+acciones desde el inicio; si a media sesión se cargara otra partida, esa bitácora
+reproduciría algo que nunca ocurrió, y §4.11 prohíbe expresamente reproducir en
+silencio contra datos distintos. Por eso cargar es `python main.py --cargar ARCHIVO`,
+que arma la partida **antes** de abrir la bitácora, de modo que la sesión cargada
+tenga un log propio y coherente. El comando `cargar` de adentro del juego no se
+quedó sin respuesta: explica esto y dice qué usar.
+
+**El inventario cargado se vuelve a armar con el historial puesto.** Es el punto
+frágil del cargado y conviene dejarlo escrito. El historial del retroceso necesita el
+`GameState`, que se arma a partir de lo que traía el archivo, así que el inventario
+sale de la lectura sin historial. Si se quedara así, las acciones posteriores a cargar
+no se anotarían y un pergamino de retroceso no las desharía **sin dar ningún error**,
+que es la peor forma de fallar. Se vuelve a armar con los mismos objetos, de modo que
+el equipo del jugador sigue apuntando al objeto que está en el inventario. Marcar el
+rastro al cargar no deja nada deshacible, porque el historial solo anota después de
+`begin_action()` y recién cargada no hay ninguna acción abierta.
+
 **El archivo se escribe en un temporal y se reemplaza de una sola vez** con
 `os.replace`, igual que el índice de fichas. Si el programa se cierra a medio
 guardar, el guardado anterior queda intacto.
@@ -1593,9 +1614,10 @@ precio de que se abra sin el catálogo, y está medido arriba.
 guardados anteriores se reportan como incompatibles y no se cargan. Para un trabajo
 de curso alcanza; un programa de verdad querría poder leer la versión anterior.
 
-**Todavía no está conectado a un comando del programa.** El almacén guarda y carga,
-y está probado contra el motor, pero `main.py` no tiene una opción para guardar ni
-para cargar. Eso toca el controlador y la vista, que son de la Persona 4.
+**Cargar no funciona en medio de una partida**, solo al arrancar, por lo que se
+explicó en la decisión: la bitácora de la sesión quedaría reproduciendo algo que no
+ocurrió. Si el grupo quisiera cargar a media sesión, habría que decidir qué pasa con
+esa bitácora, cerrarla y abrir otra o negarse, y eso es una decisión de §4.11.
 
 ### Pruebas
 
@@ -1624,6 +1646,16 @@ sigue funcionando. Si esos bytes se estuvieran leyendo, la prueba fallaría.
 que cambian de máquina en máquina, sino que la comparación sea justa: que el JSON
 guarde el mismo estado que el binario y reconstruya los mismos objetos, y que
 recuperar una sala crezca con la cripta en JSON y no en binario.
+
+`tests/test_guardado_en_la_aplicacion.py`, 12 pruebas, todas pasan. Prueban el
+guardado desde la aplicación con los datos de `datos_offline`, con el mismo andamio
+que `tests/test_application.py`. La de fondo es
+`test_guardar_y_cargar_da_lo_mismo_que_seguir_jugando`: se juega la misma partida de
+dos formas, de corrido y cortándola con un guardado y volviendo con `--cargar`, y las
+dos tienen que terminar en el mismo reloj, con la misma vida, la misma sala y los
+mismos contadores. También fijan que guardar no consuma tiempo ni cuente como acción,
+que la sesión cargada abra una bitácora propia, que la semilla salga del archivo y no
+de la bandera, y que una partida cargada anote para el retroceso.
 
 ---
 
@@ -2769,11 +2801,12 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_inventory_actions.py` | 34 |
 | `tests/test_rewind.py` | 27 |
 | `tests/test_save_load.py` | 20 |
-| `tests/test_almacen_partida.py` | 45 |
+| `tests/test_almacen_partida.py` | 51 |
 | `tests/test_bench_almacen_partida.py` | 7 |
-| **Total del motor** | **324** |
+| `tests/test_guardado_en_la_aplicacion.py` | 12 |
+| **Total del motor** | **342** |
 
-Con las del bloque 2 integradas, el proyecto tiene 822 pruebas y todas pasan en
+Con las del bloque 2 integradas, el proyecto tiene 840 pruebas y todas pasan en
 Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
 `cripta/`, con las dependencias de `requirements.txt` instaladas.
 
@@ -2798,6 +2831,6 @@ Las mediciones se corren con `python -m benchmark.scheduler_bench` y
 3. **Medir la frecuencia de las operaciones de inventario y ordenamiento en una partida real**, cuando el motor de la Persona 1 ya las use.
 4. **Repetir la frecuencia del historial** cuando el motor anote sus cambios. La cifra de este documento es una cota inferior.
 5. **Que el grupo decida** el caso del inventario por encima del máximo (§4.6).
-6. **Conectar el guardado de §4.10 a un comando del programa.** El almacén guarda y
-   carga y está probado, pero `main.py` no tiene todavía una opción para usarlo. Toca
-   el controlador y la vista, que son de la Persona 4.
+6. **Que el grupo decida** si cargar debe poder hacerse en medio de una partida
+   (§4.10). Hoy se carga solo al arrancar, con `--cargar`, porque hacerlo a media
+   sesión dejaría la bitácora de §4.11 reproduciendo algo que no ocurrió.

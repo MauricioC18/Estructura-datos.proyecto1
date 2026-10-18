@@ -1087,3 +1087,112 @@ def construir_juego(partida, trail=None, history=None, event_queue=None,
         player_actions=partida.player_actions,
         enemies_defeated=partida.enemies_defeated,
     )
+
+
+def guardar_partida(juego, ruta, repositorio=None):
+    """Guarda la partida y devuelve cuantos bytes quedaron en el archivo.
+
+    Si se le pasa el repositorio, anota las versiones de la cripta y del
+    catalogo con que se esta jugando, para poder avisar al cargar.
+    """
+    versiones = ("", "", "")
+
+    if repositorio is not None:
+        versiones = repositorio.versiones_de_la_partida()
+
+    return AlmacenPartida(ruta).guardar(juego, versiones=versiones)
+
+
+def cargar_partida(ruta):
+    """Lee el archivo y devuelve la PartidaGuardada, sin armar el Game.
+
+    Se devuelve en dos pasos porque el id de la cripta viene adentro del
+    archivo: quien llama lo necesita para iniciar el repositorio antes de
+    poder comprobar las versiones.
+    """
+    return AlmacenPartida(ruta).cargar()
+
+
+def comprobar_versiones_vigentes(partida, repositorio):
+    """Levanta PartidaIncompatible si la cripta o el catalogo ya no son los
+    mismos con que se guardo la partida."""
+    _, version_cripta, version_catalogo = repositorio.versiones_de_la_partida()
+    _comprobar_versiones(partida, (version_cripta, version_catalogo))
+
+
+def construir_juego_reversible(partida, message_log=None):
+    """Arma el Game de una partida cargada, con historial para el retroceso.
+
+    Es la version que usa el programa, no las pruebas: le pone el historial, el
+    rastro anotado y la agenda reversible que necesita el pergamino de §2.11.
+
+    El historial necesita el GameState, que se arma aca a partir de lo que traia
+    el archivo, asi que el inventario sale de la lectura sin historial y hay que
+    volver a armarlo. Marcar el rastro no deja nada deshacible porque el
+    historial solo anota despues de begin_action(), y recien cargada no hay
+    ninguna accion abierta.
+    """
+    from model.game_state import GameState
+    from structures.history import History, ReversibleEventQueue
+    from structures.trail import PlayerTrail
+
+    state = GameState(seed=partida.seed)
+    state.restore(partida.clock, partida.sequence_counter, partida.random_state)
+    history = History(state)
+
+    _reasignar_inventario_con_historial(partida.player, history)
+
+    trail = PlayerTrail(history)
+
+    for room_id, momento in partida.trail_marks:
+        trail.mark(room_id, momento)
+
+    from model.game import Game
+
+    return Game.load(
+        state,
+        partida.player,
+        partida.enemies,
+        partida.room_map,
+        partida.exit_room_id,
+        trail,
+        history=history,
+        message_log=message_log,
+        event_queue=ReversibleEventQueue(history),
+        events=partida.events,
+        torch_lit=partida.torch_lit,
+        result=partida.result,
+        player_actions=partida.player_actions,
+        enemies_defeated=partida.enemies_defeated,
+    )
+
+
+def _reasignar_inventario_con_historial(player, history):
+    """Vuelve a armar el inventario cargado, ahora con el historial puesto.
+
+    Si se quedara sin historial, las acciones posteriores a cargar no se
+    anotarian y un pergamino de retroceso no las desharia, sin dar ningun
+    error. Se reutilizan los mismos objetos, de modo que el equipo del jugador
+    sigue apuntando al objeto que esta en el inventario.
+    """
+    viejo = player.inventory
+
+    if viejo is None:
+        return
+
+    objetos = list(viejo)
+    actual = viejo.current()
+    nuevo = Inventory(viejo.capacity, history)
+
+    for item in objetos:
+        nuevo.pick_up(item)
+
+    nuevo.go_to_start()
+
+    for item in objetos:
+        if item is actual:
+            break
+
+        nuevo.next()
+
+    player.inventory = nuevo

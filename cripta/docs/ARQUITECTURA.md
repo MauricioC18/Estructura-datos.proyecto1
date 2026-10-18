@@ -113,7 +113,7 @@ Permite obtener y almacenar datos sin acoplar el modelo a una implementación co
 * `fuente_offline.py`: proporciona una fuente alternativa para el funcionamiento sin conexión (`FuenteOffline`), con el mismo contrato.
 * `almacen_fichas.py`: guarda en disco las fichas del catálogo, con un índice binario ordenado y validación por versión.
 * `almacen_cripta.py`: guarda en disco el esqueleto y el contenido de cada cripta, validados por versión.
-* `almacen_partida.py`: guarda en disco el estado de una partida (§4.10), con el mismo patrón que `almacen_fichas.py`: firma, versión del formato, bloque por sala e índice ordenado con búsqueda binaria, de modo que una sala se puede recuperar sin leer el archivo completo. Lo tomó la Persona 1 el 18 de octubre, porque el motor ya tenía `Game.load()` resuelto. Falta conectarlo a un comando del programa, que es de la Persona 4.
+* `almacen_partida.py`: guarda en disco el estado de una partida (§4.10), con el mismo patrón que `almacen_fichas.py`: firma, versión del formato, bloque por sala e índice ordenado con búsqueda binaria, de modo que una sala se puede recuperar sin leer el archivo completo. Lo tomó la Persona 1 el 18 de octubre, porque el motor ya tenía `Game.load()` resuelto. Está conectado al comando `guardar` de la partida y a la opción `--cargar` de `main.py`; cargar se hace solo al arrancar, para que la bitácora de §4.11 no quede reproduciendo algo que no ocurrió.
 
 El modelo debe utilizar interfaces comunes en lugar de depender directamente de HTTP o de archivos específicos.
 

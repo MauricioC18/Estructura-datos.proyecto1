@@ -26,6 +26,7 @@ from adapters.almacen_partida import (
     ArchivoDePartidaDanado,
     PartidaIncompatible,
     construir_juego,
+    construir_juego_reversible,
 )
 from model.enemy import Enemy
 from model.game import ACTOR_ACTION, DEFEAT, Game
@@ -649,6 +650,102 @@ class PruebasAlmacenPartida(unittest.TestCase):
         largo = struct.unpack_from("<I", contenido, tamano_del_encabezado)[0]
         empieza = tamano_del_encabezado + struct.calcsize("<I")
         self._sobrescribir(empieza, b"\xff" * largo)
+
+
+class PruebasPartidaCargadaConHistorial(unittest.TestCase):
+    """construir_juego_reversible: la version que usa el programa.
+
+    El historial necesita el GameState, que se arma despues de leer el
+    archivo, asi que el inventario sale de la lectura sin historial. Si se
+    quedara asi, las acciones posteriores a cargar no se anotarian y un
+    pergamino no las desharia, sin dar ningun error. Estas pruebas fijan que
+    el retroceso funcione despues de cargar.
+    """
+
+    def setUp(self):
+        self._carpeta_temporal = tempfile.TemporaryDirectory()
+        self.ruta = Path(self._carpeta_temporal.name) / "partida.cripta"
+
+    def tearDown(self):
+        self._carpeta_temporal.cleanup()
+
+    def cargada(self, juego):
+        AlmacenPartida(self.ruta).guardar(juego, versiones=("cripta-01", "3", "7"))
+        return construir_juego_reversible(AlmacenPartida(self.ruta).cargar())
+
+    def test_recien_cargada_no_hay_nada_que_deshacer(self):
+        juego = self.cargada(construir_partida())
+
+        self.assertFalse(juego.rewind().accepted)
+
+    def test_una_espera_posterior_se_puede_deshacer(self):
+        juego = self.cargada(construir_partida())
+        reloj = juego.state.clock
+
+        juego.wait()
+
+        self.assertGreater(juego.state.clock, reloj)
+        self.assertTrue(juego.rewind().accepted)
+        self.assertEqual(juego.state.clock, reloj)
+
+    def test_recoger_despues_de_cargar_se_deshace(self):
+        """La prueba del arreglo: si el inventario perdiera el historial, el
+        objeto se quedaria adentro al retroceder."""
+        juego = self.cargada(construir_partida())
+        suelo = juego.room_map.room(1).floor_items
+        cuantos = len(suelo)
+        recogido = suelo[0].instance_id
+        pergaminos = juego.player.inventory.scroll_count()
+
+        self.assertTrue(juego.pick_up(0).accepted)
+        self.assertIn(
+            recogido, [item.instance_id for item in juego.player.inventory]
+        )
+        self.assertEqual(len(suelo), cuantos - 1)
+
+        juego.rewind()
+
+        # El objeto vuelve al suelo y sale del inventario. El pergamino usado
+        # no vuelve: §2.11 lo excluye del historial reversible.
+        self.assertNotIn(
+            recogido, [item.instance_id for item in juego.player.inventory]
+        )
+        self.assertEqual(len(suelo), cuantos)
+        self.assertEqual(
+            juego.player.inventory.scroll_count(), pergaminos - 1
+        )
+
+    def test_el_inventario_cargado_conserva_su_orden_y_su_cursor(self):
+        original = construir_partida()
+        original.player.inventory.go_to_start()
+        juego = self.cargada(original)
+
+        self.assertEqual(
+            [item.instance_id for item in juego.player.inventory],
+            [item.instance_id for item in original.player.inventory],
+        )
+        self.assertEqual(
+            juego.player.inventory.current().instance_id,
+            original.player.inventory.current().instance_id,
+        )
+
+    def test_los_pergaminos_cargados_se_cuentan(self):
+        original = construir_partida()
+        juego = self.cargada(original)
+
+        self.assertEqual(
+            juego.player.inventory.scroll_count(),
+            original.player.inventory.scroll_count(),
+        )
+
+    def test_la_agenda_cargada_es_reversible(self):
+        juego = self.cargada(construir_partida())
+        pendientes = len(juego.events.active_events())
+
+        juego.wait()
+        juego.rewind()
+
+        self.assertEqual(len(juego.events.active_events()), pendientes)
 
 
 if __name__ == "__main__":

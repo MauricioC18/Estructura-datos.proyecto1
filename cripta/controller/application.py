@@ -12,6 +12,14 @@ import time
 from dataclasses import dataclass
 
 from adapters.almacen_fichas import ErrorAlmacenDisco
+from adapters.almacen_partida import (
+    ArchivoDePartidaDanado,
+    PartidaIncompatible,
+    cargar_partida,
+    comprobar_versiones_vigentes,
+    construir_juego_reversible,
+    guardar_partida,
+)
 from adapters.fuente_datos import ErrorFuenteDatos
 from adapters.scoreboard import ScoreboardError, ScoreEntry
 from controller.commands import (
@@ -230,23 +238,67 @@ def ask_player_name(view):
     return text.strip()
 
 
+def load_saved_game(repository, view, load_path, in_use=None):
+    """Arma la partida guardada de load_path (§4.10).
+
+    Devuelve (game, id_cripta, semilla), o (None, None, None) si el archivo no
+    se pudo usar. El id de la cripta viene adentro del archivo, asi que hay que
+    leerlo antes de poder iniciar el repositorio y comprobar las versiones.
+    """
+    partida = cargar_partida(load_path)
+
+    if not partida.id_cripta:
+        view.show_message(
+            f"{load_path} no dice de que cripta es la partida."
+        )
+        return None, None, None
+
+    repository.iniciar_partida(partida.id_cripta)
+    comprobar_versiones_vigentes(partida, repository)
+    game = construir_juego_reversible(partida)
+
+    if in_use is not None:
+        in_use.game = game
+
+    view.show_message(
+        f"Partida cargada de {load_path}: "
+        f"{partida.player_actions} acciones jugadas, reloj en {partida.clock}."
+    )
+
+    return game, partida.id_cripta, partida.seed
+
+
 def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
-         log_directory=LOG_DIRECTORY, scoreboard=None):
+         log_directory=LOG_DIRECTORY, scoreboard=None, load_path=None):
     """Juega una partida completa con la vista de consola.
 
     Devuelve el Game al terminar, o None si no se llego a empezar. Si la
     partida termina en victoria o derrota y hay tabla de puntajes, la registra
     y muestra el ranking de esa cripta (§2.12). Una partida interrumpida con
     salir no entra en la tabla.
+
+    Con load_path la partida sale de un archivo guardado (§4.10) en vez de
+    empezar de cero. Se carga antes de abrir la bitacora, de modo que la
+    sesion arranque con un log propio y coherente: cargar a media sesion
+    dejaria el log reproduciendo algo que no ocurrio.
     """
     repository.empezar_conteo_de_partida()
-    crypt_id = choose_crypt(repository, view, crypt_id)
 
-    if crypt_id is None:
-        return None
+    if load_path is not None:
+        game, crypt_id, seed = load_saved_game(
+            repository, view, load_path, in_use
+        )
 
-    repository.iniciar_partida(crypt_id)
-    game = build_game(repository, seed, player_name, in_use)
+        if game is None:
+            return None
+    else:
+        crypt_id = choose_crypt(repository, view, crypt_id)
+
+        if crypt_id is None:
+            return None
+
+        repository.iniciar_partida(crypt_id)
+        game = build_game(repository, seed, player_name, in_use)
 
     crypt, crypt_version, catalog_version = repository.versiones_de_la_partida()
     header = ReplayHeader(crypt, crypt_version, catalog_version, seed)
@@ -323,10 +375,31 @@ def _command_loop(controller, view):
             show = False
             continue
 
-        if command.name in (SAVE, LOAD):
-            # El guardado binario (§4.10) lo esta terminando otro integrante.
-            # Cuando exponga save_game/load_game se conectan aqui.
-            view.show_message("Guardar y cargar todavia no estan disponibles.")
+        if command.name == SAVE:
+            try:
+                escritos = guardar_partida(
+                    controller.game, command.argument, controller.repository
+                )
+            except OSError as error:
+                view.show_message(f"No se pudo guardar: {error}")
+            else:
+                view.show_message(
+                    f"Partida guardada en {command.argument} "
+                    f"({escritos} bytes)."
+                )
+
+            show = False
+            continue
+
+        if command.name == LOAD:
+            # Cargar a media partida dejaria la bitacora de esta sesion
+            # reproduciendo algo que no paso, y §4.11 prohibe reproducir en
+            # silencio contra datos distintos.
+            view.show_message(
+                "Cargar no se hace en medio de una partida: la bitacora de "
+                "esta sesion quedaria reproduciendo algo que no ocurrio. "
+                f"Salga y use: python main.py --cargar {command.argument}"
+            )
             show = False
             continue
 
