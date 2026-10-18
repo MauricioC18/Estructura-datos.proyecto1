@@ -113,8 +113,7 @@ Permite obtener y almacenar datos sin acoplar el modelo a una implementación co
 * `fuente_offline.py`: proporciona una fuente alternativa para el funcionamiento sin conexión (`FuenteOffline`), con el mismo contrato.
 * `almacen_fichas.py`: guarda en disco las fichas del catálogo, con un índice binario ordenado y validación por versión.
 * `almacen_cripta.py`: guarda en disco el esqueleto y el contenido de cada cripta, validados por versión.
-
-El guardado binario de una partida (§4.10) no forma parte de estos archivos y queda por asignar.
+* `almacen_partida.py`: guarda en disco el estado de una partida (§4.10), con el mismo patrón que `almacen_fichas.py`: firma, versión del formato, bloque por sala e índice ordenado con búsqueda binaria, de modo que una sala se puede recuperar sin leer el archivo completo. Lo tomó la Persona 1 el 18 de octubre, porque el motor ya tenía `Game.load()` resuelto. Falta conectarlo a un comando del programa, que es de la Persona 4.
 
 El modelo debe utilizar interfaces comunes en lugar de depender directamente de HTTP o de archivos específicos.
 
@@ -160,7 +159,7 @@ La vista no debe implementar las reglas del juego ni modificar directamente las 
 
 | Integrante | Responsabilidad principal                                                      |
 | ---------- | ------------------------------------------------------------------------------ |
-| Persona 1  | Motor del juego, agenda de eventos, reloj virtual, actores, combate y enemigos |
+| Persona 1  | Motor del juego, agenda de eventos, reloj virtual, actores, combate, enemigos y guardado binario de la partida (§4.10) |
 | Persona 2  | API, fuentes de datos, precarga, catálogo, caché y persistencia relacionada    |
 | Persona 3  | Inventario, historial reversible, rewind, rastro, bitácora y ordenamientos     |
 | Persona 4  | MVC, interfaz, replay, benchmark e integración                                 |

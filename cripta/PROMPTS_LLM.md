@@ -1060,3 +1060,35 @@ Adjuntos: Captura de PowerShell con las pruebas y `python main.py --help`, y el 
 Uso en el proyecto: Revisión del proyecto integrado (pruebas, una partida con `main.py --offline`, su reproducción con `--replay`, `--bench` y la tabla de puntajes); secciones 4.2, 4.3 y 4.4 de `docs/DECISIONES.md`; `benchmark/bench_frecuencia_bloque2.py` con su prueba `tests/test_bench_frecuencia_bloque2.py` y la medición `docs/mediciones/bloque2/frecuencias_2026-10-18.txt`; actualización de `docs/BLOQUE_2_PARA_EL_GRUPO.md`.
 
 Cambios realizados por el estudiante: Se unieron las ramas de los cuatro integrantes en la rama local de revisión y se verificaron las 741 pruebas y las opciones de `main.py`. A partir del mensaje del grupo, se pidió escribir las secciones 4.2 a 4.4 con los seis apartados de §8 usando las mediciones del 13 y 14 de octubre. Como §8.1 pide la frecuencia medida de las operaciones y no la teníamos, se decidió agregar un benchmark que la cuenta, y se aceptó que la comparación de políticas FIFO y LFU quede razonada y declarada como no medida. Las secciones se pegaron en el `DECISIONES.md` unificado por la persona 1, después de la 4.1.
+
+### 6.30 Auditoría final de la parte del motor contra el Apéndice B
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-10-18
+
+Objetivo: Revisar si quedaba algo pendiente de la parte propia (motor, agenda, reloj, actores, combate y enemigos) antes de la entrega, cruzando los catorce casos del Apéndice B contra las pruebas y verificando que los números del Documento de Decisiones siguieran vigentes después de la última medición.
+
+Prompts utilizados:
+
+```text
+revisa si queda algo de mi parte?
+```
+
+Uso en el proyecto: Dos pruebas nuevas en `tests/test_rewind.py` y correcciones de cifras y una sección nueva en `docs/DECISIONES.md`.
+
+Cambios realizados por el estudiante: Se revisaron los catorce casos del Apéndice B uno por uno contra las pruebas del motor. Trece corresponden a esta parte y doce ya estaban cubiertos; el que faltaba era el del pergamino recogido dentro del intervalo revertido. Antes de escribir la prueba se verificó que la excepción de §2.11 estuviera aplicada en los dos lugares que tienen que concordar, el suelo en `Game` y el contador en `Inventory`, y estaban correctos, así que se agregaron las dos pruebas que lo dejan demostrado en ambos sentidos. En el Documento de Decisiones se corrigió la razón contra el tope de §5.2, que había quedado en sesenta veces cuando correspondía a la medición anterior y con 0.4403 ms son cuarenta y cinco, y se actualizaron los conteos de pruebas de `test_game.py`, `test_rewind.py` y el total del proyecto. Se agregó la sección que deja constancia de la excepción de los pergaminos.
+
+### 6.31 Guardado binario de la partida (sección 4.10)
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-10-18
+
+Objetivo: Implementar la sección 4.10 del enunciado, que no tenía responsable asignado: el archivo binario de formato propio, la recuperación de una sala sin leer el archivo completo, la detección de versión incompatible y la comparación contra JSON.
+
+Prompts utilizados: la petición fue elegir la opción 2 de las que se ofrecieron al cerrar la auditoría de la entrada 6.30, es decir, tomar la sección 4.10 aprovechando que `Game.load()` ya estaba resuelto del lado del motor. No hubo más texto.
+
+Uso en el proyecto: `adapters/almacen_partida.py`, `benchmark/bench_almacen_partida.py`, `tests/test_almacen_partida.py`, `tests/test_bench_almacen_partida.py`, la medición `docs/mediciones/persona1/guardado_binario_2026-10-18.txt`, la sección 4.10 de `docs/DECISIONES.md` y la actualización de responsables en `docs/ARQUITECTURA.md`.
+
+Cambios realizados por el estudiante: Antes de escribir nada se revisaron las cuatro ramas del grupo para confirmar que nadie había empezado la sección, y se decidió no inventar un formato propio sino seguir el de `adapters/almacen_fichas.py` de la Persona 2, que ya tenía firma, versión, índice ordenado y búsqueda binaria, para que la entrega no quedara con dos estilos de persistencia binaria. El formato se diseñó alrededor del requisito de leer una sala sola: encabezado de tamaño fijo, bloque global, un bloque por sala y el índice al final con su posición anotada en el encabezado. Se decidió que el archivo guarde el estado completo en vez de solo los identificadores, aunque la alternativa ahorra hasta un 60 %, para que una partida guardada no quede inservible si cambia la versión del catálogo; esa alternativa se midió para poder decir con números qué costó la decisión. Dos problemas se resolvieron durante la implementación: que una puerta es el mismo objeto desde sus dos salas, lo que obligó a guardarla en los dos bloques y a compartirla al cargar, y que al medir la alternativa descartada poner los campos en cero no ahorraba bytes porque los enteros del formato son de ancho fijo, de modo que hubo que armar el formato mínimo de verdad omitiendo los campos. La medición dio un resultado contrario a la decisión en una de las tres comparaciones: cargar la partida completa es entre 1.7 y 2 veces más lento que JSON, porque el módulo `json` está escrito en C. Se compilaron los formatos de `struct` una sola vez, lo que recuperó un 15 %, y se decidió reportar el número tal como quedó en el apartado de evidencia empírica y en el de límites conocidos, en vez de omitirlo.

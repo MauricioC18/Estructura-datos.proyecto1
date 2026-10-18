@@ -1004,7 +1004,7 @@ De 100 a 1 000 cambios, el tiempo se multiplica por 11: es el crecimiento lineal
 
 Anotar cuesta un 48 % más en la agenda. Es el precio de no copiar el estado.
 
-Esa estimación se pudo reemplazar por una medición real cuando el motor quedó anotando sus propios cambios. El ciclo completo de §5.2 pasó de 0.3302 ms a 0.4403 ms con 50 enemigos, un 33 % más, y ese aumento incluye además la decisión del rastreador, que antes no existía. Sigue a sesenta veces del límite de 20 ms.
+Esa estimación se pudo reemplazar por una medición real cuando el motor quedó anotando sus propios cambios. El ciclo completo de §5.2 pasó de 0.3302 ms a 0.4403 ms con 50 enemigos, un 33 % más, y ese aumento incluye además la decisión del rastreador, que antes no existía. Sigue a cuarenta y cinco veces del límite de 20 ms.
 
 **Corrección con el motor real.** Las pruebas `TestReversibleQueueWithTheEngine` usan el `Game` real y verifican que después de deshacer queden idénticos el reloj, los eventos activos de la agenda con su `time` y `sequence`, y el `scheduled_event` de cada actor. Los casos son: un `wait()`, dos retrocesos seguidos, un cambio de velocidad y la cancelación por muerte.
 
@@ -1347,18 +1347,283 @@ También cubren la regla de selección: pequeños, grandes desordenados, casi or
 
 ---
 
-## 4.10 — Guardado binario de la partida
+## 4.10 Guardado binario de la partida
 
-**Pendiente, y sin responsable asignado.** La tabla de `ARQUITECTURA.md` pone la
-persistencia del lado de la Persona 2, pero en la coordinación del 13 de octubre la
-Persona 4 había propuesto encargarse de `save_file.py` y `json_save.py`. Hay que
-decidirlo.
+### Problema
 
-Del lado del motor ya está resuelto: `Game.load()` reconstruye una partida guardada sin
-hacer el trabajo de inicio, y `GameState.restore()` y `EventQueue.active_events()`
-entregan el estado temporal y la agenda. Lo que falta es el formato del archivo, el
-acceso a una sala sin leerlo completo, la validación de versión y la comparación contra
-JSON que pide §4.10.
+§4.10 pide cuatro cosas a la vez: que el estado se guarde en un archivo binario
+de formato propio, que al cargar se pueda recuperar una sala específica sin leer
+el archivo completo, que el archivo detecte que es de otra versión del formato en
+vez de seguir como si nada, y que se compare tamaño en disco y tiempo de carga
+contra guardar el mismo estado en JSON.
+
+Lo que hay que guardar es casi todo el estado vivo: las versiones de la cripta y
+del catálogo, el reloj virtual, el contador de secuencia, el estado del generador
+aleatorio, el jugador con su inventario y su equipo, los enemigos con su vida y su
+sala, las salas con sus puertas, trampas y suelo, la agenda de eventos pendientes,
+el rastro, la antorcha, el resultado y los dos contadores de la tabla de puntajes.
+
+Y hay tres cosas que a propósito **no** se guardan. El historial del retroceso,
+porque §2.11 lo deja fuera y una partida cargada empieza sin pergaminos por
+deshacer. La bitácora de los últimos mensajes, que es de la sesión y no del
+estado. Y `events_processed`, que es un contador de diagnóstico.
+
+El requisito de recuperar una sala sola es el que manda en el diseño. Obliga a que
+el archivo tenga un índice y a que los datos de cada sala estén juntos, en vez de
+escribir el estado en el orden en que se le ocurra al programa.
+
+### Frecuencia medida de las operaciones
+
+Cada sala, salida, trampa, objeto, enemigo y evento se empaca exactamente una vez
+por guardado, así que contarlos en el estado da la frecuencia real de las
+operaciones del formato. Medido con `benchmark/bench_almacen_partida.py`:
+
+| | 6 salas | 40 salas | 200 salas |
+| --- | ---: | ---: | ---: |
+| Salas | 6 | 40 | 200 |
+| Salidas con su puerta | 10 | 78 | 398 |
+| Trampas | 6 | 40 | 200 |
+| Objetos | 23 | 118 | 608 |
+| Enemigos | 6 | 50 | 300 |
+| Eventos pendientes | 2 | 4 | 4 |
+| Marcas de rastro | 1 | 1 | 1 |
+
+La operación más frecuente es empacar un objeto, y la cantidad crece con el tamaño
+de la cripta, no con lo que se haya jugado. La agenda, en cambio, se mantiene
+chica: son los eventos **pendientes** en ese instante, no los procesados.
+
+Pero el dato que más pesó en la decisión es otro, y es una frecuencia hacia abajo:
+guardar y cargar ocurren **unas pocas veces por sesión**, mientras que la agenda se
+toca decenas de miles de veces. Por eso acá el criterio no fue el tiempo. Una
+diferencia de milisegundos en algo que pasa una vez al cargar no se compara con los
+20 ms por ciclo que limita §5.2. Lo que sí importa es el tamaño del archivo y el
+costo de recuperar una sala, que es lo que §4.10 pide poder hacer sin leer todo.
+
+### Alternativas consideradas
+
+**`pickle`.** Es la forma corta de guardar objetos de Python y el enunciado la
+prohíbe, así que no se evaluó. Vale decir por qué la prohibición tiene sentido:
+`pickle` guarda la forma de las clases, de modo que cambiar un atributo rompe los
+archivos viejos, y además ejecuta código al cargar.
+
+**JSON.** Es la alternativa que §4.10 manda comparar, y está medida más abajo.
+Pesa entre 1.87 y 2.32 veces más que el formato propio. Para recuperar una sala
+hay que leer y convertir el archivo completo, porque un JSON no se puede abrir por
+la mitad: eso es justamente lo que §4.10 pide evitar. Quedó implementada en
+`benchmark/bench_almacen_partida.py`, no en el programa, igual que la lista sin
+ordenar de §4.1, porque solo existe para comparar.
+
+**Un archivo por sala.** Usaría las carpetas del sistema operativo como índice y
+recuperar una sala sería abrir su archivo. Se descartó por la misma razón que la
+Persona 2 la descartó en §4.4: crea cientos de archivos chicos, y además el estado
+no se parte limpio en salas, porque el reloj, la agenda y el inventario no son de
+ninguna.
+
+**Guardar solo los identificadores y reconstruir desde el catálogo.** Los objetos,
+las trampas y los enemigos los construye el Traductor desde las fichas, así que el
+archivo podría guardar solo `instance_id`, `type_id` y lo que cambia, y pedirle el
+resto al catálogo al cargar. Es la alternativa más tentadora porque el ahorro es
+grande y está medido: entre 28 % y 60 % menos bytes. Se descartó, y la razón está
+en la decisión.
+
+**El índice al principio del archivo.** Es lo natural, pero la posición de cada
+bloque solo se conoce después de armarlo, así que habría que escribir el archivo
+dos veces o calcular todos los tamaños de antemano. Se puso al final, con su
+posición anotada en el encabezado: llegar al índice sigue costando un salto.
+
+### Decisión
+
+Un archivo binario propio, `adapters/almacen_partida.py`, con el mismo patrón que
+el almacén de fichas de la Persona 2: firma, versión del formato, índice ordenado
+y búsqueda binaria. Se siguió ese patrón a propósito, para que la entrega no tenga
+dos formas distintas de hacer lo mismo.
+
+El archivo tiene cuatro partes:
+
+| Parte | Qué lleva |
+| --- | --- |
+| Encabezado | Firma `CRIPTAPA`, versión del formato, dónde empieza el índice y cuántas salas hay. Mide siempre lo mismo. |
+| Bloque global | Lo que no es de ninguna sala: versiones, reloj, secuencia, generador, jugador con inventario, agenda, rastro, antorcha, resultado y contadores. |
+| Bloques de sala | Uno por sala, con sus salidas y puertas, sus trampas, su suelo y los enemigos que están en ella. |
+| Índice | Una entrada por sala, ordenada por id de sala: el id, dónde empieza su bloque y cuánto mide. |
+
+Recuperar una sala es leer el encabezado, saltar al índice, buscar el id con
+búsqueda binaria y leer solo los bytes de ese bloque. No se toca el bloque global
+ni el de las demás salas.
+
+**El archivo se guarda completo y no solo con los identificadores.** Es la decisión
+que más se discutió consigo misma, porque la alternativa ahorra hasta un 60 %. Se
+eligió el archivo autocontenido porque la otra opción ata la partida guardada a que
+el catálogo siga en la misma versión: si el catálogo cambia, el archivo no se podría
+cargar en vez de quedar simplemente viejo. Guardar el doble de bytes a cambio de que
+una partida guardada se pueda abrir siempre es un cambio que conviene, sobre todo
+porque hablamos de 134 KB en la cripta más grande que se midió.
+
+**Las puertas se guardan en los dos bloques que las comparten.** Una puerta conecta
+dos salas y es el mismo objeto desde las dos (§2.9). Si se guardara una sola vez, el
+bloque de una de las dos salas quedaría incompleto y no se podría leer sola. Se
+guarda en los dos y, al cargar la cripta completa, la segunda aparición devuelve el
+objeto que ya se creó, de modo que abrir la puerta desde una sala la abre desde la
+otra. Hay una prueba para eso.
+
+**La agenda guarda el identificador del actor, no el objeto.** Al cargar se vuelve a
+apuntar cada evento a su actor. Para encontrarlo se usa la `TablaHash` del grupo y no
+un `dict`, que §7 prohíbe como índice.
+
+**Los efectos activos no se guardan.** Se deducen de la agenda al cargar, que es lo
+que ya hacía `Game.load()`: si hay pulsos de veneno pendientes, hay veneno. Así el
+archivo no puede contradecirse consigo mismo.
+
+**Cargar usa `Game.load()` y no el constructor.** El constructor hace el trabajo de
+inicio de partida: programa la primera acción del jugador en el instante 0 y activa
+los enemigos de la sala inicial. Una partida cargada con el constructor quedaría mal
+sin dar ningún error.
+
+**El archivo se escribe en un temporal y se reemplaza de una sola vez** con
+`os.replace`, igual que el índice de fichas. Si el programa se cierra a medio
+guardar, el guardado anterior queda intacto.
+
+**La versión se revisa antes de interpretar un solo byte.** Si la firma o la versión
+del formato no coinciden, cargar levanta `PartidaIncompatible`. Si se le pasan las
+versiones vigentes de la cripta y del catálogo, también las compara: una partida
+guardada contra otra cripta se reporta en vez de cargarse mal.
+
+### Análisis de complejidad
+
+Con n salas y m bytes del bloque de una sala:
+
+| Operación | Costo | Por qué |
+| --- | --- | --- |
+| Guardar | O(tamaño del estado) | Una sola pasada por salas, actores y agenda |
+| Cargar todo | O(tamaño del archivo) | Hay que construir todos los objetos |
+| Recuperar una sala | O(log n) + O(m) | Búsqueda binaria en el índice y la lectura de un bloque |
+| Leer los ids de sala | O(n) | Solo el índice |
+| Memoria al leer una sala | O(n) + O(m) | El índice y ese bloque, no el archivo |
+
+Lo que importa de esta tabla es que recuperar una sala **no depende de cuántas
+salas tenga la cripta**, salvo por el logaritmo de la búsqueda. Con JSON sería
+O(tamaño del archivo) siempre, porque hay que convertirlo entero.
+
+Ordenar el índice se hace con `sort()` de `structures/sorting.py` y no con
+`sorted()`, que §4.9 prohíbe.
+
+### Evidencia empírica
+
+Medido con `benchmark/bench_almacen_partida.py` en Python 3.14.6 sobre Windows 11.
+La salida completa está en
+`docs/mediciones/persona1/guardado_binario_2026-10-18.txt`. Cada tiempo es el mejor
+de siete repeticiones. Después de la primera lectura el sistema operativo guarda el
+archivo en su propia memoria, así que esto mide el disco caliente, que es el caso
+normal mientras se juega.
+
+**Tamaño en disco.** Acá gana el formato propio, y la ventaja crece con la cripta:
+
+| Escenario | Binario | JSON | JSON / binario |
+| --- | ---: | ---: | ---: |
+| 6 salas, 6 enemigos | 9.2 KB | 17.2 KB | 1.87x |
+| 40 salas, 50 enemigos | 29.4 KB | 65.1 KB | 2.21x |
+| 200 salas, 300 enemigos | 133.7 KB | 310.2 KB | 2.32x |
+
+**Recuperar una sala.** Es lo que pide §4.10 y es donde los dos formatos se separan
+de verdad:
+
+| Escenario | Binario | JSON | JSON / binario |
+| --- | ---: | ---: | ---: |
+| 6 salas | 0.137 ms | 0.144 ms | 1.05x |
+| 40 salas | 0.139 ms | 0.395 ms | 2.84x |
+| 200 salas | 0.156 ms | 1.811 ms | 11.60x |
+
+Lo que hay que leer en esa tabla no es la última columna, sino las dos primeras
+filas contra la última. De 6 a 200 salas, la cripta se hizo 33 veces más grande y
+el binario pasó de 0.137 a 0.156 ms: un 14 % más. El JSON pasó de 0.144 a 1.811, 12
+veces más. El binario casi no crece porque salta al bloque; el JSON crece con el
+archivo porque lo convierte entero. Eso es la prueba de que el acceso por sala
+funciona, y no solo de que es más rápido.
+
+**Cargar la partida completa. Acá el formato propio pierde**, y conviene decirlo
+con el número y no esconderlo:
+
+| Escenario | Binario | JSON | JSON / binario |
+| --- | ---: | ---: | ---: |
+| 6 salas | 0.402 ms | 0.206 ms | 0.51x |
+| 40 salas | 1.275 ms | 0.689 ms | 0.54x |
+| 200 salas | 5.761 ms | 3.342 ms | 0.58x |
+
+El JSON carga entre 1.7 y 2 veces más rápido. La razón no es el formato sino quién
+lo interpreta: el módulo `json` de Python está escrito en C y convierte el archivo
+entero de una sola llamada, mientras que leer el formato propio es código Python que
+desempaca campo por campo. Antes de reportar este número se compilaron los formatos
+de `struct` una sola vez en vez de interpretar la cadena de formato en cada campo, y
+la carga de la cripta grande bajó de 6.75 a 5.76 ms, un 15 %. Siguió perdiendo. Se
+deja así porque el número es honesto: en Python, desempacar a mano no le gana a una
+biblioteca escrita en C, y lo que se gana con el formato propio está en las otras dos
+tablas.
+
+**La alternativa de guardar solo los identificadores**, medida para saber qué costó
+la decisión del archivo autocontenido:
+
+| Escenario | Archivo completo | Solo identificadores | Ahorro |
+| --- | ---: | ---: | ---: |
+| 6 salas | 9.2 KB | 6.6 KB | 28.1 % |
+| 40 salas | 29.4 KB | 14.5 KB | 50.9 % |
+| 200 salas | 133.7 KB | 52.9 KB | 60.5 % |
+
+Esa medición se hizo armando el formato mínimo de verdad, omitiendo los campos
+estáticos, y no poniéndolos en cero: los enteros del formato son de ancho fijo, así
+que vaciarlos no habría ahorrado un solo byte. Se le dejó el mismo encabezado y el
+mismo índice para que la diferencia fuera solo la de los campos, y se le agregó al
+enemigo el id de su ficha, que hoy no guarda y que esa alternativa necesitaría, para
+no medir a favor de la decisión tomada.
+
+### Límites conocidos
+
+**Cargar completo es más lento que JSON**, entre 1.7 y 2 veces. Se aceptó porque
+cargar ocurre una vez por sesión: 5.8 ms en la cripta más grande medida, contra los
+20 ms que §5.2 da para un solo ciclo de eventos. Si alguna vez importara, el camino
+no es cambiar de formato sino dejar de construir los objetos que no se van a usar.
+
+**Guardar reescribe el archivo completo.** No se guarda una sala suelta, aunque el
+formato lo permitiría, porque el reloj, la agenda y el inventario cambian en casi
+toda acción y habría que reescribir el bloque global de todos modos.
+
+**El archivo pesa más del doble que la alternativa de solo identificadores.** Es el
+precio de que se abra sin el catálogo, y está medido arriba.
+
+**La versión del formato no sabe convertir archivos viejos.** Si cambia, los
+guardados anteriores se reportan como incompatibles y no se cargan. Para un trabajo
+de curso alcanza; un programa de verdad querría poder leer la versión anterior.
+
+**Todavía no está conectado a un comando del programa.** El almacén guarda y carga,
+y está probado contra el motor, pero `main.py` no tiene una opción para guardar ni
+para cargar. Eso toca el controlador y la vista, que son de la Persona 4.
+
+### Pruebas
+
+`tests/test_almacen_partida.py`, 45 pruebas, todas pasan. Están agrupadas en el
+archivo y su firma, el estado general, el jugador y su inventario, los enemigos, las
+salas con sus puertas y trampas, la agenda, la lectura de una sala sola, las
+versiones y los archivos dañados, y la prueba de fondo.
+
+| Prueba | Qué fija |
+| --- | --- |
+| `test_la_partida_cargada_sigue_igual` | La de fondo: se juegan las mismas acciones en la original y en la cargada con objetos nuevos, y tienen que terminar iguales, mensajes incluidos |
+| `test_leer_una_sala_no_lee_el_bloque_global` | Se daña el bloque global a propósito: leer la sala sigue funcionando y cargar todo falla |
+| `test_leer_una_sala_no_lee_el_bloque_de_las_otras` | Se daña el bloque de otra sala y la sala pedida se lee igual |
+| `test_una_puerta_es_el_mismo_objeto_desde_sus_dos_salas` | Cada bloque guarda su copia, pero al cargar todo se comparte |
+| `test_el_equipo_apunta_al_objeto_del_inventario` | No basta que vuelva el bono: tiene que ser el mismo objeto |
+| `test_otra_version_del_formato_no_se_interpreta` | La incompatibilidad se reporta antes de leer un byte |
+| `test_cargar_no_arranca_una_partida_nueva` | Cargar no programa la acción del instante 0 ni reactiva enemigos |
+| `test_el_indice_queda_ordenado_aunque_las_salas_no_lo_esten` | La búsqueda binaria necesita el índice ordenado |
+
+Las dos pruebas de que leer una sala no lee el resto del archivo merecen una nota.
+En vez de medir bytes leídos, que obligaría a instrumentar el acceso a disco, se daña
+a propósito el bloque global o el de otra sala y se comprueba que leer la sala pedida
+sigue funcionando. Si esos bytes se estuvieran leyendo, la prueba fallaría.
+
+`tests/test_bench_almacen_partida.py`, 7 pruebas, todas pasan. No comprueban tiempos,
+que cambian de máquina en máquina, sino que la comparación sea justa: que el JSON
+guarde el mismo estado que el binario y reconstruya los mismos objetos, y que
+recuperar una sala crezca con la cripta en JSON y no en binario.
 
 ---
 
@@ -2026,6 +2291,20 @@ El jugador muere en el instante 198 y el primer pergamino lo devuelve vivo al 10
 la vida de la rata restaurada. El segundo lo lleva al principio, con la trampa rearmada.
 Los pergaminos no vuelven.
 
+#### La excepción de los pergaminos, en los dos sentidos
+
+El Apéndice B pide un resultado definido para el caso en que el intervalo revertido
+incluya la recolección de otro pergamino. La excepción de §2.11 se aplica en dos
+lugares que tienen que concordar: el motor saca el pergamino del suelo sin anotarlo
+(`_take_from_floor`), y el inventario lo suma a su contador sin anotarlo tampoco. Si
+solo uno de los dos respetara la excepción, el pergamino se duplicaría o desaparecería
+al retroceder.
+
+Las dos mitades están probadas. Con un pergamino encima y otro en el suelo, recoger
+deja dos, y retroceder deja uno: el suelo no lo recupera y la cantidad baja solo por la
+unidad consumida. En el sentido contrario, soltar un pergamino y retroceder lo deja en
+el suelo y el contador en cero.
+
 ### Cargar una partida es un camino aparte del constructor
 
 El constructor de `Game` hace trabajo de inicio de partida: marca el rastro de la sala
@@ -2245,11 +2524,11 @@ Y la segunda sale de comparar contra la medición anterior, cuando el motor toda
 tenía rastreadores ni anotaba para el retroceso: el mismo escenario grande daba 0.3302 ms
 por ciclo y ahora da 0.4403, un 33 % más caro. Ese es el precio de la decisión del
 rastreador, que examina las salas vecinas y consulta el rastro, y de anotar cada cambio
-de estado. Sigue a sesenta veces del límite.
+de estado. Sigue a cuarenta y cinco veces del límite.
 
 ### Pruebas
 
-`tests/test_game.py`, 31 pruebas, todas pasan. Están agrupadas en bucle, combate,
+`tests/test_game.py`, 36 pruebas, todas pasan. Están agrupadas en bucle, combate,
 acciones rechazadas, determinismo, activación de enemigos, cambio de velocidad, estado
 visible y contadores.
 
@@ -2488,11 +2767,13 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_effects.py` | 33 |
 | `tests/test_movement.py` | 61 |
 | `tests/test_inventory_actions.py` | 34 |
-| `tests/test_rewind.py` | 25 |
+| `tests/test_rewind.py` | 27 |
 | `tests/test_save_load.py` | 20 |
-| **Total del motor** | **270** |
+| `tests/test_almacen_partida.py` | 45 |
+| `tests/test_bench_almacen_partida.py` | 7 |
+| **Total del motor** | **324** |
 
-Con las del bloque 2 integradas, el proyecto tiene 761 pruebas y todas pasan en
+Con las del bloque 2 integradas, el proyecto tiene 822 pruebas y todas pasan en
 Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
 `cripta/`, con las dependencias de `requirements.txt` instaladas.
 
@@ -2501,8 +2782,8 @@ desde la sala inicial hasta la de salida, disparando la trampa de la sala 2, abr
 con la llave negra la puerta de la salida y terminando en victoria con el reloj en 350
 y cero solicitudes de red.
 
-Las mediciones se corren con `python -m benchmark.scheduler_bench` desde la misma
-carpeta.
+Las mediciones se corren con `python -m benchmark.scheduler_bench` y
+`python -m benchmark.bench_almacen_partida` desde la misma carpeta.
 
 ---
 
@@ -2517,3 +2798,6 @@ carpeta.
 3. **Medir la frecuencia de las operaciones de inventario y ordenamiento en una partida real**, cuando el motor de la Persona 1 ya las use.
 4. **Repetir la frecuencia del historial** cuando el motor anote sus cambios. La cifra de este documento es una cota inferior.
 5. **Que el grupo decida** el caso del inventario por encima del máximo (§4.6).
+6. **Conectar el guardado de §4.10 a un comando del programa.** El almacén guarda y
+   carga y está probado, pero `main.py` no tiene todavía una opción para usarlo. Toca
+   el controlador y la vista, que son de la Persona 4.
