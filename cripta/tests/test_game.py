@@ -4,6 +4,7 @@ from model.enemy import Enemy
 from model.game import DEFEAT, IN_PROGRESS, Game
 from model.game_state import GameState
 from model.player import Player
+from structures.event_queue import EventQueue
 
 
 class Weapon:
@@ -197,13 +198,13 @@ class TestDeterminism(unittest.TestCase):
 
         self.assertEqual(first.player.health, second.player.health)
         self.assertEqual(first.state.clock, second.state.clock)
-        self.assertEqual(first.messages, second.messages)
+        self.assertEqual(list(first.messages), list(second.messages))
 
     def test_a_different_seed_produces_a_different_game(self):
         first = self.play(2026)
         other = self.play(1807)
 
-        self.assertNotEqual(first.messages, other.messages)
+        self.assertNotEqual(list(first.messages), list(other.messages))
 
 
 class TestEnemyActivation(unittest.TestCase):
@@ -304,6 +305,126 @@ class TestVisibleState(unittest.TestCase):
         game = make_game(player=player)
 
         self.assertEqual(game.visible_state().attack, 9)
+
+
+
+class TestCounters(unittest.TestCase):
+
+    def test_player_actions_counts_accepted_actions(self):
+        game = make_game(enemies=[make_enemy()])
+
+        game.wait()
+        game.wait()
+        game.attack("e-201")
+
+        self.assertEqual(game.player_actions, 3)
+
+    def test_rejected_actions_are_not_counted(self):
+        game = make_game(enemies=[make_enemy()])
+
+        game.wait()
+        game.attack("e-999")
+        game.attack("e-201")
+
+        self.assertEqual(game.player_actions, 2)
+
+    def test_defeated_enemies_are_counted(self):
+        first = make_enemy(actor_id="e-1", max_health=1)
+        second = make_enemy(actor_id="e-2", max_health=1)
+        game = make_game(enemies=[first, second])
+
+        self.assertEqual(game.enemies_defeated, 0)
+
+        game.attack("e-1")
+        game.attack("e-2")
+
+        self.assertEqual(game.enemies_defeated, 2)
+
+    def test_processed_events_grow_with_the_game(self):
+        game = make_game(enemies=[make_enemy(speed=250)])
+        after_start = game.events_processed
+
+        game.wait()
+
+        self.assertGreater(game.events_processed, after_start)
+
+    def test_the_game_accepts_an_injected_agenda(self):
+        agenda = EventQueue()
+        game = Game(
+            GameState(seed=2026),
+            make_player(),
+            [make_enemy()],
+            event_queue=agenda,
+        )
+
+        self.assertIs(game.events, agenda)
+
+        game.wait()
+
+        self.assertIs(agenda.peek(), game.enemies[0].scheduled_event)
+
+
+
+class TestActionsWithoutAnInventory(unittest.TestCase):
+    """Un jugador sin inventario rechaza, no revienta.
+
+    Ocurre antes de que el controlador le asigne uno. Las siete acciones
+    existen y responden; ninguna lanza AttributeError.
+    """
+
+
+    def setUp(self):
+        self.game = make_game(enemies=[make_enemy()])
+
+    def pending_actions(self):
+        return (
+            ("pick_up", lambda: self.game.pick_up(0)),
+            ("drop", self.game.drop),
+            ("use_item", self.game.use_item),
+            ("equip_item", self.game.equip_item),
+            ("inventory_next", self.game.inventory_next),
+            ("inventory_previous", self.game.inventory_previous),
+            ("rewind", self.game.rewind),
+        )
+
+    def test_they_answer_instead_of_crashing(self):
+        for name, action in self.pending_actions():
+            with self.subTest(action=name):
+                result = action()
+
+                self.assertFalse(result.accepted)
+                self.assertIn("Todavia no se puede", result.message)
+
+    def test_they_consume_no_time(self):
+        for name, action in self.pending_actions():
+            with self.subTest(action=name):
+                clock_before = self.game.state.clock
+
+                action()
+
+                self.assertEqual(self.game.state.clock, clock_before)
+
+    def test_they_are_not_counted_as_player_actions(self):
+        for name, action in self.pending_actions():
+            with self.subTest(action=name):
+                actions_before = self.game.player_actions
+
+                action()
+
+                self.assertEqual(self.game.player_actions, actions_before)
+
+    def test_they_consume_no_randomness(self):
+        for name, action in self.pending_actions():
+            with self.subTest(action=name):
+                state_before = self.game.state.random_state()
+
+                action()
+
+                self.assertEqual(self.game.state.random_state(), state_before)
+
+    def test_the_message_names_what_is_missing(self):
+        self.assertIn("inventario", self.game.drop().message)
+        self.assertIn("inventario", self.game.rewind().message)
 
 
 if __name__ == "__main__":

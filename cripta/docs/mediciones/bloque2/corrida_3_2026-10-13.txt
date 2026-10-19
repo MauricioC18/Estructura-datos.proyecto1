@@ -1,0 +1,117 @@
+Verificación del proyecto CRIPTA
+Fecha: 2026-10-13 23:37
+Python 3.13.14 en Windows AMD64
+
+========================================================================
+Pruebas unitarias: OK
+Comando: python -m unittest
+========================================================================
+...............................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 191 tests in 0.349s
+
+OK
+
+========================================================================
+Benchmark de la tabla hash: OK
+Comando: python -m bench.bench_tabla_hash
+========================================================================
+Python 3.13.14 en Windows AMD64
+
+Búsqueda con acierto (la clave existe), en nanosegundos por búsqueda
+     n |    TablaHash crc32 |   TablaHash FNV-1a | Lista ord.+binaria |             Lineal |  dict (referencia)
+---------------------------------------------------------------------------------------------------------------
+    25 |                166 |                838 |                224 |                287 |                 15
+   100 |                168 |                831 |                325 |                884 |                 14
+  1000 |                182 |                882 |                578 |               8693 |                 19
+ 10000 |                190 |                881 |                816 |              81606 |                 21
+
+Búsqueda con fallo (la clave no existe), en nanosegundos por búsqueda
+     n |    TablaHash crc32 |   TablaHash FNV-1a | Lista ord.+binaria |             Lineal |  dict (referencia)
+---------------------------------------------------------------------------------------------------------------
+    25 |                156 |                865 |                269 |                400 |                 15
+   100 |                158 |                874 |                361 |               1348 |                 16
+  1000 |                170 |                908 |                611 |              14916 |                 18
+ 10000 |                175 |                915 |                832 |             154073 |                 22
+
+========================================================================
+Benchmark de la caché del catálogo: OK
+Comando: python -m bench.bench_cache_catalogo
+========================================================================
+Python 3.13.14 en Windows AMD64
+
+Caché llena, en nanosegundos por operación
+capacidad |            alternativa | obtener (acierto) | agregar con desalojo
+-----------------------------------------------------------------------------
+       25 | Lista doble (decisión) |               291 |                  990
+       25 |         list de Python |               328 |                  670
+      100 | Lista doble (decisión) |               291 |                 1003
+      100 |         list de Python |               550 |                  689
+     1000 | Lista doble (decisión) |               303 |                 1034
+     1000 |         list de Python |              3422 |                  832
+     5000 | Lista doble (decisión) |               318 |                 1069
+     5000 |         list de Python |             22031 |                 1389
+
+========================================================================
+Benchmark del almacén de fichas: OK
+Comando: python -m bench.bench_almacen_fichas
+========================================================================
+Python 3.13.14 en Windows AMD64
+
+Recuperar una ficha liberada de memoria
+fichas |              alternativa | µs por lectura | archivos | bytes en disco
+------------------------------------------------------------------------------
+    25 | AlmacenFichas (decisión) |           33.4 |        2 |           5769
+    25 |        un JSON por ficha |           46.2 |       25 |           5040
+    25 |             un solo JSON |           59.3 |        1 |           5090
+   100 | AlmacenFichas (decisión) |           33.1 |        2 |          23019
+   100 |        un JSON por ficha |           45.7 |      100 |          20190
+   100 |             un solo JSON |          117.5 |        1 |          20390
+  1000 | AlmacenFichas (decisión) |           33.9 |        2 |         230919
+  1000 |        un JSON por ficha |           45.7 |     1000 |         202890
+  1000 |             un solo JSON |          764.2 |        1 |         204890
+
+Solo la búsqueda binaria en el índice de AlmacenFichas
+    25 fichas: 0.29 µs por búsqueda
+   100 fichas: 0.37 µs por búsqueda
+  1000 fichas: 0.62 µs por búsqueda
+
+========================================================================
+Benchmark de la precarga de contenido: OK
+Comando: python -m bench.bench_precarga_contenido
+========================================================================
+Precarga de contenido: solicitudes y esperas en el mismo recorrido
+
+cripta-01 real (6 salas), recorrido completo
+              estrategia | solicitudes | salas descargadas | esperas en la puerta
+  -------------------------------------------------------------------------------
+          BFS (decisión) |           1 |                 6 |                    0
+   solo vecinos directos |           4 |                 6 |                    0
+            sin precarga |           6 |                 6 |                    6
+  (salas distintas visitadas: 6)
+
+cuadrícula 10x10 (100 salas), 300 pasos al azar
+              estrategia | solicitudes | salas descargadas | esperas en la puerta
+  -------------------------------------------------------------------------------
+          BFS (decisión) |          10 |               100 |                    0
+   solo vecinos directos |          57 |               100 |                    0
+            sin precarga |          81 |                81 |                   81
+  (salas distintas visitadas: 81)
+
+cuadrícula 20x20 (400 salas), 300 pasos al azar
+              estrategia | solicitudes | salas descargadas | esperas en la puerta
+  -------------------------------------------------------------------------------
+          BFS (decisión) |          31 |               310 |                    0
+   solo vecinos directos |         117 |               229 |                    0
+            sin precarga |         130 |               130 |                  130
+  (salas distintas visitadas: 130)
+
+cuadrícula 30x30 (900 salas), 300 pasos al azar
+              estrategia | solicitudes | salas descargadas | esperas en la puerta
+  -------------------------------------------------------------------------------
+          BFS (decisión) |          33 |               330 |                    0
+   solo vecinos directos |         125 |               240 |                    0
+            sin precarga |         135 |               135 |                  135
+  (salas distintas visitadas: 135)
+
+Resultado general: todo correcto
