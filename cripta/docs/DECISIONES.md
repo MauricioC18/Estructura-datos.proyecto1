@@ -782,6 +782,11 @@ verifica de punta a punta 7 solicitudes en frío y 3 en caliente.
 
 Estado: implementado, probado, medido e integrado al motor.
 
+**De dónde salen las cifras de 4.5 a 4.9.** Ninguna es estimada. Los archivos están en `docs/mediciones/persona3/`.
+- **Tiempos:** `python -m benchmark.persona3_corridas`, que corre `benchmark/persona3_bench.py` tres veces y guarda las corridas y la mediana. Las secciones 4.5 a 4.8 citan las corridas del 2026-10-17 (`*_2026-10-17.txt`). La 4.9 cita las del 2026-10-18 (`2026-10-18_vm_*.txt`), porque el ordenamiento cambió.
+- **Frecuencias:** `python -m benchmark.persona3_frecuencias` (`2026-10-18_vm_frecuencias.txt`). Recorre con el motor integrado la cripta sintética de `benchmark/scheduler_bench.py`, 1 000 decisiones del jugador, en tres escenarios: 6 salas con 5 errantes, 40 salas con 50 errantes y 40 salas con 50 rastreadores. El motor abre los intervalos, anota los cambios, marca el rastro y ordena por sí mismo; el script solo le pasa versiones con contadores.
+- **Equipo:** Python 3.13.16 sobre Linux x86_64, no la computadora de Mauricio donde se midieron las secciones del motor. Las proporciones y la forma en que crece cada columna no deberían cambiar; los valores absolutos sí. Hay que repetir la corrida en una máquina del grupo antes de entregar.
+
 ### Problema
 
 El inventario es una colección de objetos con un orden real, el orden en que el jugador los tiene, y un cursor que señala el objeto que se está viendo. El enunciado pide cinco cosas:
@@ -903,7 +908,7 @@ La vista ordenada es la operación más cara del inventario. Aun así, son 86 µ
 
 ## 4.6 Pergaminos de retroceso e historial reversible
 
-Estado: estructura implementada, probada y medida. La agenda y el reloj se revierten con el motor real. **Falta que el motor anote sus propios cambios y conecte `rewind()`**, y eso le corresponde a la Persona 1.
+Estado: implementado, probado, medido e integrado. El motor anota sus cambios y `rewind()` usa el pergamino. Una prueba recorre partidas con 50 enemigos y deshace cada acción comparando 461 campos del estado.
 
 ### Problema
 
@@ -918,11 +923,13 @@ Las operaciones que ocurren de verdad:
 
 | Operación | Cuándo | Medido |
 | --- | --- | --- |
-| Abrir un intervalo | una vez por acción aceptada del jugador | 1.00 por decisión |
-| Anotar un cambio | cada vez que algo cambia entre dos decisiones | 18.88 por decisión con 5 enemigos y 138.10 con 50 (cota inferior) |
+| Abrir un intervalo | una vez por acción aceptada del jugador | 1.00 por decisión en los tres escenarios |
+| Anotar un cambio | cada vez que algo cambia entre dos decisiones | 31.28 por decisión con 5 errantes, 205.08 con 50 errantes y 205.99 con 50 rastreadores |
 | Deshacer | cuando el jugador usa un pergamino | depende del jugador; a lo sumo 5 seguidas |
 
-La medición importante es la segunda fila. Anotar ocurre muchísimo más que deshacer, y crece con la cantidad de enemigos activos, igual que los eventos de la agenda. Con 50 errantes, el intervalo más largo tuvo 206 anotaciones. **Lo que tiene que ser barato es anotar, no deshacer.**
+La medición importante es la segunda fila. Anotar ocurre muchísimo más que deshacer, y crece con la cantidad de enemigos activos, igual que los eventos de la agenda: de 5 a 50 enemigos, las anotaciones se multiplican por 6.6 y los eventos por 7.5. El intervalo más largo tuvo 40 anotaciones con 5 enemigos y 247 con 50. **Lo que tiene que ser barato es anotar, no deshacer.**
+
+Estas cifras reemplazan a las de la primera versión de esta sección (18.88 y 138.10 por decisión), que eran una cota inferior: se midieron antes de que el motor anotara sus propios cambios y solo contaban la agenda y el rastro.
 
 ### Alternativas consideradas
 
@@ -993,7 +1000,9 @@ c es la cantidad de cambios del intervalo.
 | 100 | 36.9 µs |
 | 1 000 | 412.5 µs |
 
-De 100 a 1 000 cambios, el tiempo se multiplica por 11: es el crecimiento lineal que predice la teoría. El intervalo más grande que medimos en una partida tuvo 206 anotaciones, que queda entre las filas de 100 y 1 000. Por la tabla, anotar y deshacer esa acción cuesta del orden de 0.1 ms, muy lejos de los 20 ms de §5.2.
+De 100 a 1 000 cambios, el tiempo se multiplica por 11: es el crecimiento lineal que predice la teoría.
+
+**Deshacer intervalos reales.** Al final de cada recorrido de `persona3_frecuencias` se deshacen las últimas 5 acciones de la partida. Con 50 enemigos eran 1 073 anotaciones y tardó entre 0.8 y 1.4 ms en varias corridas, unos 0.2 ms por pergamino. Con 5 enemigos fueron 152 anotaciones en 0.12 ms. El reloj volvió en todos los casos al instante de la quinta acción hacia atrás.
 
 **Costo de la agenda reversible.** 300 eventos pendientes y 20 000 ciclos de sacar e insertar, con el mismo patrón de `scheduler_bench.py`:
 
@@ -1008,7 +1017,9 @@ Esa estimación se pudo reemplazar por una medición real cuando el motor quedó
 
 **Corrección con el motor real.** Las pruebas `TestReversibleQueueWithTheEngine` usan el `Game` real y verifican que después de deshacer queden idénticos el reloj, los eventos activos de la agenda con su `time` y `sequence`, y el `scheduled_event` de cada actor. Los casos son: un `wait()`, dos retrocesos seguidos, un cambio de velocidad y la cancelación por muerte.
 
-**Prueba de que no se escapa nada.** `tests/verificar_retroceso.py` toma una foto de todo lo que §2.11 pide revertir, ejecuta una acción, usa el pergamino y compara. Contra el motor de la rama `mauricio-logica-juego`, que todavía no anota sus cambios, encontró que `wait()` deja `player_actions` en 1 después de deshacer, mientras que la agenda y el reloj sí vuelven bien. La foto solo existe dentro de las pruebas y nunca restaura nada.
+**Prueba de que no se escapa nada.** `tests/verificar_retroceso.py` toma una foto de todo lo que §2.11 pide revertir, ejecuta una acción, deshace y compara: reloj, actores, puertas, trampas, suelo, agenda con `time` y `sequence`, efectos y rastro. La foto solo existe dentro de las pruebas y nunca restaura nada.
+
+Antes de la integración, contra el motor que todavía no anotaba, encontró que `wait()` dejaba `player_actions` en 1 después de deshacer. Con el motor integrado lo corrimos sobre 600 acciones de la cripta sintética de 40 salas y 50 enemigos, 300 con errantes y 300 con rastreadores, deshaciendo cada una y comparando 461 campos cada vez: **ninguna diferencia**. Una versión corta quedó como prueba permanente en `tests/test_retroceso_partida.py`. Para comprobar que la prueba sí detecta errores, simulamos que el motor olvidaba anotar el rearme de las trampas, y falló en la segunda acción.
 
 ### Límites conocidos
 
@@ -1030,6 +1041,8 @@ Esa estimación se pudo reemplazar por una medición real cuando el motor quedó
 
 `tests/test_verificar_retroceso.py`, 7 pruebas, verifica el propio verificador.
 
+`tests/test_retroceso_partida.py`, 2 pruebas: 60 acciones con errantes y 60 con rastreadores, deshaciendo cada una con el motor integrado.
+
 ---
 
 ## 4.7 El rastro del jugador
@@ -1045,9 +1058,9 @@ Las operaciones que ocurren de verdad:
 | Operación | Cuándo | Medido |
 | --- | --- | --- |
 | Marcar la sala del jugador | al iniciar y en cada acción aceptada (Apéndice B) | 1.00 por decisión |
-| Decidir hacia dónde va un rastreador | en cada turno de un rastreador | hasta 6.94 por decisión con 5 enemigos y 66.55 con 50, si todos fueran rastreadores |
+| Consultar el rastro | en cada turno de un rastreador que no comparte sala con el jugador | 37.02 por decisión con 50 rastreadores |
 
-Los rastreadores deciden muchísimo más seguido de lo que el jugador marca: con 50 enemigos, 66 veces más. **Lo que tiene que ser barato es consultar, no marcar.**
+Los rastreadores consultan muchísimo más seguido de lo que el jugador marca: con 50, 37 veces más. **Lo que tiene que ser barato es consultar, no marcar.** No todos los turnos consultan: un rastreador en la sala del jugador ataca sin mirar el rastro (§2.8).
 
 **Cuándo se marca.** Acordado con la Persona 1: la sala destino de un movimiento se marca con el reloj del instante en que se ejecuta la acción, no al terminar su costo. Lo dice §2.5 ("el jugador aparece en la sala destino al ejecutar la acción") y lo confirma el ejemplo de §2.13.
 
@@ -1101,7 +1114,7 @@ Cada rastreador en una sala con 1 a 4 salidas, con rastros al azar en sus vecina
 
 De 10 a 1 000 rastreadores, el costo de cada decisión se mantiene en 1.2 µs, así que el trabajo total crece linealmente con los rastreadores, como pide §4.7. El primer valor es menor porque a ese único rastreador le tocó una sala con 1 salida; los demás promedian entre 1 y 4.
 
-**En contexto:** el escenario con más turnos de enemigos tuvo 66.55 por decisión del jugador. Si todos fueran rastreadores, decidir costaría unos 80 µs por ciclo, el 0.4 % de los 20 ms de §5.2.
+**En contexto:** con 50 rastreadores hubo 37.02 consultas por decisión del jugador. A 1.2 µs cada una son unos 45 µs por ciclo, el 0.2 % de los 20 ms de §5.2.
 
 No medimos la eliminación activa: por construcción, solo agregaría eventos a la agenda.
 
@@ -1136,10 +1149,10 @@ Las operaciones que ocurren de verdad:
 
 | Operación | Cuándo | Medido |
 | --- | --- | --- |
-| Agregar un mensaje | el motor escribe uno por acción y por evento visible | 3.38 por decisión con 5 enemigos y 3.71 con 50 |
+| Agregar un mensaje | el motor escribe uno por acción y por evento visible | 3.38 por decisión con 5 errantes, 3.70 con 50 errantes y 30.10 con 50 rastreadores |
 | Recorrer los 20 | al armar `visible_state()`, una vez por decisión | 1 por decisión |
 
-Algo que no esperábamos: los mensajes casi no crecen con los enemigos. De 5 a 50 errantes, los eventos se multiplican por 7.7, pero los mensajes solo por 1.1. La razón es que el motor no escribe ningún mensaje cuando un enemigo se mueve o espera, solo cuando ataca. Lo demás lo escribe por las acciones del jugador, las trampas, las puertas y los efectos.
+Algo que no esperábamos: con errantes, los mensajes casi no crecen con los enemigos. De 5 a 50 errantes, los eventos se multiplican por 7.5, pero los mensajes solo por 1.1. La razón es que el motor no escribe ningún mensaje cuando un enemigo se mueve o espera, solo cuando ataca. Con rastreadores es distinto: persiguen al jugador, lo alcanzan y atacan, y los mensajes suben a 30 por decisión. Ese es el escenario que más escribe, y el que usamos para el costo en contexto.
 
 ### Alternativas consideradas
 
@@ -1179,7 +1192,7 @@ El mismo `CircularBuffer` guarda los 5 intervalos del historial de §4.6. Así h
 
 **Con 20 mensajes, la alternativa descartada es casi tres veces más rápida.** Igual que en §4.5, `list` está escrita en C y desplazar 19 punteros es baratísimo. La decisión no se sostiene por velocidad: se sostiene porque §4.8 prohíbe ese desplazamiento.
 
-**El costo, en contexto:** con 3.71 mensajes por decisión, el buffer circular cuesta unos 0.6 µs por ciclo, y la alternativa, 0.2 µs. La diferencia es de 0.4 µs contra un presupuesto de 20 ms.
+**El costo, en contexto:** con 30.10 mensajes por decisión, el caso de los rastreadores, el buffer circular cuesta unos 5.2 µs por ciclo y la alternativa 1.8 µs. La diferencia es de 3.4 µs contra un presupuesto de 20 ms. Con errantes, unos 0.6 µs contra 0.2.
 
 **Memoria constante, verificada:** la prueba `test_memory_stays_constant` agrega 10 000 mensajes y comprueba que el arreglo sigue teniendo 20 posiciones. La prueba `test_plugs_into_game` hace lo mismo con el `Game` real, con 30 esperas.
 
@@ -1206,7 +1219,7 @@ El mismo `CircularBuffer` guarda los 5 intervalos del historial de §4.6. Así h
 
 ## 4.9 Ordenamiento
 
-Estado: implementado, probado y medido. Se usa en la activación de enemigos de §2.4 y en las vistas del inventario. **La selección automática tiene un defecto medido que hay que corregir antes de entregar** (ver límites).
+Estado: implementado, probado y medido. Se usa en la activación de enemigos de §2.4 y en las vistas del inventario. La primera versión tenía un defecto medido con datos rotados; esta versión lo corrige y lo mide (ver decisión y evidencia).
 
 ### Problema
 
@@ -1221,7 +1234,7 @@ El programa necesita ordenar en varios contextos (§4.9):
 
 Las condiciones son cuatro: dos algoritmos con características distintas, que el programa escoja automáticamente según propiedades medibles de los datos, que la decisión se sustente con mediciones propias considerando tamaños pequeños, datos casi ordenados y comparaciones costosas, y que no se use `sorted()` ni `list.sort()`.
 
-**Frecuencia:** la activación de enemigos ocurre al entrar a una sala con enemigos dormidos, a lo sumo una vez por movimiento. Las vistas ocurren con cada `ver`. Ninguna está dentro del bucle de eventos. No contamos cuántas veces ordena el motor por partida, porque la integración en `_by_ascending_id()` se hizo en la rama de la Persona 1 y no en la que medimos.
+**Frecuencia medida:** el motor ordena al activar los enemigos de la sala a la que entra el jugador: 0.83 veces por decisión con 5 errantes y 0.76 con 50, casi una por movimiento. Medimos también el tamaño de esas listas: con 50 errantes, 718 de las 758 estaban vacías, 30 tenían un enemigo y 10 tenían dos. Los enemigos de una sala se activan una sola vez, así que casi todas las entradas encuentran la sala ya activada. En este contexto el algoritmo casi no trabaja: lo que importa es que sea estable y que no use `sorted()`. Las vistas del inventario dependen de que el jugador escriba `ver` y la tabla de puntajes se ordena al mostrarla; un recorrido automático no las ejecuta. Ninguna está dentro del bucle de eventos.
 
 ### Alternativas consideradas
 
@@ -1242,15 +1255,25 @@ Inserción y mezcla son complementarias: una es la mejor con datos pequeños o c
 
 Usamos `structures/sorting.py`, con `insertion_sort`, `merge_sort` y `sort`, que escoge entre los dos.
 
-**Cómo escoge `sort`.** Hace una pasada que cuenta los **descensos**: las posiciones donde un elemento va antes que su anterior. Cuesta n − 1 comparaciones. Después aplica dos reglas:
+**Cómo escoge `sort`:**
 
-- con n ≤ `SMALL_THRESHOLD` (16) usa inserción;
-- con descensos ≤ n × `NEARLY_SORTED_RATIO` (5 %) usa inserción;
-- en cualquier otro caso usa mezcla.
+1. **Con n ≤ 32 usa inserción** (`SMALL_THRESHOLD`). El umbral sale de las mediciones: con datos al azar y con comparaciones costosas, inserción gana hasta 32 elementos y mezcla desde 64.
+2. **Si no, cuenta los descensos**: las posiciones donde un elemento va antes que su anterior. Es una pasada de n − 1 comparaciones. Si los descensos superan el 5 % de n (`NEARLY_SORTED_RATIO`), usa mezcla.
+3. **Con pocos descensos intenta inserción, pero con un tope.** Cuenta los desplazamientos que hace. Si superan n × (bits de n), que es del orden del trabajo que haría mezcla, deja inserción y termina con mezcla sobre lo que ya quedó.
+
+El tercer paso existe por un defecto que medimos en la primera versión, que no tenía tope. Los descensos son una aproximación del desorden, y fallan con datos rotados. `[5, 6, 7, 8, 9, 0, 1, 2, 3, 4]` tiene un solo descenso, pero la mitad de los elementos está lejos de su lugar e inserción hace O(n²) trabajo. Con 4 096 elementos rotados, la primera versión tardó 0.54 s, cuando mezcla tardaba 8.4 ms: 64 veces más. Las corridas de esa versión son las del 2026-10-17 en `docs/mediciones/persona3/`.
+
+**Por qué el tope es n × (bits de n).** Mezcla hace del orden de n·log₂(n) comparaciones. Si inserción gasta ese mismo trabajo sin terminar, ya no puede ganarle a mezcla, así que conviene cambiar. En el peor caso se paga el tope más una mezcla completa: unas dos veces mezcla, en lugar del O(n²) de inserción. Probamos también topes fijos de 2n, 4n, 8n, 16n y 32n:
+- los chicos abandonaban inserción en datos casi ordenados que ella sí habría terminado antes que mezcla;
+- los grandes dejaban caros los datos rotados.
+
+Ninguno funcionaba en todos los tamaños.
+
+**El cambio a mitad de camino no rompe la estabilidad.** Inserción nunca invierte dos elementos con la misma clave, así que lo que alcanzó a ordenar respeta el orden original de los empates. Mezcla también es estable. La prueba `test_fallback_is_stable` lo verifica con 3 000 elementos rotados y claves repetidas.
 
 **Comparaciones costosas.** La clave de cada elemento se calcula **una sola vez**: se arma una lista de pares (clave, elemento) y se ordenan los pares. Así una clave cara, como pasar un nombre a minúsculas, no se recalcula en cada comparación. Además, mezcla hace muchas menos comparaciones que inserción con datos desordenados, que es lo que importa cuando comparar es caro.
 
-Las tres funciones son estables, aceptan `reverse` y no modifican la entrada.
+Las tres funciones son estables, aceptan `reverse` y no modifican la entrada. Si se le pasa un `ComparisonCounter`, `sort` anota qué algoritmo usó: inserción, mezcla, o inserción y luego mezcla.
 
 ### Análisis de complejidad
 
@@ -1258,79 +1281,76 @@ Las tres funciones son estables, aceptan `reverse` y no modifican la entrada.
 | --- | --- | --- |
 | `insertion_sort` | O(n + inversiones): O(n) si está ordenado, O(n²) si está invertido | O(n) por los pares |
 | `merge_sort` | O(n log n) siempre | O(n) por los pares y el auxiliar |
-| `sort` | O(n) de la pasada, más el algoritmo escogido | la del algoritmo escogido |
+| `sort` con n ≤ 32 | inserción; con n acotado, a lo sumo 496 desplazamientos | O(n) |
+| `sort` con n > 32 | O(n) de la pasada, más O(n log n) en el peor caso, porque el tope acota inserción a n × (bits de n) | O(n) |
+
+El cambio importante está en la última fila. Sin el tope, el peor caso de `sort` era O(n²). Con el tope es O(n log n), igual que mezcla, con una constante de alrededor de 2.
 
 ### Evidencia empírica
 
-Mediana de tres corridas. Cada valor es el mejor de tres repeticiones. Se omitió inserción con n = 4 096 en los patrones desordenados, por lenta. "Automático" es `sort` y aparece con el algoritmo que escogió.
+Mediana de tres corridas del 2026-10-18 (`2026-10-18_vm_medianas.txt`), con `python -m benchmark.persona3_corridas`. Cada valor es el mejor de tres repeticiones. Se omitió inserción con n = 4 096 en los patrones desordenados, por lenta. "Automático" es `sort`, y entre paréntesis va lo que terminó usando: I = inserción, M = mezcla, I→M = inserción y luego mezcla.
 
 **Datos aleatorios** (µs):
 
-| n | Inserción | Mezcla | Automático (escogió) |
+| n | Inserción | Mezcla | Automático |
 | ---: | ---: | ---: | ---: |
-| 4 | 2.1 | 3.0 | 1.7 (inserción) |
-| 8 | 3.6 | 6.3 | 4.1 (inserción) |
-| 16 | 6.8 | 15.4 | 8.3 (inserción) |
-| 32 | 27.8 | 33.8 | 38.3 (mezcla) |
-| 64 | 134.8 | 79.6 | 87.2 (mezcla) |
-| 256 | 1 837 | 416 | 451 (mezcla) |
-| 1 024 | 33 680 | 2 483 | 2 519 (mezcla) |
+| 16 | 7.3 | 15.0 | 7.3 (I) |
+| 32 | 29.9 | 34.2 | 30.7 (I) |
+| 64 | 154.4 | 79.4 | 86.0 (M) |
+| 256 | 1 940 | 398 | 429 (M) |
+| 1 024 | 38 800 | 2 355 | 2 442 (M) |
 
-Con datos al azar, inserción gana hasta 32 elementos y mezcla gana desde 64. El umbral de 16 es conservador: con n = 32 escogió mezcla y tardó 38.3 µs, cuando inserción habría tardado 27.8. **El cruce medido está entre 32 y 64, así que `SMALL_THRESHOLD` debería subir a 32.**
+Con datos al azar, inserción gana hasta 32 y mezcla desde 64. Con el umbral en 32, `sort` escoge en cada fila el algoritmo más rápido. Con el umbral anterior de 16, en n = 32 escogía mezcla, que era la más lenta.
 
 **Comparaciones costosas** (cadenas de 200 caracteres con prefijo común, µs):
 
-| n | Inserción | Mezcla | Automático (escogió) | Comparaciones, inserción contra mezcla |
+| n | Inserción | Mezcla | Automático | Comparaciones, inserción contra mezcla |
 | ---: | ---: | ---: | ---: | --- |
-| 16 | 12.5 | 16.3 | 12.0 (inserción) | 58 contra 45 |
-| 32 | 29.5 | 37.7 | 40.2 (mezcla) | 199 contra 121 |
-| 64 | 141.2 | 83.9 | 91.7 (mezcla) | 1 077 contra 302 |
-| 1 024 | 36 460 | 2 395 | 2 579 (mezcla) | 259 395 contra 8 929 |
+| 32 | 29.2 | 36.6 | 28.7 (I) | 199 contra 121 |
+| 64 | 147.4 | 86.2 | 91.8 (M) | 1 077 contra 302 |
+| 1 024 | 39 680 | 2 391 | 2 529 (M) | 259 395 contra 8 929 |
 
-Con comparaciones caras, el cruce queda en el mismo lugar, entre 32 y 64. Calcular la clave una sola vez hace que una comparación de cadenas largas no cambie el cuadro.
+El cruce queda en el mismo lugar, entre 32 y 64. Calcular la clave una sola vez hace que comparar cadenas largas no cambie el cuadro.
 
 **Datos casi ordenados** (1 % de intercambios al azar, µs):
 
-| n | Inserción | Mezcla | Automático (escogió) |
+| n | Inserción | Mezcla | Automático |
 | ---: | ---: | ---: | ---: |
-| 16 | 4.2 | 13.7 | 5.8 (inserción) |
-| 32 | 10.1 | 31.5 | 33.6 (mezcla) |
-| 64 | 20.2 | 69.5 | 24.3 (inserción) |
-| 256 | 74.8 | 339.9 | 98.3 (inserción) |
-| 1 024 | 892 | 1 916 | 959 (inserción) |
-| 4 096 | 13 760 | 9 505 | 14 300 (inserción) |
+| 32 | 10.3 | 32.1 | 10.6 (I) |
+| 64 | 27.1 | 68.1 | 27.6 (I) |
+| 256 | 80.4 | 327.8 | 114.7 (I) |
+| 1 024 | 955 | 1 864 | 1 063 (I) |
+| 4 096 | 15 030 | 9 395 | 17 370 (I→M) |
 
-Aquí inserción saca la ventaja que promete: con 256 elementos es 4.5 veces más rápida que mezcla. La selección acierta en casi toda la tabla, con dos fallos:
+Aquí inserción saca la ventaja que promete: con 256 elementos es 4 veces más rápida que mezcla, y `sort` la aprovecha hasta 1 024 elementos. Con 4 096, el 1 % de intercambios entre posiciones lejanas ya hace que inserción pierda. El tope lo detecta, pero tarde: `sort` terminó 1.8 veces más lento que mezcla sola (ver límites).
 
-- **n = 32:** había más del 5 % de descensos, así que escogió mezcla, que fue 3 veces más lenta.
-- **n = 4 096:** el 1 % de intercambios entre posiciones lejanas desplaza elementos muy lejos. Hay pocos descensos, pero muchas inversiones, y ahí inserción ya pierde contra mezcla.
+**Datos rotados**, el caso que motivó el tope (µs):
 
-**Datos invertidos:** desde n = 32 escogió mezcla en todos los casos, que es lo correcto. Con 1 024 elementos, inserción tardó 62.2 ms y mezcla 1.8 ms.
+| n | Inserción | Mezcla | Automático, primera versión | Automático, con tope |
+| ---: | ---: | ---: | ---: | ---: |
+| 64 | 134.3 | 64.2 | 123.5 (I) | 135.4 (I→M) |
+| 256 | 1 961 | 312 | 1 785 (I) | 664 (I→M) |
+| 1 024 | 38 170 | 1 708 | 32 290 (I) | 3 506 (I→M) |
+| 4 096 | — | 8 293 | **537 800** (I) | **16 880** (I→M) |
 
-**Datos rotados**, el caso que delata el defecto (µs):
+Con 4 096 elementos, `sort` pasó de 64 veces el costo de mezcla a 2 veces, que es lo que predice el tope. La columna de la primera versión sale de las corridas del 2026-10-17.
 
-| n | Inserción | Mezcla | Automático (escogió) |
-| ---: | ---: | ---: | ---: |
-| 64 | 117.9 | 63.4 | 123.5 (inserción) |
-| 256 | 1 796 | 309 | 1 785 (inserción) |
-| 1 024 | 32 470 | 1 748 | 32 290 (inserción) |
-| 4 096 | — | 8 375 | **537 800 (inserción)** |
-
-Una lista rotada, como `[5, 6, 7, 8, 9, 0, 1, 2, 3, 4]`, tiene **un solo descenso**, así que la regla la considera casi ordenada y escoge inserción. Pero la mitad de los elementos está a n/2 posiciones de su lugar, e inserción hace O(n²) trabajo. Con 4 096 elementos, `sort` tardó 0.54 s cuando mezcla habría tardado 8.4 ms: **64 veces más lento.**
+**Datos invertidos:** desde n = 64, los descensos superan el 5 % y `sort` va directo a mezcla, que es lo correcto. Con 1 024 elementos, inserción tardó 77.2 ms y `sort` 1.9 ms.
 
 ### Límites conocidos
 
-- **Los descensos no miden bien el desorden.** Fallan con datos rotados y con pocos elementos muy desplazados. En el juego real la exposición es baja: las vistas del inventario (10 objetos en `cripta-01`) y la activación de enemigos (los de una sala) quedan por debajo del umbral de 16, donde siempre se usa inserción y en todas las mediciones fue la más rápida. Pero la tabla de puntajes y los índices del guardado pueden crecer, y §9 avisa que la cripta de la revisión puede ser más grande.
-
-  **Corrección propuesta, pendiente de implementar y medir:** contar descensos sigue siendo O(n), pero además se le pone a inserción un tope de n (por ejemplo, 1 024) por encima del cual siempre se usa mezcla. Otra opción es medir también el desplazamiento máximo en la misma pasada. Cualquiera de las dos tiene que validarse con el benchmark antes de entrar.
-- **El umbral pequeño es conservador.** Las mediciones ponen el cruce entre 32 y 64 tanto con datos al azar como con comparaciones caras. Hay que subir `SMALL_THRESHOLD` a 32 y repetir la medición en la máquina del grupo.
-- **La pasada de descensos no es gratis.** Cuando escoge mezcla, `sort` tardó entre un 1 % y un 13 % más que llamar a mezcla directamente. Es el costo de decidir.
+- **El tope cuesta hasta unas dos veces mezcla cuando se activa.** Es el precio de intentar inserción con datos que parecían casi ordenados. Lo medimos en dos casos:
+  - **Rotados:** 2.0 veces mezcla con 1 024 y con 4 096 elementos.
+  - **Casi ordenados con 4 096 elementos:** 1.8 veces mezcla, y peor que inserción sola. Ahí inserción gastó casi todo su tope antes de rendirse. Es el caso más desfavorable del tope: datos donde inserción casi termina.
+- **Con n ≤ 32 no hay tope.** Con datos invertidos de 32 elementos, inserción tardó 62.3 µs y mezcla 30.2. Se pierden 32 µs en el peor caso, a cambio de ganar en los datos al azar, que son el caso común. A esa escala no importa.
+- **Intentar y cambiar tiene un costo fijo.** Con datos casi ordenados de 256 elementos, `sort` tardó 114.7 µs e inserción sola 80.4. La diferencia es la pasada de descensos más el conteo de desplazamientos.
+- **En el juego actual nada de esto se nota.** Las vistas del inventario (10 objetos en `cripta-01`) y la activación de enemigos (los de una sala) quedan por debajo de 32, donde siempre se usa inserción. El tope protege la tabla de puntajes y los índices del guardado si crecen, como advierte §9.
 - **Mezcla usa O(n) de memoria extra.** Con los tamaños del juego no es un problema.
 - **La recursión de mezcla tiene profundidad log₂ n**: 12 niveles con 4 096 elementos. No se acerca al límite de recursión de Python.
 
 ### Pruebas
 
-`tests/test_sorting.py`, 14 pruebas, todas pasan. Para los tres algoritmos cubren:
+`tests/test_sorting.py`, 21 pruebas, todas pasan. Para los tres algoritmos cubren:
 
 - lista vacía y de un elemento;
 - casos básicos y repetidos;
@@ -1341,9 +1361,15 @@ Una lista rotada, como `[5, 6, 7, 8, 9, 0, 1, 2, 3, 4]`, tiene **un solo descens
 - claves de texto;
 - el contador de comparaciones.
 
-También cubren la regla de selección: pequeños, grandes desordenados, casi ordenados, invertidos y orden descendente.
+Para la selección automática cubren el umbral exacto (32 usa inserción, 33 invertidos usan mezcla), datos grandes desordenados, casi ordenados e invertidos, y orden descendente.
 
----
+Para el tope cubren:
+- su valor;
+- que los datos rotados cambien a mezcla y queden bien ordenados;
+- que el cambio haga al menos 10 veces menos comparaciones que inserción sola;
+- que los casi ordenados no cambien;
+- la estabilidad después del cambio;
+- el cambio con orden descendente.
 
 ---
 
@@ -1642,7 +1668,7 @@ En vez de medir bytes leídos, que obligaría a instrumentar el acceso a disco, 
 a propósito el bloque global o el de otra sala y se comprueba que leer la sala pedida
 sigue funcionando. Si esos bytes se estuvieran leyendo, la prueba fallaría.
 
-`tests/test_bench_almacen_partida.py`, 7 pruebas, todas pasan. No comprueban tiempos,
+`tests/test_bench_almacen_partida.py`, 8 pruebas, todas pasan. No comprueban tiempos,
 que cambian de máquina en máquina, sino que la comparación sea justa: que el JSON
 guarde el mismo estado que el binario y reconstruya los mismos objetos, y que
 recuperar una sala crezca con la cripta en JSON y no en binario.
@@ -2215,9 +2241,10 @@ esos métodos no existían todavía en `Game`, porque dependían del inventario 
 historial reversible de la Persona 3, así que escribir "soltar" terminaba el programa
 con `AttributeError`.
 
-De esos siete, seis ya están implementados contra el inventario real. El único que
-sigue devolviendo el rechazo provisional es `rewind()`, que espera a que el motor anote
-sus cambios en el historial.
+Hoy los siete están implementados contra el inventario y el historial reales, incluido
+`rewind()`. El rechazo provisional solo se ve si `Game` se construye sin inventario,
+cosa que hacen únicamente las pruebas de `tests/test_game.py`; en una partida normal el
+inventario siempre existe.
 
 No era un error de su controlador: programó contra el contrato acordado. El hueco era
 nuestro. Ahora esos siete métodos existen y devuelven un `ActionResult` rechazado que
@@ -2802,11 +2829,11 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_rewind.py` | 27 |
 | `tests/test_save_load.py` | 20 |
 | `tests/test_almacen_partida.py` | 51 |
-| `tests/test_bench_almacen_partida.py` | 7 |
+| `tests/test_bench_almacen_partida.py` | 8 |
 | `tests/test_guardado_en_la_aplicacion.py` | 12 |
-| **Total del motor** | **342** |
+| **Total del motor** | **343** |
 
-Con las del bloque 2 integradas, el proyecto tiene 840 pruebas y todas pasan en
+Con las del bloque 2 integradas, el proyecto tiene 850 pruebas y todas pasan en
 Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
 `cripta/`, con las dependencias de `requirements.txt` instaladas.
 
@@ -2816,21 +2843,19 @@ con la llave negra la puerta de la salida y terminando en victoria con el reloj 
 y cero solicitudes de red.
 
 Las mediciones se corren con `python -m benchmark.scheduler_bench` y
-`python -m benchmark.bench_almacen_partida` desde la misma carpeta.
+`python -m benchmark.bench_almacen_partida` desde la misma carpeta. Las dos corren
+también dentro de `python main.py --bench`.
 
 ---
 
 ## Pendientes antes de entregar
 
-1. **Correr el benchmark en la máquina del grupo** y reemplazar las cifras de este documento:
+1. **Correr las mediciones de 4.5 a 4.9 en una máquina del grupo** y reemplazar sus cifras. Es un solo comando desde `cripta/`, tarda menos de un minuto y guarda todo en `docs/mediciones/persona3/`:
    ```
-   python -m benchmark.persona3_bench
-   python -m benchmark.persona3_frecuencias
+   python -m benchmark.persona3_corridas
    ```
-2. **Corregir la selección de §4.9** (umbral de 32 y tope para inserción), volver a medir y actualizar esa sección.
-3. **Medir la frecuencia de las operaciones de inventario y ordenamiento en una partida real**, cuando el motor de la Persona 1 ya las use.
-4. **Repetir la frecuencia del historial** cuando el motor anote sus cambios. La cifra de este documento es una cota inferior.
-5. **Que el grupo decida** el caso del inventario por encima del máximo (§4.6).
-6. **Que el grupo decida** si cargar debe poder hacerse en medio de una partida
+2. **Medir la frecuencia de las operaciones de inventario y de las vistas ordenadas en una partida jugada**, por ejemplo reproduciendo con `--replay` un log de una partida real. El recorrido automático no las ejecuta.
+3. **Que el grupo decida** el caso del inventario por encima del máximo (§4.6).
+4. **Que el grupo decida** si cargar debe poder hacerse en medio de una partida
    (§4.10). Hoy se carga solo al arrancar, con `--cargar`, porque hacerlo a media
    sesión dejaría la bitácora de §4.11 reproduciendo algo que no ocurrió.
