@@ -1,0 +1,38 @@
+Python 3.13.16 en Linux x86_64, vm, 2026-10-18
+
+Recorrido, 6 salas, 5 errantes
+  Decisiones del jugador                        1,000
+  Eventos procesados                            8,927
+  Intervalos abiertos en el historial           1,000   1.00 por decision
+  Anotaciones en el historial                  31,283   31.28 por decision
+  Mayor intervalo (anotaciones)                    40
+  Mensajes en la bitacora                       3,383   3.38 por decision
+  Marcas de rastro                              1,001   1.00 por decision
+  Consultas del rastro (rastreadores)               0   0.00 por decision
+  Ordenamientos del motor                         834   0.83 por decision
+  Deshacer las ultimas 5 acciones: 152 anotaciones en 0.115 ms; reloj de 91650 a 91200
+
+Recorrido, 40 salas, 50 errantes
+  Decisiones del jugador                        1,000
+  Eventos procesados                           67,128
+  Intervalos abiertos en el historial           1,000   1.00 por decision
+  Anotaciones en el historial                 205,077   205.08 por decision
+  Mayor intervalo (anotaciones)                   247
+  Mensajes en la bitacora                       3,697   3.70 por decision
+  Marcas de rastro                              1,001   1.00 por decision
+  Consultas del rastro (rastreadores)               0   0.00 por decision
+  Ordenamientos del motor                         758   0.76 por decision
+  Deshacer las ultimas 5 acciones: 1073 anotaciones en 1.384 ms; reloj de 87850 a 87400
+
+Recorrido, 40 salas, 50 rastreadores
+  Decisiones del jugador                        1,000
+  Eventos procesados                           67,128
+  Intervalos abiertos en el historial           1,000   1.00 por decision
+  Anotaciones en el historial                 205,993   205.99 por decision
+  Mayor intervalo (anotaciones)                   247
+  Mensajes en la bitacora                      30,103   30.10 por decision
+  Marcas de rastro                              1,001   1.00 por decision
+  Consultas del rastro (rastreadores)          37,025   37.02 por decision
+  Ordenamientos del motor                         758   0.76 por decision
+  Deshacer las ultimas 5 acciones: 1073 anotaciones en 0.822 ms; reloj de 87850 a 87400
+

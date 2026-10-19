@@ -10,7 +10,9 @@ Esta rama agrega solo archivos nuevos. No modifica ningún archivo de otro integ
 | `structures/trail.py` | `PlayerTrail` |
 | `structures/sorting.py` | `insertion_sort`, `merge_sort` y `sort` (selección automática) |
 | `benchmark/persona3_bench.py` | `run()`, con el mismo contrato de `Measurement` |
-| `tests/test_*.py` | 113 pruebas propias |
+| `benchmark/persona3_frecuencias.py` | frecuencia medida de las operaciones (§8.1) |
+| `benchmark/persona3_corridas.py` | corre todo tres veces y guarda los resultados en `docs/mediciones/persona3/` |
+| `tests/test_*.py` | 122 pruebas propias, incluida `test_retroceso_partida.py` |
 | `tests/verificar_retroceso.py` | `assert_rewind_restores`, para probar el retroceso del motor (sección 4) |
 
 Esta rama se basa en `mauricio-logica-juego`, porque necesita `model/item.py`, `model/room.py` y `structures/tabla_hash.py`.
@@ -183,7 +185,7 @@ ordenados = sort(enemies, key=lambda enemy: enemy.actor_id)
 
 Con esto se puede reemplazar `Game._by_ascending_id()`, como pide su propio docstring. Es estable y no modifica la entrada.
 
-`SMALL_THRESHOLD` y `NEARLY_SORTED_RATIO` son provisionales y se calibran con el benchmark.
+El umbral es 32, calibrado con las mediciones. Con datos casi ordenados, `sort` intenta inserción con un tope de n × (bits de n) desplazamientos; si lo supera, termina con mezcla. La justificación está en `DECISIONES.md`, §4.9.
 
 ## 6. Vista (Persona 4)
 
@@ -198,7 +200,7 @@ Las vistas ordenadas no van al log de replay porque no cambian el estado. Así l
 ## 7. Benchmark
 
 ```
-python -m benchmark.persona3_bench
+python -m benchmark.persona3_corridas
 ```
 
 Mide:

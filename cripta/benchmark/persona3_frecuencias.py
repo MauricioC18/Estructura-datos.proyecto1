@@ -1,25 +1,29 @@
 """
 Frecuencia medida de las operaciones de la Persona 3 (§8.1).
 
-Recorre la misma cripta sintetica que benchmark/scheduler_bench.py, con el
-motor real, y cuenta cuantas veces se ejecuta cada operacion por decision del
-jugador. No modifica Game: se le inyectan la bitacora y la agenda con
-contadores, igual que hace CountingEventQueue.
+Recorre la misma cripta sintetica que benchmark/scheduler_bench.py con el
+motor real, ya integrado: Game abre los intervalos del historial, anota sus
+cambios, marca el rastro y ordena los enemigos al activarlos. Este archivo no
+simula nada de eso; solo le pasa a Game versiones con contadores del
+historial, el rastro y la bitacora, igual que CountingEventQueue hace con la
+agenda.
 
     python -m benchmark.persona3_frecuencias
 
-Que se mide y que no
-    - Mensajes de la bitacora: medidos, son los que el motor escribe.
-    - Cambios que la agenda anota en el historial: medidos con
-      ReversibleEventQueue. Es una cota inferior del tamano del historial,
-      porque los cambios de atributos del motor todavia no se anotan.
-    - Marcas de rastro: una por accion aceptada del jugador, mas la inicial,
-      como pide el Apendice B. Se cuentan desde este recorrido.
-    - Decisiones de rastreador: se cuentan los turnos de enemigos, que es lo
-      que costaria si todos fueran rastreadores.
-    - Inventario y vistas ordenadas: dependen de los comandos del jugador, no
-      del motor. No se pueden medir con un recorrido automatico.
+Escenarios
+    - 6 salas y 5 errantes, y 40 salas y 50 errantes: los mismos de
+      scheduler_bench, para poder comparar.
+    - 40 salas y 50 rastreadores: los rastreadores consultan el rastro en
+      cada turno, asi que es el escenario que mide esa operacion.
+
+Que no se mide
+    Las operaciones de inventario y las vistas ordenadas dependen de los
+    comandos que escriba el jugador. Un recorrido automatico solo se mueve y
+    abre puertas, asi que no las ejecuta.
 """
+import time
+
+import model.game as game_module
 from benchmark.scheduler_bench import build_synthetic_crypt, walk_the_crypt
 from model.enemy import Enemy
 from model.game import Game
@@ -31,7 +35,11 @@ from structures.trail import PlayerTrail
 
 SEED = 2026
 DECISIONS = 1_000
-SCENARIOS = ((6, 5), (40, 50))
+SCENARIOS = (
+    (6, 5, Enemy.WANDERER, "errantes"),
+    (40, 50, Enemy.WANDERER, "errantes"),
+    (40, 50, Enemy.TRACKER, "rastreadores"),
+)
 
 
 class CountingLog(CircularLog):
@@ -47,12 +55,14 @@ class CountingLog(CircularLog):
 class CountingHistory(History):
     def __init__(self, state):
         super().__init__(state)
+        self.intervals = 0
         self.records = 0
         self.max_interval = 0
         self._in_interval = 0
 
     def begin_action(self):
         super().begin_action()
+        self.intervals += 1
         self._in_interval = 0
 
     def record(self, change):
@@ -63,100 +73,129 @@ class CountingHistory(History):
                 self.max_interval = self._in_interval
         super().record(change)
 
+    def assign(self, target, attribute, value):
+        if self.is_recording:
+            self.records += 1
+            self._in_interval += 1
+            if self._in_interval > self.max_interval:
+                self.max_interval = self._in_interval
+        super().assign(target, attribute, value)
 
-def measure(room_count, wanderers, decisions=DECISIONS, seed=SEED):
+
+class CountingTrail(PlayerTrail):
+    def __init__(self, history):
+        super().__init__(history)
+        self.marks = 0
+        self.decisions = 0
+
+    def mark(self, room_id, time):
+        super().mark(room_id, time)
+        self.marks += 1
+
+    def freshest_exit(self, room, current_time):
+        self.decisions += 1
+        return super().freshest_exit(room, current_time)
+
+
+def measure(room_count, enemy_count, behavior, decisions=DECISIONS, seed=SEED):
     state = GameState(seed=seed)
     history = CountingHistory(state)
+    trail = CountingTrail(history)
     log = CountingLog()
-    trail = PlayerTrail(history)
 
     room_map = build_synthetic_crypt(room_count)
     player = Player("p-1", "Heroe", 100_000_000, 6, 100, 100, 1)
     enemies = [
         Enemy(
             f"e-{index:04}",
-            "Errante",
+            "Enemigo",
             1_000_000,
             5,
             1,
             150,
             1 + index % room_count,
-            Enemy.WANDERER,
+            behavior,
         )
-        for index in range(wanderers)
+        for index in range(enemy_count)
     ]
 
-    game = Game(
-        state,
-        player,
-        enemies,
-        room_map=room_map,
-        message_log=log,
-        event_queue=ReversibleEventQueue(history),
-    )
+    sorts = 0
+    original_sort = game_module.sort
 
-    for room_id in range(1, room_count + 1):
-        game._activate_enemies_in(room_id)
+    def counted_sort(*args, **kwargs):
+        nonlocal sorts
+        sorts += 1
+        return original_sort(*args, **kwargs)
 
-    trail.mark(player.room_id, state.clock)
-    marks = 1
-    enemy_turns = 0
-
-    original_move = game.move
-    original_open = game.open_door
-    original_enemy_turn = game._run_enemy_turn
-
-    def counted_enemy_turn(enemy):
-        nonlocal enemy_turns
-        enemy_turns += 1
-        original_enemy_turn(enemy)
-
-    def as_player_action(action):
-        def wrapped(direction):
-            nonlocal marks
-            clock = state.clock
-            history.begin_action()
-            result = action(direction)
-            if result.accepted:
-                trail.mark(player.room_id, clock)
-                marks += 1
-            else:
-                history.undo()
-            return result
-        return wrapped
-
-    game._run_enemy_turn = counted_enemy_turn
-    game.move = as_player_action(original_move)
-    game.open_door = as_player_action(original_open)
-
-    walk_the_crypt(game, decisions)
+    game_module.sort = counted_sort
+    try:
+        game = Game(
+            state,
+            player,
+            enemies,
+            room_map=room_map,
+            trail=trail,
+            history=history,
+            message_log=log,
+            event_queue=ReversibleEventQueue(history),
+        )
+        walk_the_crypt(game, decisions)
+    finally:
+        game_module.sort = original_sort
 
     actions = game.player_actions
+    events = game.events_processed
+    sizes = [len(interval.changes) for interval in history._intervals]
+    clock = state.clock
+    start = time.perf_counter()
+    undone = 0
+    while history.undo():
+        undone += 1
+    undo_seconds = time.perf_counter() - start
+
     return {
-        "salas": room_count,
-        "errantes": wanderers,
         "decisiones": actions,
-        "eventos": game.events_processed,
-        "mensajes": log.appended,
+        "eventos": events,
+        "intervalos": history.intervals,
         "anotaciones": history.records,
         "max_intervalo": history.max_interval,
-        "marcas": marks,
-        "turnos_enemigos": enemy_turns,
+        "mensajes": log.appended,
+        "marcas": trail.marks,
+        "consultas_rastro": trail.decisions,
+        "ordenamientos": sorts,
+        "deshechos": undone,
+        "anotaciones_deshechas": sum(sizes),
+        "segundos_deshacer": undo_seconds,
+        "reloj_final": clock,
+        "reloj_tras_deshacer": state.clock,
     }
 
 
 def main():
-    for room_count, wanderers in SCENARIOS:
-        result = measure(room_count, wanderers)
+    for room_count, enemy_count, behavior, label in SCENARIOS:
+        result = measure(room_count, enemy_count, behavior)
         decisions = result["decisiones"]
-        print(f"Recorrido, {room_count} salas, {wanderers} errantes")
-        print(f"  Decisiones del jugador                 {decisions:>10,}")
-        print(f"  Eventos procesados                     {result['eventos']:>10,}")
-        print(f"  Mensajes en la bitacora                {result['mensajes']:>10,}   {result['mensajes'] / decisions:.2f} por decision")
-        print(f"  Anotaciones de la agenda en historial  {result['anotaciones']:>10,}   {result['anotaciones'] / decisions:.2f} por decision")
-        print(f"  Mayor intervalo (anotaciones)          {result['max_intervalo']:>10,}")
-        print(f"  Marcas de rastro                       {result['marcas']:>10,}   {result['marcas'] / decisions:.2f} por decision")
-        print(f"  Turnos de enemigos                     {result['turnos_enemigos']:>10,}   {result['turnos_enemigos'] / decisions:.2f} por decision")
+
+        def line(name, key):
+            value = result[key]
+            print(f"  {name:<40} {value:>10,}   {value / decisions:.2f} por decision")
+
+        print(f"Recorrido, {room_count} salas, {enemy_count} {label}")
+        print(f"  {'Decisiones del jugador':<40} {decisions:>10,}")
+        print(f"  {'Eventos procesados':<40} {result['eventos']:>10,}")
+        line("Intervalos abiertos en el historial", "intervalos")
+        line("Anotaciones en el historial", "anotaciones")
+        print(f"  {'Mayor intervalo (anotaciones)':<40} {result['max_intervalo']:>10,}")
+        line("Mensajes en la bitacora", "mensajes")
+        line("Marcas de rastro", "marcas")
+        line("Consultas del rastro (rastreadores)", "consultas_rastro")
+        line("Ordenamientos del motor", "ordenamientos")
+        print(
+            f"  Deshacer las ultimas {result['deshechos']} acciones: "
+            f"{result['anotaciones_deshechas']} anotaciones en "
+            f"{result['segundos_deshacer'] * 1000:.3f} ms; "
+            f"reloj de {result['reloj_final']} a {result['reloj_tras_deshacer']}"
+        )
         print()
 
 

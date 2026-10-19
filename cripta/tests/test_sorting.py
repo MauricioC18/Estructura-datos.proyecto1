@@ -4,12 +4,14 @@ import unittest
 from structures import sorting
 from structures.sorting import (
     INSERTION,
+    INSERTION_THEN_MERGE,
     MERGE,
     ComparisonCounter,
     algorithm_for,
     choose_algorithm,
     insertion_sort,
     merge_sort,
+    shift_budget,
     sort,
 )
 
@@ -100,8 +102,68 @@ class TestAutomaticChoice(unittest.TestCase):
     def test_large_reversed_uses_merge(self):
         self.assertEqual(algorithm_for(list(range(1000, 0, -1))), MERGE)
 
+    def test_threshold_is_32(self):
+        self.assertEqual(sorting.SMALL_THRESHOLD, 32)
+        counter = ComparisonCounter()
+        sort(list(range(32, 0, -1)), counter=counter)
+        self.assertEqual(counter.algorithm, INSERTION)
+        sort(list(range(33, 0, -1)), counter=counter)
+        self.assertEqual(counter.algorithm, MERGE)
+
     def test_reversed_data_is_sorted_when_asked_in_reverse(self):
         self.assertEqual(algorithm_for(list(range(1000, 0, -1)), reverse=True), INSERTION)
+
+
+
+def rotated(size):
+    half = size // 2
+    return list(range(half, size)) + list(range(half))
+
+
+class TestShiftBudget(unittest.TestCase):
+    def test_budget_is_n_times_bits(self):
+        self.assertEqual(shift_budget(1024), 1024 * 11)
+        self.assertEqual(shift_budget(64), 64 * 7)
+
+    def test_rotated_data_falls_back_to_merge(self):
+        data = rotated(2048)
+        self.assertEqual(algorithm_for(data), INSERTION)
+        counter = ComparisonCounter()
+        self.assertEqual(sort(data, counter=counter), list(range(2048)))
+        self.assertEqual(counter.algorithm, INSERTION_THEN_MERGE)
+
+    def test_fallback_costs_far_less_than_plain_insertion(self):
+        data = rotated(2048)
+        plain = ComparisonCounter()
+        insertion_sort(data, counter=plain)
+        adaptive = ComparisonCounter()
+        sort(data, counter=adaptive)
+        self.assertLess(adaptive.comparisons * 10, plain.comparisons)
+
+    def test_nearly_sorted_stays_with_insertion(self):
+        data = list(range(1000))
+        for index in range(0, 1000, 100):
+            data[index], data[index + 1] = data[index + 1], data[index]
+        counter = ComparisonCounter()
+        self.assertEqual(sort(data, counter=counter), list(range(1000)))
+        self.assertEqual(counter.algorithm, INSERTION)
+
+    def test_fallback_is_stable(self):
+        keys = [key // 3 for key in rotated(3000)]
+        data = [(keys[index], index) for index in range(len(keys))]
+        counter = ComparisonCounter()
+        result = sort(data, key=lambda pair: pair[0], counter=counter)
+        self.assertEqual(counter.algorithm, INSERTION_THEN_MERGE)
+        for index in range(1, len(result)):
+            if result[index - 1][0] == result[index][0]:
+                self.assertLess(result[index - 1][1], result[index][1])
+        self.assertEqual(result, merge_sort(data, key=lambda pair: pair[0]))
+
+    def test_fallback_in_reverse(self):
+        data = list(reversed(rotated(2048)))
+        counter = ComparisonCounter()
+        self.assertEqual(sort(data, reverse=True, counter=counter), list(range(2047, -1, -1)))
+        self.assertEqual(counter.algorithm, INSERTION_THEN_MERGE)
 
 
 if __name__ == "__main__":

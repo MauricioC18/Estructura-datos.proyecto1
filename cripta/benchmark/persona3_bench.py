@@ -24,7 +24,6 @@ from structures.history import History, ReversibleEventQueue
 from structures.inventory import DoublyLinkedList, Inventory, _Node
 from structures.sorting import (
     ComparisonCounter,
-    algorithm_for,
     insertion_sort,
     merge_sort,
     sort,
@@ -163,7 +162,6 @@ def bench_sorting(sizes=(4, 8, 16, 32, 64, 128, 256, 1_024, 4_096)):
     for pattern in ("aleatorio", "casi ordenado", "invertido", "rotado", "cadenas largas"):
         for size in sizes:
             data = _pattern(pattern, size, generator)
-            chosen = algorithm_for(data)
 
             for label, algorithm in algorithms:
                 if label == "insercion" and size > 1_024 and pattern != "casi ordenado":
@@ -173,7 +171,7 @@ def bench_sorting(sizes=(4, 8, 16, 32, 64, 128, 256, 1_024, 4_096)):
                 algorithm(data, counter=counter)
                 detail = f"{pattern}, n={size}, {counter.comparisons} comparaciones"
                 if label == "automatico":
-                    detail += f", escogio {chosen}"
+                    detail += f", uso {counter.algorithm}"
 
                 measurements.append(
                     Measurement(f"Ordenamiento: {label}", _best(lambda: algorithm(data), 3), detail)
