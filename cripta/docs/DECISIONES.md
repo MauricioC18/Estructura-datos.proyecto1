@@ -891,7 +891,7 @@ La vista ordenada es la operación más cara del inventario. Aun así, son 86 µ
 
 ### Pruebas
 
-`tests/test_inventory.py`, 32 pruebas, todas pasan. Cubren:
+`tests/test_inventory.py`, 33 pruebas, todas pasan. Cubren:
 
 - la lista doble en sí;
 - inventario vacío, capacidad inválida y capacidad llena;
@@ -1025,7 +1025,11 @@ Antes de la integración, contra el motor que todavía no anotaba, encontró que
 
 - **Un cambio sin anotar no lanza ninguna excepción: simplemente no se deshace.** Es el riesgo principal del diseño, y por eso existe el verificador. Cada acción y cada evento del motor necesitan su prueba de retroceso.
 - **La memoria crece con lo que pasa en el intervalo, no con lo que el jugador hace.** Si una cripta tuviera cientos de enemigos activos, un intervalo largo (por ejemplo, un jugador lento) acumularía miles de anotaciones. Por la tabla de evidencia, 1 000 cambios cuestan 0.41 ms por acción, así que todavía hay margen amplio.
-- **Inventario por encima del máximo.** Si el jugador suelta un objeto, después recoge un pergamino y retrocede hasta antes de soltar, el inventario puede quedar con un objeto más que `inventario_max`. Pasa porque el pergamino no se devuelve (§2.11) y el objeto soltado sí. El enunciado no define este caso; queda pendiente de decisión del grupo.
+- **Inventario por encima del máximo: no puede pasar.** La primera versión de esta sección temía que soltar un objeto, recoger un pergamino y retroceder hasta antes de soltar dejara el inventario con un objeto más que `inventario_max`, porque el pergamino recogido no se devuelve (§2.11) y el objeto soltado sí vuelve. Al revisarlo para decidirlo, resultó que no ocurre. Cada retroceso deshace **una** acción del jugador, y una acción mete a lo sumo un objeto al inventario, así que deshacerla devuelve a lo sumo uno. El retroceso, además, consume siempre un pergamino, que libera un lugar. Por inducción sobre los retrocesos encadenados, el total nunca pasa de lo que había antes de la acción deshecha, que ya respetaba el tope. Lo comprobamos así:
+  - `tests/test_rewind.py` (`TestTheInventoryNeverGoesOverTheMaximum`) recorre justo ese caso con el inventario lleno: después de soltar y recoger tiene 10 objetos, y después de cada uno de los dos retrocesos, 9.
+  - Corrimos además 20 000 partidas al azar con capacidad 4, cada una de 25 acciones entre recoger, soltar, retroceder, recorrer y esperar. Ninguna pasó el tope.
+
+  Si el juego llegara a tener una acción que meta dos objetos de una vez, el argumento deja de valer. Por eso la decisión ya está tomada: el inventario podría quedar temporalmente por encima del tope, y recoger seguiría prohibido hasta bajar de él. Es lo que ya hace `is_full()`, que compara con `>=`, y es lo mismo que pide el Apéndice B para el inventario lleno. Para que ese caso no pierda nada al guardar, la carga arma el inventario con `Inventory.restore()`, que copia el estado tal como estaba sin volver a aplicar el tope. Con `pick_up()`, un objeto que no cupiera se habría perdido sin ningún aviso.
 - **Si el vecino de un objeto soltado era un pergamino** que después salió sin anotarse, el objeto se reinserta junto al otro vecino, o al final si tampoco está. La prueba `test_neighbour_scroll_left_without_being_recorded` cubre este caso.
 - **Cargar una partida guardada es un caso distinto.** Al cargar, `History.clear()` descarta el historial anterior. Restaurar el contador y el generador le corresponde al guardado de §4.10.
 
@@ -1505,16 +1509,37 @@ inicio de partida: programa la primera acción del jugador en el instante 0 y ac
 los enemigos de la sala inicial. Una partida cargada con el constructor quedaría mal
 sin dar ningún error.
 
-**Guardar se hace dentro de la partida; cargar, al arrancar.** El comando
-`guardar <archivo>` funciona en cualquier momento, porque no cambia el estado: §4.11
-ya lo dejaba fuera de la bitácora de reproducción. Cargar es distinto, y acá §4.10 y
-§4.11 se estorban. La bitácora de una sesión guarda la semilla en su encabezado y las
-acciones desde el inicio; si a media sesión se cargara otra partida, esa bitácora
-reproduciría algo que nunca ocurrió, y §4.11 prohíbe expresamente reproducir en
-silencio contra datos distintos. Por eso cargar es `python main.py --cargar ARCHIVO`,
-que arma la partida **antes** de abrir la bitácora, de modo que la sesión cargada
-tenga un log propio y coherente. El comando `cargar` de adentro del juego no se
-quedó sin respuesta: explica esto y dice qué usar.
+**Guardar y cargar se pueden hacer en cualquier momento; una bitácora nunca mezcla
+dos partidas.** El comando `guardar <archivo>` no cambia el estado, y §4.11 ya lo
+dejaba fuera de la bitácora de reproducción. Cargar sí lo cambia, y acá §4.10 y §4.11
+se estorban. La bitácora de una sesión guarda la semilla en su cabecera y las acciones
+desde el inicio. Si a media sesión se cargara otra partida y se siguiera anotando en
+la misma bitácora, esa bitácora reproduciría algo que nunca ocurrió, y §4.11 prohíbe
+reproducir en silencio contra datos distintos.
+
+La primera versión resolvía esto permitiendo cargar solo al arrancar, con
+`python main.py --cargar ARCHIVO`. Ahora el comando `cargar <archivo>` también
+funciona dentro de la partida:
+
+1. Primero revisa el archivo: que exista, que se pueda leer y, si es de la misma
+   cripta, que sus versiones sigan vigentes. Si algo falla, lo dice y el jugador sigue
+   en su partida, sin perder nada.
+2. Si el archivo sirve, cierra la sesión actual. Su bitácora queda completa y se puede
+   reproducir hasta ese punto.
+3. Abre una sesión nueva desde el archivo, con su propia bitácora, igual que
+   `--cargar`.
+
+**La bitácora de una sesión cargada dice de qué archivo salió.** Esto corrige un
+error que tenía la primera versión: la cabecera de una sesión cargada solo traía la
+semilla, así que `--replay` la reproducía desde el instante 0 y no desde el estado
+guardado. A veces lo detectaba como una divergencia, y otras veces, con acciones como
+`esperar`, habría reproducido en silencio otra partida. Ahora la cabecera lleva dos
+líneas más, `partida_cargada=<archivo>` y `huella_partida=<SHA-256 del archivo>`, y
+`--replay` arranca desde ese archivo. Si el archivo no está, o su huella cambió porque
+se volvió a guardar encima, informa que no puede garantizar una reproducción fiel y
+no reproduce, con el mismo criterio que con las versiones de la cripta. Las dos líneas
+son opcionales, así que los logs de partidas nuevas no cambian y el formato sigue
+siendo el 1.
 
 **El inventario cargado se vuelve a armar con el historial puesto.** Es el punto
 frágil del cargado y conviene dejarlo escrito. El historial del retroceso necesita el
@@ -1640,10 +1665,16 @@ precio de que se abra sin el catálogo, y está medido arriba.
 guardados anteriores se reportan como incompatibles y no se cargan. Para un trabajo
 de curso alcanza; un programa de verdad querría poder leer la versión anterior.
 
-**Cargar no funciona en medio de una partida**, solo al arrancar, por lo que se
-explicó en la decisión: la bitácora de la sesión quedaría reproduciendo algo que no
-ocurrió. Si el grupo quisiera cargar a media sesión, habría que decidir qué pasa con
-esa bitácora, cerrarla y abrir otra o negarse, y eso es una decisión de §4.11.
+**Para reproducir una sesión cargada hace falta el mismo archivo de guardado.** El log
+apunta al archivo por su ruta y comprueba su huella. Si se borra el guardado, o se
+guarda otra vez encima con el mismo nombre, los logs de las sesiones que salieron de
+él dejan de poder reproducirse. El programa lo informa y no reproduce otra cosa. Para
+reportar un error de una partida cargada hay que entregar el log junto con su archivo
+de guardado.
+
+**El reporte de red es el de la última sesión.** Cargar a media partida empieza una
+partida nueva, así que el conteo de solicitudes vuelve a cero, igual que con
+`--cargar`.
 
 ### Pruebas
 
@@ -1673,7 +1704,7 @@ que cambian de máquina en máquina, sino que la comparación sea justa: que el 
 guarde el mismo estado que el binario y reconstruya los mismos objetos, y que
 recuperar una sala crezca con la cripta en JSON y no en binario.
 
-`tests/test_guardado_en_la_aplicacion.py`, 12 pruebas, todas pasan. Prueban el
+`tests/test_guardado_en_la_aplicacion.py`, 18 pruebas, todas pasan. Prueban el
 guardado desde la aplicación con los datos de `datos_offline`, con el mismo andamio
 que `tests/test_application.py`. La de fondo es
 `test_guardar_y_cargar_da_lo_mismo_que_seguir_jugando`: se juega la misma partida de
@@ -1682,6 +1713,12 @@ dos tienen que terminar en el mismo reloj, con la misma vida, la misma sala y lo
 mismos contadores. También fijan que guardar no consuma tiempo ni cuente como acción,
 que la sesión cargada abra una bitácora propia, que la semilla salga del archivo y no
 de la bandera, y que una partida cargada anote para el retroceso.
+
+Para cargar a media partida, fijan que continúe la partida guardada y abra otra
+bitácora, y que un archivo que no existe se rechace sin soltar la partida actual. Para
+la reproducción, fijan que la bitácora de una sesión cargada, con `--cargar` o con el
+comando, se reproduzca y termine en el mismo estado. También fijan que, si el guardado
+cambió o no está, no se reproduzca.
 
 ---
 
@@ -1897,10 +1934,10 @@ sin reproducir ninguna acción.
 - **Una versión que ya no existe.** Si el API publica una versión nueva de la cripta y
   no hay copia local de la anterior, sus logs no se pueden reproducir. El programa lo
   informa (supuesto S18) y la salida es usar `--offline` con una copia de esos datos.
-- **Partidas cargadas desde un guardado.** Un log empieza en la semilla y en el
-  instante 0, así que no reproduce una partida que se cargó de un archivo a mitad de
-  camino. Queda por decidir junto con el guardado de §4.10, que todavía no está
-  integrado.
+- **Partidas cargadas desde un guardado.** El log de una sesión cargada no empieza en
+  el instante 0, sino en el archivo que indica su cabecera (`partida_cargada` y
+  `huella_partida`, ver §4.10). Por eso depende de ese archivo: sin él, o si cambió,
+  el programa informa que no puede garantizar una reproducción fiel y no reproduce.
 - **El nombre del jugador no va en la cabecera.** Hoy no afecta: ningún mensaje del
   motor lo usa y el replay no registra puntajes. Si algún mensaje empezara a usarlo, el
   texto reproducido cambiaría aunque la partida fuera la misma.
@@ -1913,7 +1950,7 @@ sin reproducir ninguna acción.
 
 | Archivo | Qué cubre | Pruebas |
 | --- | --- | ---: |
-| `tests/test_replay_log.py` | Cabecera, formato, modo `"x"`, comentarios, errores con número de línea | 16 |
+| `tests/test_replay_log.py` | Cabecera, formato, modo `"x"`, comentarios, errores con número de línea, cabecera de una sesión cargada | 19 |
 | `tests/test_replay.py` | Misma semilla y mismas acciones dan la misma partida; divergencias | 6 |
 | `tests/test_commands.py` | `parse_command()` y la forma canónica que se escribe en el log | 20 |
 | `tests/test_game_controller.py` | Se anotan solo las acciones aceptadas | 8 |
@@ -2826,14 +2863,14 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_effects.py` | 33 |
 | `tests/test_movement.py` | 61 |
 | `tests/test_inventory_actions.py` | 34 |
-| `tests/test_rewind.py` | 27 |
+| `tests/test_rewind.py` | 28 |
 | `tests/test_save_load.py` | 20 |
 | `tests/test_almacen_partida.py` | 51 |
 | `tests/test_bench_almacen_partida.py` | 8 |
-| `tests/test_guardado_en_la_aplicacion.py` | 12 |
-| **Total del motor** | **343** |
+| `tests/test_guardado_en_la_aplicacion.py` | 18 |
+| **Total del motor** | **350** |
 
-Con las del bloque 2 integradas, el proyecto tiene 850 pruebas y todas pasan en
+Con las del bloque 2 integradas, el proyecto tiene 861 pruebas y todas pasan en
 Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
 `cripta/`, con las dependencias de `requirements.txt` instaladas.
 
@@ -2855,7 +2892,7 @@ también dentro de `python main.py --bench`.
    python -m benchmark.persona3_corridas
    ```
 2. **Medir la frecuencia de las operaciones de inventario y de las vistas ordenadas en una partida jugada**, por ejemplo reproduciendo con `--replay` un log de una partida real. El recorrido automático no las ejecuta.
-3. **Que el grupo decida** el caso del inventario por encima del máximo (§4.6).
-4. **Que el grupo decida** si cargar debe poder hacerse en medio de una partida
-   (§4.10). Hoy se carga solo al arrancar, con `--cargar`, porque hacerlo a media
-   sesión dejaría la bitácora de §4.11 reproduciendo algo que no ocurrió.
+
+Las dos decisiones que estaban abiertas quedaron tomadas. El inventario por encima del
+máximo no puede ocurrir (ver los límites de §4.6). Cargar se puede hacer a media
+partida, con una bitácora nueva por sesión que dice de qué guardado sale (§4.10).

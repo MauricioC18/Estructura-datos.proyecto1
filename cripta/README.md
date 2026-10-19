@@ -74,12 +74,14 @@ Comandos dentro de la partida (con `ayuda` se ven en pantalla):
 | `ver [peso\|valor\|nombre]` | Mostrar el inventario, en su orden real u ordenado |
 | `retroceder` | Usar un pergamino de retroceso |
 | `guardar <archivo>` | Guardar la partida en el archivo binario indicado |
-| `cargar <archivo>` | Solo al arrancar: `python main.py --cargar <archivo>`. Dentro de la partida indica ese comando |
+| `cargar <archivo>` | Deja la partida actual y continúa la guardada, con una bitácora nueva. Si el archivo no sirve, se sigue en la partida actual |
 | `salir` | Terminar la sesión |
 
 Al terminar una partida el programa muestra el resultado, la registra en la tabla de puntajes si se ganó o se perdió, y muestra el reporte de red: solicitudes realizadas, presupuesto de la cripta, aciertos y fallos de caché (§5.1).
 
 Una partida reproducida con `--replay` solo se ejecuta si la fuente tiene las mismas versiones de cripta y catálogo que indica el log. Si no las tiene, el programa lo informa y no reproduce. Para un log viejo se usa `--offline` con una copia de los datos de esas versiones.
+
+El log de una sesión que empezó cargando un guardado, con `--cargar` o con `cargar`, indica en su cabecera de qué archivo salió (`partida_cargada`) y su huella (`huella_partida`). Para reproducirlo, ese archivo tiene que seguir en la misma ruta y sin cambios; si no, el programa lo informa y no reproduce.
 
 ## Herramientas del bloque 2
 

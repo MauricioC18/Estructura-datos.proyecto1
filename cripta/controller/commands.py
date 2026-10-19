@@ -35,7 +35,7 @@ HELP_LINES = (
     "ver [peso|valor|nombre]  mostrar el inventario, ordenado si se indica",
     "retroceder         usar un pergamino de retroceso",
     "guardar <archivo>  guardar la partida",
-    "cargar <archivo>   solo al arrancar: python main.py --cargar <archivo>",
+    "cargar <archivo>   dejar esta partida y continuar la guardada",
     "ayuda              mostrar esta lista",
     "salir              terminar la sesion",
 )
