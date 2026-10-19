@@ -785,7 +785,7 @@ Estado: implementado, probado, medido e integrado al motor.
 **De dónde salen las cifras de 4.5 a 4.9.** Ninguna es estimada. Los archivos están en `docs/mediciones/persona3/`.
 - **Tiempos:** `python -m benchmark.persona3_corridas`, que corre `benchmark/persona3_bench.py` tres veces y guarda las corridas y la mediana. Las secciones 4.5 a 4.8 citan las corridas del 2026-10-17 (`*_2026-10-17.txt`). La 4.9 cita las del 2026-10-18 (`2026-10-18_vm_*.txt`), porque el ordenamiento cambió.
 - **Frecuencias:** `python -m benchmark.persona3_frecuencias` (`2026-10-18_vm_frecuencias.txt`). Recorre con el motor integrado la cripta sintética de `benchmark/scheduler_bench.py`, 1 000 decisiones del jugador, en tres escenarios: 6 salas con 5 errantes, 40 salas con 50 errantes y 40 salas con 50 rastreadores. El motor abre los intervalos, anota los cambios, marca el rastro y ordena por sí mismo; el script solo le pasa versiones con contadores.
-- **Equipo:** Python 3.13.16 sobre Linux x86_64, no la computadora de Mauricio donde se midieron las secciones del motor. Las proporciones y la forma en que crece cada columna no deberían cambiar; los valores absolutos sí. Hay que repetir la corrida en una máquina del grupo antes de entregar.
+- **Equipo:** Python 3.13.16 sobre Linux x86_64, no la computadora de Mauricio donde se midieron las secciones del motor. Las proporciones y la forma en que crece cada columna no deberían cambiar; los valores absolutos sí (ver el primer límite de 4.5).
 
 ### Problema
 
@@ -888,6 +888,8 @@ La vista ordenada es la operación más cara del inventario. Aun así, son 86 µ
 - **`consume_scroll` es O(n)** porque busca el primer pergamino. Con inventarios de decenas de objetos no importa. Con miles, convendría llevar los pergaminos en su propia lista.
 - **Cada nodo ocupa más memoria** que una celda de `list`: tres referencias más un indicador. No es un problema a esta escala.
 - **El cursor no es estado reversible.** Al deshacer un `soltar` vuelve al objeto restaurado. En los demás casos queda donde estaba. Ver §4.6.
+- **Los tiempos de 4.5 a 4.9 son de otro equipo.** Se midieron en una máquina virtual con Linux (Python 3.13.16), no en la computadora donde se midió el motor. Las comparaciones entre alternativas y la forma en que crece cada columna se sostienen, pero los valores absolutos no se comparan con los de las otras secciones. Para repetirlas en otra máquina basta `python -m benchmark.persona3_corridas` desde `cripta/`; tarda menos de un minuto y guarda todo en `docs/mediciones/persona3/`.
+- **La frecuencia de las operaciones del inventario no se midió en una partida jugada.** El recorrido automático de `persona3_frecuencias` mueve al jugador y deja actuar a los enemigos, pero no recoge, suelta, equipa ni pide vistas ordenadas. Esas operaciones las dispara solo el jugador, a lo sumo una por decisión, así que no pueden acercarse a la frecuencia de la agenda ni del historial. Para medirlas habría que reproducir con `--replay` el log de una partida real y contarlas.
 
 ### Pruebas
 
@@ -1350,6 +1352,7 @@ Con 4 096 elementos, `sort` pasó de 64 veces el costo de mezcla a 2 veces, que 
 - **Intentar y cambiar tiene un costo fijo.** Con datos casi ordenados de 256 elementos, `sort` tardó 114.7 µs e inserción sola 80.4. La diferencia es la pasada de descensos más el conteo de desplazamientos.
 - **En el juego actual nada de esto se nota.** Las vistas del inventario (10 objetos en `cripta-01`) y la activación de enemigos (los de una sala) quedan por debajo de 32, donde siempre se usa inserción. El tope protege la tabla de puntajes y los índices del guardado si crecen, como advierte §9.
 - **Mezcla usa O(n) de memoria extra.** Con los tamaños del juego no es un problema.
+- **Las vistas ordenadas del inventario no se contaron en una partida jugada.** La frecuencia medida es la de la activación de enemigos, que la dispara el motor. Las vistas las pide el jugador con `ver`, que no consume tiempo ni pasa por el ciclo de eventos, así que no afectan el presupuesto de §5.2 por más que se usen (ver los límites de 4.5).
 - **La recursión de mezcla tiene profundidad log₂ n**: 12 niveles con 4 096 elementos. No se acerca al límite de recursión de Python.
 
 ### Pruebas
@@ -2882,17 +2885,3 @@ y cero solicitudes de red.
 Las mediciones se corren con `python -m benchmark.scheduler_bench` y
 `python -m benchmark.bench_almacen_partida` desde la misma carpeta. Las dos corren
 también dentro de `python main.py --bench`.
-
----
-
-## Pendientes antes de entregar
-
-1. **Correr las mediciones de 4.5 a 4.9 en una máquina del grupo** y reemplazar sus cifras. Es un solo comando desde `cripta/`, tarda menos de un minuto y guarda todo en `docs/mediciones/persona3/`:
-   ```
-   python -m benchmark.persona3_corridas
-   ```
-2. **Medir la frecuencia de las operaciones de inventario y de las vistas ordenadas en una partida jugada**, por ejemplo reproduciendo con `--replay` un log de una partida real. El recorrido automático no las ejecuta.
-
-Las dos decisiones que estaban abiertas quedaron tomadas. El inventario por encima del
-máximo no puede ocurrir (ver los límites de §4.6). Cargar se puede hacer a media
-partida, con una bitácora nueva por sesión que dice de qué guardado sale (§4.10).
