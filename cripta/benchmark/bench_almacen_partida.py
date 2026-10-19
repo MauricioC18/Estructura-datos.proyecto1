@@ -46,6 +46,7 @@ from adapters.almacen_partida import (
 )
 from benchmark.scheduler_bench import build_synthetic_crypt
 from benchmark.utilidades_medicion import (
+    Measurement,
     calentar_procesador,
     descripcion_del_equipo,
 )
@@ -595,6 +596,55 @@ def medir(room_count, enemy_count):
         resultado["operaciones"] = contar_operaciones(juego)
         resultado["bytes_solo_ids"] = tamano_solo_con_identificadores(juego, carpeta)
         return resultado
+
+
+def medir_guardado(room_count, enemy_count):
+    """Tiempo de escribir la partida, en binario y en JSON."""
+    with tempfile.TemporaryDirectory() as temporal:
+        carpeta = Path(temporal)
+        juego = construir_partida(room_count, enemy_count)
+        almacen = AlmacenPartida(carpeta / "partida.cripta")
+        ruta_json = carpeta / "partida.json"
+        versiones = ("cripta-01", "3", "7")
+
+        return (
+            _segundos_por_llamada(lambda: almacen.guardar(juego, versiones=versiones)),
+            _segundos_por_llamada(
+                lambda: guardar_en_json(juego, ruta_json, versiones=versiones)
+            ),
+        )
+
+
+def run():
+    """Mediciones para el ejecutor de --bench (benchmark/benchmark.py)."""
+    measurements = []
+
+    for nombre, room_count, enemy_count in ESCENARIOS:
+        datos = medir(room_count, enemy_count)
+        guardado_binario, guardado_json = medir_guardado(room_count, enemy_count)
+        escenario = f"{room_count} salas, {enemy_count} enemigos"
+
+        measurements.append(Measurement(
+            f"Tamano ({nombre})", None,
+            f"binario {_kilobytes(datos['bytes_binarios'])}, "
+            f"JSON {_kilobytes(datos['bytes_json'])} [descartado], "
+            f"solo ids {_kilobytes(datos['bytes_solo_ids'])} [descartado]",
+        ))
+
+        for operacion, binario, json_ in (
+            ("Guardar", guardado_binario, guardado_json),
+            ("Cargar completa", datos["carga_binaria"], datos["carga_json"]),
+            ("Recuperar una sala", datos["una_sala_binaria"], datos["una_sala_json"]),
+        ):
+            measurements.append(Measurement(
+                f"{operacion}: binario ({nombre})", binario, escenario,
+            ))
+            measurements.append(Measurement(
+                f"{operacion}: JSON [descartado] ({nombre})", json_,
+                f"{json_ / binario:.2f}x el binario",
+            ))
+
+    return measurements
 
 
 def _milisegundos(segundos):

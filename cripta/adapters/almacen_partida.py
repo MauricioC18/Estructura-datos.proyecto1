@@ -462,7 +462,7 @@ def _leer_jugador(lector, history=None):
         inventory = Inventory(max(1, capacidad), history)
 
         for item in items:
-            inventory.pick_up(item)
+            inventory.restore(item)
 
         inventory.go_to_start()
 
@@ -1185,7 +1185,7 @@ def _reasignar_inventario_con_historial(player, history):
     nuevo = Inventory(viejo.capacity, history)
 
     for item in objetos:
-        nuevo.pick_up(item)
+        nuevo.restore(item)
 
     nuevo.go_to_start()
 

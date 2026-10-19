@@ -1,3 +1,4 @@
+import hashlib
 from dataclasses import dataclass
 
 from controller.commands import CommandError, is_game_action, parse_command
@@ -13,6 +14,8 @@ CRYPT_KEY = "cripta"
 CRYPT_VERSION_KEY = "version_cripta"
 CATALOG_VERSION_KEY = "version_catalogo"
 SEED_KEY = "semilla"
+SAVED_GAME_KEY = "partida_cargada"
+SAVED_GAME_DIGEST_KEY = "huella_partida"
 
 
 class ReplayLogError(ValueError):
@@ -27,6 +30,11 @@ class ReplayHeader:
     crypt_version: str
     catalog_version: str
     seed: int
+    # Solo en una sesion que empezo cargando un guardado (§4.10): de que
+    # archivo salio y su huella SHA-256, para reproducir desde ese estado y no
+    # desde el instante 0. Vacios en una partida nueva.
+    saved_game: str = ""
+    saved_game_digest: str = ""
 
 
 @dataclass
@@ -64,6 +72,13 @@ class ReplayLogWriter:
         self._write_line(f"{CRYPT_VERSION_KEY}={header.crypt_version}")
         self._write_line(f"{CATALOG_VERSION_KEY}={header.catalog_version}")
         self._write_line(f"{SEED_KEY}={header.seed}")
+
+        if header.saved_game:
+            _check_value(header.saved_game, SAVED_GAME_KEY)
+            _check_value(header.saved_game_digest, SAVED_GAME_DIGEST_KEY)
+            self._write_line(f"{SAVED_GAME_KEY}={header.saved_game}")
+            self._write_line(f"{SAVED_GAME_DIGEST_KEY}={header.saved_game_digest}")
+
         self._write_line(SEPARATOR)
 
     def append(self, command):
@@ -127,6 +142,8 @@ def _parse_header(lines):
     crypt_version = None
     catalog_version = None
     seed = None
+    saved_game = ""
+    saved_game_digest = ""
 
     for index in range(1, len(lines)):
         text = lines[index].strip()
@@ -149,6 +166,10 @@ def _parse_header(lines):
             catalog_version = value
         elif key == SEED_KEY:
             seed = _integer(value, key, index + 1)
+        elif key == SAVED_GAME_KEY:
+            saved_game = value
+        elif key == SAVED_GAME_DIGEST_KEY:
+            saved_game_digest = value
         else:
             raise ReplayLogError(f"Linea {index + 1}: clave desconocida '{key}'.")
 
@@ -166,7 +187,16 @@ def _parse_header(lines):
     _require(catalog_version, CATALOG_VERSION_KEY)
     _require(seed, SEED_KEY)
 
-    return ReplayHeader(crypt_id, crypt_version, catalog_version, seed)
+    if bool(saved_game) != bool(saved_game_digest):
+        raise ReplayLogError(
+            f"La cabecera trae '{SAVED_GAME_KEY}' o '{SAVED_GAME_DIGEST_KEY}' "
+            "sin la otra: no se sabe desde que estado reproducir."
+        )
+
+    return ReplayHeader(
+        crypt_id, crypt_version, catalog_version, seed,
+        saved_game, saved_game_digest,
+    )
 
 
 def _parse_body_line(text, line_number):
@@ -200,3 +230,14 @@ def _require(value, key):
 def _check_value(value, key):
     if not value or "\n" in value:
         raise ValueError(f"'{key}' no puede estar vacio ni tener saltos de linea.")
+
+
+def file_digest(path):
+    """Huella SHA-256 de un archivo, para saber si un guardado cambio."""
+    digest = hashlib.sha256()
+
+    with open(path, "rb") as file:
+        for block in iter(lambda: file.read(65536), b""):
+            digest.update(block)
+
+    return digest.hexdigest()

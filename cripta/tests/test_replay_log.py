@@ -112,6 +112,22 @@ class TestReader(LogFileTestCase):
 
         self.assertEqual(read_replay_log(self.path).commands, [])
 
+    def test_a_loaded_session_keeps_its_saved_game_and_digest(self):
+        header = ReplayHeader(
+            "cripta-01", "a3f91c", "cat-2026-08-01", 12345,
+            "partida.cripta", "ab12",
+        )
+        ReplayLogWriter(self.path, header).close()
+
+        self.assertIn("partida_cargada=partida.cripta\n", self.read_text())
+        self.assertEqual(read_replay_log(self.path).header, header)
+
+    def test_a_new_game_writes_no_saved_game_lines(self):
+        ReplayLogWriter(self.path, HEADER).close()
+
+        self.assertNotIn("partida_cargada", self.read_text())
+        self.assertEqual(read_replay_log(self.path).header.saved_game, "")
+
 
 class TestInvalidLogs(LogFileTestCase):
 
@@ -155,6 +171,11 @@ class TestInvalidLogs(LogFileTestCase):
 
     def test_unknown_header_key(self):
         self.assert_invalid(self.VALID_HEADER + "color=rojo\n---\n", "color")
+
+    def test_saved_game_without_digest(self):
+        text = self.VALID_HEADER + "partida_cargada=p.cripta\n---\n"
+
+        self.assert_invalid(text, "huella_partida")
 
     def test_invalid_command_reports_its_line(self):
         self.assert_invalid(self.VALID_HEADER + "---\nvolar N\n", "Linea 8")

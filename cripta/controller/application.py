@@ -36,7 +36,12 @@ from controller.game_controller import GameController
 from model.game import DEFEAT, VICTORY, Game
 from model.game_state import GameState
 from replay.replay import ReplayDivergence, replay_commands
-from replay.replay_log import ReplayHeader, ReplayLogWriter, read_replay_log
+from replay.replay_log import (
+    ReplayHeader,
+    ReplayLogWriter,
+    file_digest,
+    read_replay_log,
+)
 from repository.gestor_catalogo import FichaNoDisponible
 from repository.gestor_contenido import ContenidoNoDisponible
 from repository.repositorio_cripta import VersionesIncompatibles
@@ -278,41 +283,57 @@ def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
     salir no entra en la tabla.
 
     Con load_path la partida sale de un archivo guardado (§4.10) en vez de
-    empezar de cero. Se carga antes de abrir la bitacora, de modo que la
-    sesion arranque con un log propio y coherente: cargar a media sesion
-    dejaria el log reproduciendo algo que no ocurrio.
+    empezar de cero. Se carga antes de abrir la bitacora, y la cabecera anota
+    de que archivo salio y su huella, para que --replay arranque desde ese
+    estado (§4.11).
+
+    El comando cargar a media partida cierra la sesion actual, cuya bitacora
+    queda completa y reproducible hasta ahi, y abre una sesion nueva con su
+    propia bitacora, igual que --cargar. Una bitacora nunca mezcla dos partidas.
     """
-    repository.empezar_conteo_de_partida()
+    while True:
+        repository.empezar_conteo_de_partida()
+        header_extra = ("", "")
 
-    if load_path is not None:
-        game, crypt_id, seed = load_saved_game(
-            repository, view, load_path, in_use
+        if load_path is not None:
+            game, crypt_id, seed = load_saved_game(
+                repository, view, load_path, in_use
+            )
+
+            if game is None:
+                return None
+
+            header_extra = (load_path, file_digest(load_path))
+        else:
+            crypt_id = choose_crypt(repository, view, crypt_id)
+
+            if crypt_id is None:
+                return None
+
+            repository.iniciar_partida(crypt_id)
+            game = build_game(repository, seed, player_name, in_use)
+
+        crypt, crypt_version, catalog_version = repository.versiones_de_la_partida()
+        header = ReplayHeader(
+            crypt, crypt_version, catalog_version, seed, *header_extra
         )
+        log_path = new_log_path(crypt, log_directory)
 
-        if game is None:
-            return None
-    else:
-        crypt_id = choose_crypt(repository, view, crypt_id)
+        view.show_message(
+            f"Partida en {crypt} (version {crypt_version}), semilla {seed}. "
+            f"Bitacora: {log_path}"
+        )
+        view.show_message("Escriba ayuda para ver los comandos.")
 
-        if crypt_id is None:
-            return None
+        with ReplayLogWriter(log_path, header) as log:
+            controller = GameController(game, log, repository)
+            load_path = _command_loop(controller, view)
 
-        repository.iniciar_partida(crypt_id)
-        game = build_game(repository, seed, player_name, in_use)
+        if load_path is None:
+            break
 
-    crypt, crypt_version, catalog_version = repository.versiones_de_la_partida()
-    header = ReplayHeader(crypt, crypt_version, catalog_version, seed)
-    log_path = new_log_path(crypt, log_directory)
-
-    view.show_message(
-        f"Partida en {crypt} (version {crypt_version}), semilla {seed}. "
-        f"Bitacora: {log_path}"
-    )
-    view.show_message("Escriba ayuda para ver los comandos.")
-
-    with ReplayLogWriter(log_path, header) as log:
-        controller = GameController(game, log, repository)
-        _command_loop(controller, view)
+        view.show_message(_ending_text(game))
+        view.show_message(f"Bitacora cerrada: {log_path}. Cargando {load_path}.")
 
     view.show_message(_ending_text(game))
 
@@ -392,14 +413,15 @@ def _command_loop(controller, view):
             continue
 
         if command.name == LOAD:
-            # Cargar a media partida dejaria la bitacora de esta sesion
-            # reproduciendo algo que no paso, y §4.11 prohibe reproducir en
-            # silencio contra datos distintos.
-            view.show_message(
-                "Cargar no se hace en medio de una partida: la bitacora de "
-                "esta sesion quedaria reproduciendo algo que no ocurrio. "
-                f"Salga y use: python main.py --cargar {command.argument}"
-            )
+            # Se revisa el archivo antes de soltar la partida actual: si no
+            # sirve, el jugador sigue donde estaba. play() cierra esta
+            # bitacora y abre otra para la partida cargada.
+            problem = _saved_game_problem(command.argument, controller.repository)
+
+            if problem is None:
+                return command.argument
+
+            view.show_message(f"No se pudo cargar: {problem}")
             show = False
             continue
 
@@ -419,6 +441,38 @@ def _command_loop(controller, view):
 
     if controller.is_over:
         view.show_state(controller.visible_state())
+
+    return None
+
+
+def _saved_game_problem(path, repository):
+    """Por que no se puede cargar path, o None si se puede.
+
+    Lee el archivo completo y, si es de la misma cripta, compara sus versiones
+    con las de la sesion. Si es de otra cripta, sus versiones se comprueban al
+    cargarla, porque para eso hay que iniciar el repositorio con esa cripta.
+    """
+    try:
+        partida = cargar_partida(path)
+    except FileNotFoundError:
+        return f"no existe el archivo {path}."
+    except OSError as error:
+        return f"no se pudo leer {path}: {error}"
+    except (ArchivoDePartidaDanado, PartidaIncompatible) as error:
+        return str(error)
+
+    if not partida.id_cripta:
+        return f"{path} no dice de que cripta es la partida."
+
+    crypt, _, _ = repository.versiones_de_la_partida()
+
+    if partida.id_cripta == crypt:
+        try:
+            comprobar_versiones_vigentes(partida, repository)
+        except PartidaIncompatible as error:
+            return str(error)
+
+    return None
 
 
 def _ending_text(game):
@@ -461,7 +515,17 @@ def replay(repository, log_path, output=print, in_use=None, verbose=True):
         output(str(error))
         return None
 
-    game = build_game(repository, header.seed, in_use=in_use)
+    if header.saved_game:
+        game = _game_from_logged_save(header, output)
+
+        if game is None:
+            return None
+
+        if in_use is not None:
+            in_use.game = game
+    else:
+        game = build_game(repository, header.seed, in_use=in_use)
+
     controller = GameController(game, repository=repository)
 
     output(
@@ -486,3 +550,39 @@ def replay(repository, log_path, output=print, in_use=None, verbose=True):
     output(_ending_text(game))
 
     return game
+
+
+def _game_from_logged_save(header, output):
+    """El estado inicial de un log que empezo cargando un guardado, o None.
+
+    Sin el mismo archivo no hay reproduccion fiel: si falta o su huella no es
+    la de la cabecera, se informa y no se reproduce (§4.11). Las versiones de
+    cripta y catalogo ya se comprobaron con las de la cabecera.
+    """
+    path = header.saved_game
+    cannot = (
+        "No se puede garantizar una reproduccion fiel: el log empieza desde "
+        f"la partida guardada {path}"
+    )
+
+    try:
+        digest = file_digest(path)
+    except OSError:
+        output(f"{cannot}, y ese archivo no esta.")
+        return None
+
+    if digest != header.saved_game_digest:
+        output(f"{cannot}, y ese archivo cambio desde que se jugo.")
+        return None
+
+    try:
+        partida = cargar_partida(path)
+    except (OSError, ArchivoDePartidaDanado, PartidaIncompatible) as error:
+        output(f"{cannot}, y no se pudo leer: {error}")
+        return None
+
+    if partida.id_cripta != header.crypt_id:
+        output(f"{cannot}, que es de otra cripta ({partida.id_cripta}).")
+        return None
+
+    return construir_juego_reversible(partida)

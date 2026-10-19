@@ -17,6 +17,7 @@ from benchmark.bench_almacen_partida import (
     guardar_en_json,
     leer_una_sala_del_json,
     medir,
+    run,
     tamano_solo_con_identificadores,
 )
 
@@ -116,6 +117,21 @@ class PruebasBenchAlmacenPartida(unittest.TestCase):
         crecimiento_json = grande["una_sala_json"] / chica["una_sala_json"]
 
         self.assertLess(crecimiento_binario, crecimiento_json)
+
+    def test_run_entrega_las_mediciones_que_pide_el_bench(self):
+        """--bench (§5.3) tiene que medir guardar y cargar."""
+        mediciones = run()
+        nombres = [medicion.name for medicion in mediciones]
+
+        for operacion in ("Guardar", "Cargar completa", "Recuperar una sala"):
+            with self.subTest(operacion=operacion):
+                self.assertTrue(
+                    any(nombre.startswith(operacion) for nombre in nombres)
+                )
+
+        for medicion in mediciones:
+            if medicion.seconds is not None:
+                self.assertGreater(medicion.seconds, 0)
 
 
 if __name__ == "__main__":

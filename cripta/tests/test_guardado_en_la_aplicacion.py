@@ -16,7 +16,7 @@ import tempfile
 import unittest
 
 from adapters.fuente_offline import FuenteOffline
-from controller.application import InUseIds, play
+from controller.application import InUseIds, play, replay
 from repository.repositorio_cripta import RepositorioCripta
 from view.console_view import ConsoleView
 
@@ -131,16 +131,37 @@ class PruebasGuardadoEnLaAplicacion(unittest.TestCase):
         self.assertIsNotNone(game)
 
     # ------------------------------------------------------------------
-    # El comando cargar, que no se atiende en medio de la partida
+    # El comando cargar en medio de la partida
     # ------------------------------------------------------------------
 
-    def test_cargar_en_medio_de_la_partida_explica_por_que_no(self):
+    def test_cargar_en_medio_de_la_partida_continua_la_guardada(self):
+        guardada, _ = self.jugar(
+            ["esperar", "esperar", f"guardar {self.guardado}", "salir"]
+        )
+
+        cargada, salida = self.jugar(
+            ["esperar", f"cargar {self.guardado}", "salir"]
+        )
+
+        self.assertIn("Partida cargada", salida)
+        self.assertEqual(self.estado(cargada), self.estado(guardada))
+
+    def test_cargar_en_medio_de_la_partida_abre_otra_bitacora(self):
+        """La bitacora de la sesion que se deja queda cerrada y completa."""
+        self.jugar(["esperar", f"guardar {self.guardado}", "salir"])
+        antes = set(os.listdir(self.logs))
+
+        self.jugar(["esperar", f"cargar {self.guardado}", "esperar", "salir"])
+
+        self.assertEqual(len(set(os.listdir(self.logs)) - antes), 2)
+
+    def test_cargar_un_archivo_que_no_existe_no_suelta_la_partida(self):
         _, salida = self.jugar(["esperar", f"cargar {self.guardado}", "salir"])
 
-        self.assertIn("--cargar", salida)
-        self.assertIn("bitacora", salida.lower())
+        self.assertIn("No se pudo cargar", salida)
+        self.assertNotIn("Partida cargada", salida)
 
-    def test_cargar_en_medio_de_la_partida_no_cambia_el_estado(self):
+    def test_cargar_un_archivo_que_no_existe_no_cambia_el_estado(self):
         sin_intentar, _ = self.jugar(["esperar", "esperar", "salir"])
         intentando, _ = self.jugar(
             ["esperar", f"cargar {self.guardado}", "esperar", "salir"]
@@ -218,6 +239,81 @@ class PruebasGuardadoEnLaAplicacion(unittest.TestCase):
         )
 
         self.assertTrue(despues_de_actuar.history.can_undo())
+
+    # ------------------------------------------------------------------
+    # Reproducir la bitacora de una sesion cargada (§4.11)
+    # ------------------------------------------------------------------
+
+    def jugar_y_tomar_la_bitacora(self, lineas, load_path=None):
+        """Juega y devuelve (game, ruta de la bitacora que abrio de ultimo)."""
+        antes = set(os.listdir(self.logs)) if os.path.isdir(self.logs) else set()
+        game, _ = self.jugar(lineas, load_path=load_path)
+        # Por fecha de escritura y no por nombre: en el mismo segundo la
+        # segunda se llama <hora>-2.log, que por nombre va antes que <hora>.log.
+        nuevas = [os.path.join(self.logs, nombre)
+                  for nombre in set(os.listdir(self.logs)) - antes]
+        ultima = nuevas[0]
+
+        for ruta in nuevas:
+            if os.stat(ruta).st_mtime_ns > os.stat(ultima).st_mtime_ns:
+                ultima = ruta
+
+        return game, ultima
+
+    def reproducir(self, ruta):
+        repository, in_use = self.repositorio()
+        salida = []
+        game = replay(repository, ruta, output=salida.append, in_use=in_use)
+        return game, "\n".join(salida)
+
+    def test_la_bitacora_de_una_sesion_cargada_se_reproduce_igual(self):
+        self.jugar(
+            ["esperar", "esperar", "mover N", f"guardar {self.guardado}", "salir"]
+        )
+        jugada, ruta = self.jugar_y_tomar_la_bitacora(
+            ["esperar", "mover S", "salir"], load_path=self.guardado
+        )
+
+        reproducida, _ = self.reproducir(ruta)
+
+        self.assertEqual(self.estado(reproducida), self.estado(jugada))
+
+    def test_la_bitacora_tras_cargar_a_media_partida_se_reproduce_igual(self):
+        self.jugar(["esperar", "mover N", f"guardar {self.guardado}", "salir"])
+        jugada, ruta = self.jugar_y_tomar_la_bitacora(
+            ["esperar", f"cargar {self.guardado}", "esperar", "salir"]
+        )
+
+        with open(ruta, encoding="utf-8") as archivo:
+            self.assertIn("partida_cargada=", archivo.read())
+
+        reproducida, _ = self.reproducir(ruta)
+
+        self.assertEqual(self.estado(reproducida), self.estado(jugada))
+
+    def test_si_el_guardado_cambio_no_se_reproduce(self):
+        self.jugar(["esperar", f"guardar {self.guardado}", "salir"])
+        _, ruta = self.jugar_y_tomar_la_bitacora(
+            ["esperar", "salir"], load_path=self.guardado
+        )
+        self.jugar(["esperar", "esperar", f"guardar {self.guardado}", "salir"])
+
+        game, salida = self.reproducir(ruta)
+
+        self.assertIsNone(game)
+        self.assertIn("No se puede garantizar una reproduccion fiel", salida)
+
+    def test_si_el_guardado_no_esta_no_se_reproduce(self):
+        self.jugar(["esperar", f"guardar {self.guardado}", "salir"])
+        _, ruta = self.jugar_y_tomar_la_bitacora(
+            ["esperar", "salir"], load_path=self.guardado
+        )
+        os.remove(self.guardado)
+
+        game, salida = self.reproducir(ruta)
+
+        self.assertIsNone(game)
+        self.assertIn("no esta", salida)
 
 
 if __name__ == "__main__":
