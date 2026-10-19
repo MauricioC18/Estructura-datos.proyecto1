@@ -20,20 +20,34 @@ cripta/
 │   ├── player.py
 │   ├── enemy.py
 │   ├── room.py
+│   ├── item.py
+│   ├── trap.py
 │   └── effects.py
 ├── structures/
 │   ├── event_queue.py
 │   ├── inventory.py
-│   ├── cache.py
+│   ├── tabla_hash.py
+│   ├── funciones_hash.py
+│   ├── cache_catalogo.py
+│   ├── lista_sin_repetidos.py
+│   ├── grafo_salas.py
 │   ├── history.py
 │   ├── trail.py
 │   ├── circular_log.py
 │   └── sorting.py
 ├── adapters/
-│   ├── data_source.py
-│   ├── http_source.py
-│   ├── offline_source.py
-│   └── persistence.py
+│   ├── fuente_datos.py
+│   ├── fuente_http.py
+│   ├── fuente_offline.py
+│   ├── almacen_fichas.py
+│   └── almacen_cripta.py
+├── repository/
+│   ├── repositorio_cripta.py
+│   ├── gestor_catalogo.py
+│   ├── gestor_contenido.py
+│   └── traductor.py
+├── tools/
+├── datos_offline/
 ├── controller/
 │   └── game_controller.py
 ├── view/
@@ -70,7 +84,7 @@ Contiene las reglas y el estado del juego. No debe depender directamente de soli
 * `player.py`: contiene el comportamiento y los datos específicos del jugador.
 * `enemy.py`: contiene los comportamientos y características de los enemigos.
 * `room.py`: representa las salas, sus conexiones y los elementos que contienen.
-* `effects.py`: representa los efectos temporales y sus reglas.
+* `effects.py`: constantes de los efectos temporales y la clase `ActiveEffect`, que agrupa los eventos que un efecto todavía puede activar. Las reglas las aplica `game.py`, porque dependen de la agenda.
 
 ### Structures
 
@@ -78,7 +92,11 @@ Contiene las estructuras de datos implementadas para resolver los requisitos del
 
 * `event_queue.py`: agenda y administra los eventos del juego.
 * `inventory.py`: administra el inventario y sus operaciones.
-* `cache.py`: administra la caché y su política de desalojo.
+* `tabla_hash.py`: tabla hash propia con encadenamiento. Reemplaza a `dict` en todo el proyecto (§7); cualquier búsqueda por clave debería usarla.
+* `funciones_hash.py`: funciones hash deterministas para la tabla (crc32, y FNV-1a como alternativa medida).
+* `cache_catalogo.py`: caché del catálogo en memoria, con tope `--cache-size` y política LRU.
+* `lista_sin_repetidos.py`: lista en orden de llegada que ignora repetidos.
+* `grafo_salas.py`: grafo de salas como lista de adyacencia y recorrido en anchura (BFS) para la precarga.
 * `history.py`: registra los cambios necesarios para revertir acciones.
 * `trail.py`: administra el rastro del jugador.
 * `circular_log.py`: conserva los últimos 20 mensajes.
@@ -90,12 +108,27 @@ Cada estructura debe respetar las restricciones del enunciado y justificar sus d
 
 Permite obtener y almacenar datos sin acoplar el modelo a una implementación concreta.
 
-* `data_source.py`: define la interfaz común para consultar los datos.
-* `http_source.py`: implementa el acceso a la API.
-* `offline_source.py`: proporciona una fuente alternativa para el funcionamiento sin conexión.
-* `persistence.py`: administra el almacenamiento persistente que le corresponda según los acuerdos del grupo.
+* `fuente_datos.py`: define la interfaz común para consultar los datos (`FuenteDatos`), los errores y la cuenta del presupuesto de solicitudes.
+* `fuente_http.py`: implementa el acceso a la API (`FuenteHttp`).
+* `fuente_offline.py`: proporciona una fuente alternativa para el funcionamiento sin conexión (`FuenteOffline`), con el mismo contrato.
+* `almacen_fichas.py`: guarda en disco las fichas del catálogo, con un índice binario ordenado y validación por versión.
+* `almacen_cripta.py`: guarda en disco el esqueleto y el contenido de cada cripta, validados por versión.
+* `almacen_partida.py`: guarda en disco el estado de una partida (§4.10), con el mismo patrón que `almacen_fichas.py`: firma, versión del formato, bloque por sala e índice ordenado con búsqueda binaria, de modo que una sala se puede recuperar sin leer el archivo completo. Lo tomó la Persona 1 el 18 de octubre, porque el motor ya tenía `Game.load()` resuelto. Está conectado al comando `guardar` de la partida y a la opción `--cargar` de `main.py`; cargar se hace solo al arrancar, para que la bitácora de §4.11 no quede reproduciendo algo que no ocurrió.
 
 El modelo debe utilizar interfaces comunes en lugar de depender directamente de HTTP o de archivos específicos.
+
+### Repository
+
+Une las fuentes, la caché y los almacenes en disco, y ofrece al controlador una sola entrada con nombres del juego. El modelo nunca lo importa.
+
+* `repositorio_cripta.py`: `RepositorioCripta`, el único punto de entrada del bloque 2 para el controlador.
+* `gestor_catalogo.py`: resuelve las fichas buscando en memoria, luego en disco y por último en el API, en lotes de 10.
+* `gestor_contenido.py`: mantiene el contenido de las salas y lo precarga por BFS.
+* `traductor.py`: convierte el JSON del API en objetos del modelo (`Player`, `Enemy`, `RoomMap`, `Room`, `Door`, `Item`, `Trap`). Es el único archivo que conoce los nombres de los campos del API.
+
+### Tools
+
+Herramientas de desarrollo que no forman parte de una partida: descarga de datos para el modo sin conexión, simulación de un recorrido usando solo el bloque 2 y ejecución de todas las verificaciones.
 
 ### Controller
 
@@ -113,7 +146,10 @@ La vista no debe implementar las reglas del juego ni modificar directamente las 
 
 ### Benchmark
 
-* `benchmark.py`: ejecuta las mediciones requeridas para evaluar las estructuras y operaciones del proyecto.
+* `benchmark.py`: ejecutor de la bandera `--bench`. Debe llamar a la función de medición que cada integrante expone para su módulo.
+* `scheduler_bench.py`: mediciones de la agenda de eventos y del ciclo del motor. Expone `run()`, que devuelve una lista de `Measurement` con nombre, segundos y detalle, y se puede correr suelto con `python -m benchmark.scheduler_bench` desde `cripta/`.
+
+`scheduler_bench.py` contiene además `UnsortedEventList`, la alternativa descartada en la sección 4.1 del Documento de Decisiones. Está implementada únicamente para medirla, como exige §8, y el motor no la usa.
 
 ### Main
 
@@ -123,7 +159,7 @@ La vista no debe implementar las reglas del juego ni modificar directamente las 
 
 | Integrante | Responsabilidad principal                                                      |
 | ---------- | ------------------------------------------------------------------------------ |
-| Persona 1  | Motor del juego, agenda de eventos, reloj virtual, actores, combate y enemigos |
+| Persona 1  | Motor del juego, agenda de eventos, reloj virtual, actores, combate, enemigos y guardado binario de la partida (§4.10) |
 | Persona 2  | API, fuentes de datos, precarga, catálogo, caché y persistencia relacionada    |
 | Persona 3  | Inventario, historial reversible, rewind, rastro, bitácora y ordenamientos     |
 | Persona 4  | MVC, interfaz, replay, benchmark e integración                                 |
@@ -147,7 +183,9 @@ La fuente de datos proporciona la información necesaria al modelo mediante una 
 
 El sistema de replay debe poder reproducir acciones sin requerir interacción del usuario. El benchmark debe poder ejecutarse sin depender de la interfaz interactiva.
 
-## 6. Agenda de eventos y reloj virtual
+## 6. Reglas de la agenda e interfaces acordadas entre módulos
+
+Esta sección empieza con las reglas de la agenda y el reloj, y sigue con la interfaz de cada clase que un módulo le ofrece a los demás. Antes de modificar cualquiera de ellas hay que avisarle al grupo.
 
 La agenda de eventos debe seleccionar el siguiente evento según estos criterios:
 
@@ -248,11 +286,21 @@ Acuerdos que esta interfaz impone al resto del modelo:
 
 ### Interfaz de `Game` (implementada en parte)
 
-**Lo que ya funciona:** `wait()`, `attack(enemy_id)`, `visible_state()`, `change_actor_speed(actor, new_speed)` y el bucle de eventos completo, con el combate de §2.6 y el azar reproducible. El resto de los métodos de la tabla siguen pendientes de las salas y del inventario.
+**Lo que ya funciona:** `wait()`, `attack(enemy_id)`, `move(direction)`, `open_door(direction)`, `visible_state()`, `change_actor_speed(actor, new_speed)` y el bucle de eventos completo, con el combate de §2.6, las trampas y el cierre automático de puertas de §2.10, la victoria de §2.12 y el azar reproducible. Faltan las acciones de inventario y el pergamino, que dependen de la Persona 3.
+
+`Game` se construye con `room_map`, `exit_room_id`, `trail`, `history`, `message_log` y `event_queue`, todos opcionales. Para una partida completa se le pasan los seis; sin `history` el motor aplica los cambios sin anotarlos y el retroceso no funciona, y sin `trail` el rastreador espera. Sin `room_map` no hay movimiento: `move()` y `open_door()` se rechazan. `exit_room_id` sale de `DatosDePartida.sala_salida`.
+
+**El controlador carga el contenido antes de mover.** `move()` exige que la sala destino tenga `content_loaded` en verdadero y, si no, rechaza el movimiento sin consumir tiempo. El motor no puede pedirlo él mismo porque §6 le prohíbe conocer HTTP. El orden es: llamar a `RepositorioCripta.cargar_contenido_de_sala()` con la sala destino, agregar los enemigos que devuelve a `Game.enemies`, y recién entonces llamar a `move()`.
+
+**La llave se reconoce por `Item.type_id`**, que es el id de la ficha, y no por el campo `opens`. §2.7 dice que una llave abre las puertas cuya llave coincide con su id, y en los datos reales `opens` nombra la puerta, no la llave. El inventario solo tiene que ser recorrible: el motor itera `player.inventory` buscando un objeto de clase llave con el `type_id` que pide la puerta.
 
 `Game` se construye con un `GameState`, el `Player` y la lista de enemigos, y ya dentro del constructor programa la primera acción del jugador en el instante 0, activa los enemigos de la sala inicial según §2.4 y deja la partida esperando la primera decisión.
 
 `GameState` guarda el estado temporal —reloj, contador de secuencia y generador aleatorio—, que es lo que hay que persistir para reanudar una partida. `Game` guarda los actores, la agenda y el resultado.
+
+**Contadores de la partida.** `Game` expone `player_actions`, `enemies_defeated` y `events_processed`. Los dos primeros son los que §2.12 pide para la tabla de puntajes, junto con el tiempo final del reloj, que está en `state.clock`. `player_actions` solo cuenta las acciones aceptadas, porque el enunciado define "acción del jugador" como una que consume tiempo virtual: una acción rechazada no cuenta y el pergamino de retroceso tampoco.
+
+**La agenda también se puede inyectar.** `Game(state, player, enemies, message_log, event_queue)` acepta una `EventQueue` desde fuera, igual que la bitácora. Se usa en las mediciones, con una subclase que lleva contadores, para no instrumentar la estructura de producción. Si no se pasa ninguna, `Game` crea la suya.
 
 
 `model/game.py` es el único punto por el que el controlador habla con el modelo. La vista nunca toca las estructuras internas.
@@ -276,11 +324,35 @@ Acuerdos que esta interfaz impone al resto del modelo:
 
 `rewind()` no consume tiempo virtual y no cuenta como acción del jugador (§2.11).
 
+**Los once métodos están implementados.** Si el jugador todavía no tiene inventario asignado, los siete que lo necesitan devuelven un `ActionResult` rechazado que lo dice, en lugar de reventar.
+
+**Cargar una partida: `Game.load()`.** El constructor normal hace el trabajo de inicio de §2.4 (programa la primera acción, activa enemigos, corre el ciclo). Al cargar nada de eso debe pasar, así que existe `Game.load()`, que recibe los mismos objetos más `events`, `effects`, `torch_lit`, `result`, `player_actions` y `enemies_defeated`. Deja además apuntando a cada actor su acción pendiente. Si no se le pasan los efectos, los deduce de la agenda, de modo que el archivo de guardado no necesita guardarlos.
+
+`rewind()` es la única acción que funciona con la partida terminada: §2.11 no pone esa condición y el resultado se restaura como cualquier otro cambio, así que un jugador muerto puede volver.
+
+**La partida terminada rechaza todo.** `Game.is_over` es `True` cuando el resultado ya no es "en curso". Toda acción pública lo revisa como primera línea, antes de validar cualquier otra cosa, y devuelve un `ActionResult` rechazado sin tocar nada. Las acciones que falten deben seguir el mismo patrón.
+
 **Resultado de una acción.** Toda acción devuelve un `ActionResult` con `accepted` y `message`. Una acción rechazada no consume tiempo virtual, no modifica el estado y no consulta el generador aleatorio. Los casos de rechazo están en el Apéndice B del enunciado: recoger con el inventario lleno, abrir una puerta sin la llave correcta, moverse hacia una salida que no existe o está cerrada, atacar a un enemigo que no está en la sala.
 
 **Estado visible.** `visible_state()` devuelve una vista de solo lectura con lo que §10.2 exige mostrar: sala actual, salidas y su estado, enemigos con su id de instancia, objetos del suelo, estadísticas del jugador, efectos activos, resultado de la partida y los últimos 20 mensajes.
 
 Se devuelve como una clase `@dataclass`, no como un `dict`. No es que un `dict` de presentación incumpla §7, que prohíbe usarlo como índice o tabla de búsqueda, pero una clase con campos nombrados evita tener que explicarlo en la defensa y sigue el estilo de los ejemplos del curso.
+
+**Efectos temporales.** `Game` los aplica y los administra; `model/effects.py` solo aporta las constantes y la clase `ActiveEffect`, que guarda los eventos que un efecto todavía puede activar para poder cancelarlos todos de una vez.
+
+| Método | Qué hace |
+| --- | --- |
+| `apply_poison(target, damage)` | programa los cinco pulsos del veneno (§2.10) |
+| `cancel_poison(target)` | efecto del antídoto: impide las activaciones futuras |
+| `apply_regeneration(target, amount)` | cura cada 200 unidades mientras el actor viva |
+| `apply_speed_change(actor, new_speed, duration)` | cambio temporal, con reajuste al comenzar y al terminar |
+| `light_torch(duration)` | enciende la antorcha y programa su apagado |
+
+La regeneración se aplica sola a los enemigos que la declaren, al activarse. Las trampas y el cierre automático de puertas quedan pendientes de las salas.
+
+**La bitácora de mensajes se recibe desde fuera.** `Game(state, player, enemies, message_log=None)` acepta cualquier estructura que tenga `append(message)` y se pueda recorrer. Si no se le pasa ninguna usa una `list`, que es provisional porque no cumple el límite de memoria de §4.8.
+
+Ese es el contrato que debe satisfacer `structures/circular_log.py`: con esos dos métodos entra sin modificar una línea de `Game`. La prueba `test_any_structure_with_append_works` ya verifica el acoplamiento con una estructura de capacidad limitada.
 
 **Estado visible, campos actuales.** `VisibleState` trae por ahora `clock`, `result`, `player_name`, `health`, `max_health`, `attack`, `defense`, `speed`, `room_id`, `enemies` y `messages`. Cada enemigo se entrega como un `EnemyView` con `actor_id`, `name`, `health` y `max_health`, y solo aparecen los que están vivos en la sala del jugador. Faltan las salidas, los objetos del suelo y los efectos activos, que dependen de las salas y del inventario.
 
@@ -292,7 +364,11 @@ Ambas heredan de `Actor`.
 
 `Player` agrega `equipped_weapon`, `equipped_armor` e `inventory`, y sobrescribe `effective_attack` y `effective_defense` sumando los bonos del equipo (§2.7). El arma y la armadura se tratan por duck typing: basta con que el objeto tenga `attack_bonus` o `defense_bonus`, así que el catálogo puede entregar lo que quiera mientras respete esos nombres. `inventory` se asigna desde fuera, para que la estructura de inventario encaje sin modificar `Player`.
 
-`Enemy` agrega `behavior`, `drops`, `regeneration` e `is_active`, y expone `decide_action(player)`, que devuelve `Enemy.ATTACK` o `Enemy.WAIT` según §2.8. Compartir sala con el jugador tiene prioridad sobre el comportamiento. El guardián está completo; el errante y el rastreador esperan hasta que existan las salas y el rastro.
+`Enemy` agrega `behavior`, `drops`, `regeneration` e `is_active`, y expone `decide_action(player, room, random_generator)`, que devuelve el par `(acción, salida)` según §2.8. La acción es `Enemy.ATTACK`, `Enemy.WAIT` o `Enemy.MOVE`, y la salida solo viene con `MOVE`. Compartir sala con el jugador tiene prioridad sobre el comportamiento.
+
+El enemigo decide pero no ejecuta: quien cambia su `room_id` y programa su siguiente acción es el motor. El guardián y el errante están completos; el rastreador espera el rastro del jugador, que le corresponde a la Persona 3.
+
+Los objetos de `drops` pasan al `floor_items` de la sala donde el enemigo muere (§2.6), cosa que hace el motor.
 
 Los valores de `behavior` son los que entrega el catálogo. El enunciado solo confirma `"rastreador"` en su ejemplo, así que los nombres del guardián y del errante deben verificarse contra el servicio real antes de confiar en ellos.
 
@@ -307,6 +383,60 @@ Los valores de `behavior` son los que entrega el catálogo. El enunciado solo co
 | ¿Cómo se despachan los comandos sin `dict`? | Con `if`/`elif` | Es la opción que no hay que justificar en la defensa |
 
 **Importante: cargar una partida guardada es un caso distinto del retroceso.** Para continuar exactamente donde se quedó, el archivo de guardado sí debe conservar y restaurar el contador de secuencia y el estado del generador aleatorio, además de los eventos pendientes de la agenda. Que el retroceso no los necesite no significa que el guardado tampoco.
+
+### Interfaz de `RepositorioCripta` (implementada)
+
+Es el único punto de entrada del bloque 2 para el controlador. Une la fuente de datos (red o sin conexión), la precarga, el catálogo, la caché y las copias en disco. La guía completa, con un ejemplo de uso, el contrato de datos y los supuestos, está en `docs/BLOQUE_2_PARA_EL_GRUPO.md`.
+
+`RepositorioCripta(fuente, carpeta_cache, capacidad_cache, consultar_ids_en_uso)` recibe una `FuenteHttp` o una `FuenteOffline` según `--offline`, la carpeta de la caché en disco y el valor de `--cache-size`.
+
+| Método | Devuelve | Comportamiento |
+| --- | --- | --- |
+| `empezar_conteo_de_partida()` | — | reinicia la cuenta de solicitudes; se llama antes de listar las criptas, porque la lista también cuenta (§5.1) |
+| `listar_criptas()` | `list` | criptas publicadas, para que el jugador elija |
+| `iniciar_partida(id_cripta, versiones_requeridas=None)` | `DatosDePartida` | carga lo necesario y deja lista la sala inicial (§2.4) |
+| `crear_jugador(nombre)` | `Player` | con las estadísticas de la cripta, en la sala inicial |
+| `crear_mapa()` | `RoomMap` | todas las salas con sus salidas y puertas compartidas, sin contenido |
+| `cargar_contenido_de_sala(sala)` | `list` de `Enemy` | llama a `preparar_entrada_a_sala` y llena la `Room` con sus objetos y trampas; devuelve sus enemigos dormidos, o `[]` si ya estaba cargada |
+| `ids_en_uso(enemigos, objetos, trampas)` | `TablaHash` | ids de tipo en uso, para armar `consultar_ids_en_uso` |
+| `preparar_entrada_a_sala(id_sala)` | entrada de contenido | se llama **antes** de confirmar que el jugador entra (§2.5); deja listas las fichas de todo lo que hay en la sala, incluidas las de lo que sueltan sus enemigos |
+| `despues_de_accion(id_sala_actual)` | — | precarga contenido y fichas alrededor del jugador; nunca falla por presupuesto |
+| `asegurar_fichas(ids)` | — | para fichas que aparezcan durante la partida; lo que suelta un enemigo ya queda listo al entrar a su sala |
+| `obtener_ficha(id)`, `contenido_de_sala(id)`, `sala_del_esqueleto(id)`, `vecinos_de_sala(id)` | datos del API | nunca usan la red |
+| `versiones_de_la_partida()` | tupla | `(id_cripta, version_cripta, version_catalogo)` para la cabecera del log de reproducción (§4.11) |
+| `reporte_de_red()` | `ReporteDeRed` | solicitudes, presupuesto, aciertos y fallos de caché (§5.1); `lineas_de_texto()` lo deja listo para mostrar |
+
+Acuerdos que esta interfaz impone al resto del proyecto:
+
+* El controlador es el único que usa `RepositorioCripta`. El modelo recibe objetos ya construidos y nunca ve HTTP, archivos ni la caché.
+* `consultar_ids_en_uso` es una función sin argumentos que el controlador arma con datos del modelo, llamando a `ids_en_uso(...)`. Devuelve una `TablaHash` con los ids de tipo en uso: enemigos vivos, objetos del inventario y objetos y trampas de la sala actual. La caché no libera esas fichas (§4.4).
+* Si `cargar_contenido_de_sala()` lanza `PresupuestoAgotado`, el movimiento se rechaza sin consumir tiempo virtual, igual que las demás acciones imposibles del Apéndice B. La sala queda sin cargar, como antes del intento.
+* En la reproducción, `iniciar_partida()` recibe las versiones de la cabecera del log. Si la fuente tiene otras, lanza `VersionesIncompatibles` antes de cargar nada.
+* El controlador recibe objetos del modelo, no JSON. Solo `repository/traductor.py` conoce los nombres de los campos del API; si el API cambia, solo cambia ese archivo.
+* Cada benchmark del bloque 2 expone `run()`, que devuelve `Measurement` con los mismos campos que `benchmark/scheduler_bench.py`. En la precarga, que cuenta solicitudes y no mide tiempo, `seconds` es `None`.
+
+### Interfaces de `Room`, `Door`, `Exit`, `RoomMap`, `Item` y `Trap` (implementadas)
+
+Las crea el traductor del bloque 2 a partir de los datos del API. Como `Event`, solo guardan estado: las reglas (abrir una puerta, recoger, activar una trampa) las aplica `Game`.
+
+| Clase | Archivo | Campos y métodos |
+| --- | --- | --- |
+| `Room` | `model/room.py` | `room_id`, `name`, `floor_items`, `traps`, `content_loaded`; `exit_towards(direccion)`, `exits()` en orden N, S, E, O |
+| `Exit` | `model/room.py` | `direction`, `destination`, `door` |
+| `Door` | `model/room.py` | `room_a`, `room_b`, `closed`, `key_id`, `auto_close`; `is_open`, `connects(sala)`, `other_side(sala)` |
+| `RoomMap` | `model/room.py` | `room(id)`, `contains(id)`, `room_ids()`, `len()`; busca con `TablaHash` |
+| `Item` | `model/item.py` | `instance_id`, `type_id`, `name`, `item_class`, `weight`, `value`, `attack_bonus`, `defense_bonus`, `heal`, `speed_modifier`, `duration`, `opens` |
+| `Trap` | `model/trap.py` | `instance_id`, `type_id`, `name`, `damage`, `rearm_interval`, `room_id`, `armed` |
+
+Acuerdos que estas clases imponen al resto del modelo:
+
+* Cada paso entre dos salas tiene una sola `Door`, compartida por las dos salidas. Abrirla o cerrarla desde un lado se ve desde el otro (§2.1). Sin salida de vuelta, el paso es de un solo sentido.
+* Las salidas se guardan en una lista fija de cuatro posiciones, una por dirección, y no en un `dict`.
+* `Room` no guarda enemigos. `Game` los sigue llevando en su lista plana con `room_id`, porque se mueven entre salas. `cargar_contenido_de_sala()` los entrega dormidos y `Game` los activa al entrar el jugador (§2.4).
+* `Enemy.drops` trae los `Item` ya creados. Cuando un enemigo muere, basta con pasarlos a `floor_items` de su sala (§2.6); no hace falta la red.
+* El traductor convierte el comportamiento del API (`"guardián"`, con tilde) a las constantes de `Enemy`, de modo que el modelo nunca compara contra textos del API.
+* `Item` es plana, por la misma razón que `Event`: el guardado binario (§4.10) la puede empaquetar sin un formato por clase. `attack_bonus` y `defense_bonus` son los nombres que `Player` ya usa para el equipo.
+* Los ids de instancia de los objetos son deterministas: `o-<sala>-<posición>` en el suelo y `<instancia del enemigo>-s<posición>` para lo que suelta un enemigo. Así una reproducción da los mismos ids.
 
 ## 7. Reglas de implementación
 

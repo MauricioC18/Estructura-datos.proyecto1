@@ -1,0 +1,36 @@
+Guardado binario de la partida (problema 4.10)
+Python 3.14.6 en Windows AMD64
+
+Midiendo cripta chica: 6 salas, 6 enemigos...
+Midiendo cripta mediana: 40 salas, 50 enemigos...
+Midiendo cripta grande: 200 salas, 300 enemigos...
+
+Frecuencia de las operaciones por guardado
+escenario                      salas           salidas           trampas           objetos          enemigos           eventos  marcas de rastro
+cripta chica                       6                10                 6                23                 6                 2                 1
+cripta mediana                    40                78                40               118                50                 4                 1
+cripta grande                    200               398               200               608               300                 4                 1
+
+Tamaño en disco
+escenario              binario        JSON   JSON/binario
+cripta chica            9.2 KB     17.2 KB          1.87x
+cripta mediana         29.4 KB     65.1 KB          2.21x
+cripta grande         133.7 KB    310.2 KB          2.32x
+
+Tiempo de cargar la partida completa
+escenario              binario        JSON   JSON/binario
+cripta chica          0.417 ms    0.220 ms          0.53x
+cripta mediana        1.281 ms    0.687 ms          0.54x
+cripta grande         6.336 ms    3.613 ms          0.57x
+
+Tiempo de recuperar UNA sala (lo que pide §4.10)
+escenario              binario        JSON   JSON/binario
+cripta chica          0.139 ms    0.147 ms          1.06x
+cripta mediana        0.138 ms    0.394 ms          2.86x
+cripta grande         0.157 ms    1.887 ms         12.02x
+
+Alternativa descartada: guardar solo los identificadores
+escenario             completo    solo ids      ahorro
+cripta chica            9.2 KB      6.6 KB       28.1%
+cripta mediana         29.4 KB     14.5 KB       50.9%
+cripta grande         133.7 KB     52.9 KB       60.5%
