@@ -1,0 +1,172 @@
+Python 3.13.16 en Linux x86_64, vm, 2026-10-18
+Mediana de 3 corridas
+
+Bitacora: buffer circular                        1.696e-07 s  [1.696e-07 s, 1.754e-07 s, 1.676e-07 s]  100,000 mensajes, se conservan 20, s por mensaje
+Bitacora: list + pop(0) [descartada]             5.745e-08 s  [5.745e-08 s, 5.752e-08 s, 5.595e-08 s]  100,000 mensajes, se conservan 20, s por mensaje
+Soltar: lista doble                              2.060e-07 s  [2.130e-07 s, 2.030e-07 s, 2.060e-07 s]  n=10, posicion inicio
+Soltar: list.pop(i) [descartada]                 8.500e-08 s  [8.500e-08 s, 8.200e-08 s, 8.600e-08 s]  n=10, posicion inicio
+Soltar: lista doble                              2.090e-07 s  [2.010e-07 s, 2.100e-07 s, 2.090e-07 s]  n=10, posicion medio
+Soltar: list.pop(i) [descartada]                 8.600e-08 s  [8.400e-08 s, 8.600e-08 s, 8.600e-08 s]  n=10, posicion medio
+Soltar: lista doble                              2.140e-07 s  [2.140e-07 s, 1.970e-07 s, 2.180e-07 s]  n=10, posicion final
+Soltar: list.pop(i) [descartada]                 8.200e-08 s  [8.300e-08 s, 8.000e-08 s, 8.200e-08 s]  n=10, posicion final
+Soltar: lista doble                              2.230e-07 s  [2.180e-07 s, 2.230e-07 s, 2.260e-07 s]  n=100, posicion inicio
+Soltar: list.pop(i) [descartada]                 9.500e-08 s  [9.500e-08 s, 9.600e-08 s, 9.200e-08 s]  n=100, posicion inicio
+Soltar: lista doble                              2.160e-07 s  [2.130e-07 s, 2.160e-07 s, 2.210e-07 s]  n=100, posicion medio
+Soltar: list.pop(i) [descartada]                 9.000e-08 s  [8.900e-08 s, 9.000e-08 s, 9.000e-08 s]  n=100, posicion medio
+Soltar: lista doble                              2.180e-07 s  [2.160e-07 s, 2.180e-07 s, 2.210e-07 s]  n=100, posicion final
+Soltar: list.pop(i) [descartada]                 8.200e-08 s  [8.200e-08 s, 8.200e-08 s, 8.400e-08 s]  n=100, posicion final
+Soltar: lista doble                              3.130e-07 s  [3.130e-07 s, 3.300e-07 s, 2.640e-07 s]  n=1000, posicion inicio
+Soltar: list.pop(i) [descartada]                 2.630e-07 s  [2.650e-07 s, 2.630e-07 s, 2.580e-07 s]  n=1000, posicion inicio
+Soltar: lista doble                              2.910e-07 s  [2.630e-07 s, 2.910e-07 s, 4.750e-07 s]  n=1000, posicion medio
+Soltar: list.pop(i) [descartada]                 2.110e-07 s  [2.030e-07 s, 2.110e-07 s, 2.840e-07 s]  n=1000, posicion medio
+Soltar: lista doble                              2.910e-07 s  [2.830e-07 s, 4.750e-07 s, 2.910e-07 s]  n=1000, posicion final
+Soltar: list.pop(i) [descartada]                 1.080e-07 s  [1.080e-07 s, 2.480e-07 s, 1.040e-07 s]  n=1000, posicion final
+Soltar: lista doble                              8.450e-07 s  [8.450e-07 s, 8.140e-07 s, 8.540e-07 s]  n=10000, posicion inicio
+Soltar: list.pop(i) [descartada]                 1.904e-06 s  [1.904e-06 s, 1.925e-06 s, 1.886e-06 s]  n=10000, posicion inicio
+Soltar: lista doble                              8.480e-07 s  [7.760e-07 s, 8.610e-07 s, 8.480e-07 s]  n=10000, posicion medio
+Soltar: list.pop(i) [descartada]                 1.221e-06 s  [1.150e-06 s, 1.258e-06 s, 1.221e-06 s]  n=10000, posicion medio
+Soltar: lista doble                              8.240e-07 s  [8.240e-07 s, 8.690e-07 s, 7.980e-07 s]  n=10000, posicion final
+Soltar: list.pop(i) [descartada]                 3.850e-07 s  [3.850e-07 s, 3.890e-07 s, 3.690e-07 s]  n=10000, posicion final
+Inventario: avanzar el cursor                    1.221e-07 s  [1.233e-07 s, 1.217e-07 s, 1.221e-07 s]  50 objetos, s por paso
+Inventario: vista ordenada                       8.142e-05 s  [8.126e-05 s, 8.175e-05 s, 8.142e-05 s]  50 objetos, s por vista
+Ordenamiento: insercion                          1.531e-06 s  [1.531e-06 s, 1.998e-06 s, 1.412e-06 s]  aleatorio, n=4, 3 comparaciones
+Ordenamiento: mezcla                             2.589e-06 s  [2.577e-06 s, 3.925e-06 s, 2.589e-06 s]  aleatorio, n=4, 4 comparaciones
+Ordenamiento: automatico                         1.307e-06 s  [1.108e-06 s, 1.730e-06 s, 1.307e-06 s]  aleatorio, n=4, 3 comparaciones, uso insercion
+Ordenamiento: insercion                          3.552e-06 s  [3.451e-06 s, 4.856e-06 s, 3.552e-06 s]  aleatorio, n=8, 17 comparaciones
+Ordenamiento: mezcla                             6.717e-06 s  [6.717e-06 s, 6.783e-06 s, 6.451e-06 s]  aleatorio, n=8, 16 comparaciones
+Ordenamiento: automatico                         3.318e-06 s  [3.318e-06 s, 3.167e-06 s, 3.429e-06 s]  aleatorio, n=8, 17 comparaciones, uso insercion
+Ordenamiento: insercion                          7.275e-06 s  [6.603e-06 s, 7.275e-06 s, 7.346e-06 s]  aleatorio, n=16, 42 comparaciones
+Ordenamiento: mezcla                             1.504e-05 s  [1.504e-05 s, 1.525e-05 s, 1.498e-05 s]  aleatorio, n=16, 45 comparaciones
+Ordenamiento: automatico                         7.286e-06 s  [7.199e-06 s, 7.286e-06 s, 7.353e-06 s]  aleatorio, n=16, 42 comparaciones, uso insercion
+Ordenamiento: insercion                          2.994e-05 s  [3.098e-05 s, 2.994e-05 s, 2.978e-05 s]  aleatorio, n=32, 236 comparaciones
+Ordenamiento: mezcla                             3.419e-05 s  [3.507e-05 s, 3.419e-05 s, 3.365e-05 s]  aleatorio, n=32, 121 comparaciones
+Ordenamiento: automatico                         3.070e-05 s  [3.100e-05 s, 3.064e-05 s, 3.070e-05 s]  aleatorio, n=32, 236 comparaciones, uso insercion
+Ordenamiento: insercion                          1.544e-04 s  [1.520e-04 s, 1.587e-04 s, 1.544e-04 s]  aleatorio, n=64, 1232 comparaciones
+Ordenamiento: mezcla                             7.943e-05 s  [7.943e-05 s, 9.673e-05 s, 7.873e-05 s]  aleatorio, n=64, 312 comparaciones
+Ordenamiento: automatico                         8.597e-05 s  [8.472e-05 s, 8.893e-05 s, 8.597e-05 s]  aleatorio, n=64, 375 comparaciones, uso mezcla
+Ordenamiento: insercion                          5.545e-04 s  [5.428e-04 s, 5.647e-04 s, 5.545e-04 s]  aleatorio, n=128, 4534 comparaciones
+Ordenamiento: mezcla                             1.742e-04 s  [1.742e-04 s, 1.730e-04 s, 1.771e-04 s]  aleatorio, n=128, 732 comparaciones
+Ordenamiento: automatico                         1.892e-04 s  [2.017e-04 s, 1.884e-04 s, 1.892e-04 s]  aleatorio, n=128, 859 comparaciones, uso mezcla
+Ordenamiento: insercion                          1.940e-03 s  [1.940e-03 s, 2.041e-03 s, 1.940e-03 s]  aleatorio, n=256, 16330 comparaciones
+Ordenamiento: mezcla                             3.980e-04 s  [4.030e-04 s, 3.980e-04 s, 3.853e-04 s]  aleatorio, n=256, 1727 comparaciones
+Ordenamiento: automatico                         4.294e-04 s  [4.294e-04 s, 4.357e-04 s, 4.243e-04 s]  aleatorio, n=256, 1982 comparaciones, uso mezcla
+Ordenamiento: insercion                          3.880e-02 s  [3.866e-02 s, 3.880e-02 s, 3.937e-02 s]  aleatorio, n=1024, 269862 comparaciones
+Ordenamiento: mezcla                             2.355e-03 s  [2.389e-03 s, 2.355e-03 s, 2.278e-03 s]  aleatorio, n=1024, 8981 comparaciones
+Ordenamiento: automatico                         2.442e-03 s  [2.442e-03 s, 2.509e-03 s, 2.424e-03 s]  aleatorio, n=1024, 10004 comparaciones, uso mezcla
+Ordenamiento: mezcla                             1.131e-02 s  [1.646e-02 s, 1.131e-02 s, 1.104e-02 s]  aleatorio, n=4096, 44026 comparaciones
+Ordenamiento: automatico                         1.165e-02 s  [1.615e-02 s, 1.165e-02 s, 1.127e-02 s]  aleatorio, n=4096, 48121 comparaciones, uso mezcla
+Ordenamiento: insercion                          1.874e-06 s  [2.794e-06 s, 1.874e-06 s, 1.738e-06 s]  casi ordenado, n=4, 6 comparaciones
+Ordenamiento: mezcla                             2.974e-06 s  [4.702e-06 s, 2.974e-06 s, 2.945e-06 s]  casi ordenado, n=4, 5 comparaciones
+Ordenamiento: automatico                         1.749e-06 s  [2.400e-06 s, 1.628e-06 s, 1.749e-06 s]  casi ordenado, n=4, 6 comparaciones, uso insercion
+Ordenamiento: insercion                          3.626e-06 s  [4.764e-06 s, 3.626e-06 s, 3.250e-06 s]  casi ordenado, n=8, 16 comparaciones
+Ordenamiento: mezcla                             8.196e-06 s  [8.514e-06 s, 8.196e-06 s, 6.533e-06 s]  casi ordenado, n=8, 16 comparaciones
+Ordenamiento: automatico                         3.583e-06 s  [4.668e-06 s, 3.583e-06 s, 3.186e-06 s]  casi ordenado, n=8, 16 comparaciones, uso insercion
+Ordenamiento: insercion                          4.327e-06 s  [6.467e-06 s, 4.124e-06 s, 4.327e-06 s]  casi ordenado, n=16, 22 comparaciones
+Ordenamiento: mezcla                             1.424e-05 s  [2.175e-05 s, 1.381e-05 s, 1.424e-05 s]  casi ordenado, n=16, 36 comparaciones
+Ordenamiento: automatico                         4.563e-06 s  [7.467e-06 s, 4.170e-06 s, 4.563e-06 s]  casi ordenado, n=16, 22 comparaciones, uso insercion
+Ordenamiento: insercion                          1.031e-05 s  [1.524e-05 s, 9.833e-06 s, 1.031e-05 s]  casi ordenado, n=32, 64 comparaciones
+Ordenamiento: mezcla                             3.208e-05 s  [4.885e-05 s, 3.208e-05 s, 3.116e-05 s]  casi ordenado, n=32, 96 comparaciones
+Ordenamiento: automatico                         1.061e-05 s  [1.621e-05 s, 1.036e-05 s, 1.061e-05 s]  casi ordenado, n=32, 64 comparaciones, uso insercion
+Ordenamiento: insercion                          2.714e-05 s  [2.829e-05 s, 2.714e-05 s, 2.027e-05 s]  casi ordenado, n=64, 134 comparaciones
+Ordenamiento: mezcla                             6.814e-05 s  [1.016e-04 s, 6.814e-05 s, 6.812e-05 s]  casi ordenado, n=64, 229 comparaciones
+Ordenamiento: automatico                         2.763e-05 s  [4.035e-05 s, 2.750e-05 s, 2.763e-05 s]  casi ordenado, n=64, 197 comparaciones, uso insercion
+Ordenamiento: insercion                          3.873e-05 s  [5.530e-05 s, 3.873e-05 s, 3.578e-05 s]  casi ordenado, n=128, 250 comparaciones
+Ordenamiento: mezcla                             1.492e-04 s  [2.243e-04 s, 1.492e-04 s, 1.454e-04 s]  casi ordenado, n=128, 507 comparaciones
+Ordenamiento: automatico                         5.053e-05 s  [7.533e-05 s, 4.912e-05 s, 5.053e-05 s]  casi ordenado, n=128, 377 comparaciones, uso insercion
+Ordenamiento: insercion                          8.037e-05 s  [1.211e-04 s, 8.037e-05 s, 7.762e-05 s]  casi ordenado, n=256, 541 comparaciones
+Ordenamiento: mezcla                             3.278e-04 s  [5.104e-04 s, 3.278e-04 s, 3.210e-04 s]  casi ordenado, n=256, 1164 comparaciones
+Ordenamiento: automatico                         1.147e-04 s  [1.640e-04 s, 1.147e-04 s, 1.022e-04 s]  casi ordenado, n=256, 796 comparaciones, uso insercion
+Ordenamiento: insercion                          9.553e-04 s  [1.520e-03 s, 9.553e-04 s, 9.353e-04 s]  casi ordenado, n=1024, 6211 comparaciones
+Ordenamiento: mezcla                             1.864e-03 s  [2.904e-03 s, 1.821e-03 s, 1.864e-03 s]  casi ordenado, n=1024, 6375 comparaciones
+Ordenamiento: automatico                         1.063e-03 s  [1.649e-03 s, 1.063e-03 s, 1.041e-03 s]  casi ordenado, n=1024, 7234 comparaciones, uso insercion
+Ordenamiento: insercion                          1.503e-02 s  [1.531e-02 s, 1.503e-02 s, 1.467e-02 s]  casi ordenado, n=4096, 104637 comparaciones
+Ordenamiento: mezcla                             9.395e-03 s  [9.395e-03 s, 9.681e-03 s, 9.124e-03 s]  casi ordenado, n=4096, 34520 comparaciones
+Ordenamiento: automatico                         1.737e-02 s  [1.743e-02 s, 1.737e-02 s, 1.678e-02 s]  casi ordenado, n=4096, 87184 comparaciones, uso insercion, luego mezcla
+Ordenamiento: insercion                          2.015e-06 s  [2.531e-06 s, 2.015e-06 s, 1.756e-06 s]  invertido, n=4, 6 comparaciones
+Ordenamiento: mezcla                             2.898e-06 s  [2.898e-06 s, 3.997e-06 s, 2.506e-06 s]  invertido, n=4, 4 comparaciones
+Ordenamiento: automatico                         1.917e-06 s  [1.917e-06 s, 2.298e-06 s, 1.647e-06 s]  invertido, n=4, 6 comparaciones, uso insercion
+Ordenamiento: insercion                          4.892e-06 s  [4.892e-06 s, 6.180e-06 s, 4.792e-06 s]  invertido, n=8, 28 comparaciones
+Ordenamiento: mezcla                             5.967e-06 s  [5.867e-06 s, 7.010e-06 s, 5.967e-06 s]  invertido, n=8, 12 comparaciones
+Ordenamiento: automatico                         5.677e-06 s  [5.677e-06 s, 6.216e-06 s, 5.409e-06 s]  invertido, n=8, 28 comparaciones, uso insercion
+Ordenamiento: insercion                          1.637e-05 s  [2.148e-05 s, 1.624e-05 s, 1.637e-05 s]  invertido, n=16, 120 comparaciones
+Ordenamiento: mezcla                             1.309e-05 s  [1.417e-05 s, 1.309e-05 s, 1.305e-05 s]  invertido, n=16, 32 comparaciones
+Ordenamiento: automatico                         1.794e-05 s  [1.794e-05 s, 2.001e-05 s, 1.550e-05 s]  invertido, n=16, 120 comparaciones, uso insercion
+Ordenamiento: insercion                          6.226e-05 s  [6.877e-05 s, 6.226e-05 s, 6.128e-05 s]  invertido, n=32, 496 comparaciones
+Ordenamiento: mezcla                             3.018e-05 s  [3.428e-05 s, 3.018e-05 s, 2.892e-05 s]  invertido, n=32, 80 comparaciones
+Ordenamiento: automatico                         6.071e-05 s  [6.815e-05 s, 6.071e-05 s, 6.071e-05 s]  invertido, n=32, 496 comparaciones, uso insercion
+Ordenamiento: insercion                          2.636e-04 s  [2.636e-04 s, 2.449e-04 s, 2.645e-04 s]  invertido, n=64, 2016 comparaciones
+Ordenamiento: mezcla                             6.494e-05 s  [7.434e-05 s, 6.468e-05 s, 6.494e-05 s]  invertido, n=64, 192 comparaciones
+Ordenamiento: automatico                         7.464e-05 s  [7.697e-05 s, 7.464e-05 s, 7.269e-05 s]  invertido, n=64, 255 comparaciones, uso mezcla
+Ordenamiento: insercion                          1.045e-03 s  [1.097e-03 s, 1.045e-03 s, 9.702e-04 s]  invertido, n=128, 8128 comparaciones
+Ordenamiento: mezcla                             1.519e-04 s  [1.519e-04 s, 1.558e-04 s, 1.433e-04 s]  invertido, n=128, 448 comparaciones
+Ordenamiento: automatico                         1.547e-04 s  [1.824e-04 s, 1.547e-04 s, 1.527e-04 s]  invertido, n=128, 575 comparaciones, uso mezcla
+Ordenamiento: insercion                          4.035e-03 s  [4.156e-03 s, 4.035e-03 s, 3.841e-03 s]  invertido, n=256, 32640 comparaciones
+Ordenamiento: mezcla                             3.272e-04 s  [3.272e-04 s, 3.138e-04 s, 3.362e-04 s]  invertido, n=256, 1024 comparaciones
+Ordenamiento: automatico                         3.465e-04 s  [3.388e-04 s, 3.490e-04 s, 3.465e-04 s]  invertido, n=256, 1279 comparaciones, uso mezcla
+Ordenamiento: insercion                          7.721e-02 s  [7.721e-02 s, 7.804e-02 s, 6.800e-02 s]  invertido, n=1024, 523776 comparaciones
+Ordenamiento: mezcla                             1.730e-03 s  [1.724e-03 s, 1.730e-03 s, 1.748e-03 s]  invertido, n=1024, 5120 comparaciones
+Ordenamiento: automatico                         1.909e-03 s  [1.909e-03 s, 1.928e-03 s, 1.882e-03 s]  invertido, n=1024, 6143 comparaciones, uso mezcla
+Ordenamiento: mezcla                             8.612e-03 s  [8.616e-03 s, 8.612e-03 s, 8.338e-03 s]  invertido, n=4096, 24576 comparaciones
+Ordenamiento: automatico                         9.169e-03 s  [9.169e-03 s, 9.306e-03 s, 8.839e-03 s]  invertido, n=4096, 28671 comparaciones, uso mezcla
+Ordenamiento: insercion                          1.583e-06 s  [1.501e-06 s, 1.769e-06 s, 1.583e-06 s]  rotado, n=4, 6 comparaciones
+Ordenamiento: mezcla                             2.627e-06 s  [2.512e-06 s, 2.674e-06 s, 2.627e-06 s]  rotado, n=4, 4 comparaciones
+Ordenamiento: automatico                         1.615e-06 s  [1.419e-06 s, 1.615e-06 s, 1.782e-06 s]  rotado, n=4, 6 comparaciones, uso insercion
+Ordenamiento: insercion                          3.802e-06 s  [3.802e-06 s, 3.658e-06 s, 3.819e-06 s]  rotado, n=8, 22 comparaciones
+Ordenamiento: mezcla                             5.683e-06 s  [5.683e-06 s, 5.815e-06 s, 5.515e-06 s]  rotado, n=8, 12 comparaciones
+Ordenamiento: automatico                         4.102e-06 s  [3.867e-06 s, 4.102e-06 s, 4.354e-06 s]  rotado, n=8, 22 comparaciones, uso insercion
+Ordenamiento: insercion                          1.099e-05 s  [1.134e-05 s, 1.058e-05 s, 1.099e-05 s]  rotado, n=16, 78 comparaciones
+Ordenamiento: mezcla                             1.305e-05 s  [1.291e-05 s, 1.305e-05 s, 1.322e-05 s]  rotado, n=16, 32 comparaciones
+Ordenamiento: automatico                         1.068e-05 s  [1.106e-05 s, 1.055e-05 s, 1.068e-05 s]  rotado, n=16, 78 comparaciones, uso insercion
+Ordenamiento: insercion                          3.467e-05 s  [3.557e-05 s, 3.467e-05 s, 3.441e-05 s]  rotado, n=32, 286 comparaciones
+Ordenamiento: mezcla                             2.931e-05 s  [3.995e-05 s, 2.915e-05 s, 2.931e-05 s]  rotado, n=32, 80 comparaciones
+Ordenamiento: automatico                         3.447e-05 s  [4.494e-05 s, 3.447e-05 s, 3.447e-05 s]  rotado, n=32, 286 comparaciones, uso insercion
+Ordenamiento: insercion                          1.343e-04 s  [1.345e-04 s, 1.343e-04 s, 1.328e-04 s]  rotado, n=64, 1086 comparaciones
+Ordenamiento: mezcla                             6.420e-05 s  [6.675e-05 s, 6.420e-05 s, 6.415e-05 s]  rotado, n=64, 192 comparaciones
+Ordenamiento: automatico                         1.354e-04 s  [1.354e-04 s, 1.407e-04 s, 1.320e-04 s]  rotado, n=64, 801 comparaciones, uso insercion, luego mezcla
+Ordenamiento: insercion                          5.171e-04 s  [5.171e-04 s, 5.299e-04 s, 5.155e-04 s]  rotado, n=128, 4222 comparaciones
+Ordenamiento: mezcla                             1.434e-04 s  [1.444e-04 s, 1.434e-04 s, 1.404e-04 s]  rotado, n=128, 448 comparaciones
+Ordenamiento: automatico                         3.049e-04 s  [3.049e-04 s, 3.070e-04 s, 2.972e-04 s]  rotado, n=128, 1830 comparaciones, uso insercion, luego mezcla
+Ordenamiento: insercion                          1.961e-03 s  [1.953e-03 s, 2.054e-03 s, 1.961e-03 s]  rotado, n=256, 16638 comparaciones
+Ordenamiento: mezcla                             3.119e-04 s  [3.119e-04 s, 3.349e-04 s, 3.074e-04 s]  rotado, n=256, 1024 comparaciones
+Ordenamiento: automatico                         6.638e-04 s  [6.638e-04 s, 6.648e-04 s, 6.455e-04 s]  rotado, n=256, 4043 comparaciones, uso insercion, luego mezcla
+Ordenamiento: insercion                          3.817e-02 s  [3.817e-02 s, 4.483e-02 s, 3.601e-02 s]  rotado, n=1024, 263166 comparaciones
+Ordenamiento: mezcla                             1.708e-03 s  [1.708e-03 s, 2.511e-03 s, 1.695e-03 s]  rotado, n=1024, 5120 comparaciones
+Ordenamiento: automatico                         3.506e-03 s  [3.506e-03 s, 5.260e-03 s, 3.456e-03 s]  rotado, n=1024, 19341 comparaciones, uso insercion, luego mezcla
+Ordenamiento: mezcla                             8.293e-03 s  [8.293e-03 s, 8.913e-03 s, 8.158e-03 s]  rotado, n=4096, 24576 comparaciones
+Ordenamiento: automatico                         1.688e-02 s  [1.688e-02 s, 1.724e-02 s, 1.659e-02 s]  rotado, n=4096, 89927 comparaciones, uso insercion, luego mezcla
+Ordenamiento: insercion                          1.973e-06 s  [1.973e-06 s, 1.879e-06 s, 2.199e-06 s]  cadenas largas, n=4, 6 comparaciones
+Ordenamiento: mezcla                             2.780e-06 s  [2.795e-06 s, 2.778e-06 s, 2.780e-06 s]  cadenas largas, n=4, 4 comparaciones
+Ordenamiento: automatico                         1.982e-06 s  [1.924e-06 s, 1.982e-06 s, 2.029e-06 s]  cadenas largas, n=4, 6 comparaciones, uso insercion
+Ordenamiento: insercion                          3.393e-06 s  [3.502e-06 s, 3.278e-06 s, 3.393e-06 s]  cadenas largas, n=8, 14 comparaciones
+Ordenamiento: mezcla                             6.898e-06 s  [6.774e-06 s, 7.567e-06 s, 6.898e-06 s]  cadenas largas, n=8, 15 comparaciones
+Ordenamiento: automatico                         3.485e-06 s  [3.368e-06 s, 3.612e-06 s, 3.485e-06 s]  cadenas largas, n=8, 14 comparaciones, uso insercion
+Ordenamiento: insercion                          9.908e-06 s  [9.801e-06 s, 9.908e-06 s, 9.953e-06 s]  cadenas largas, n=16, 58 comparaciones
+Ordenamiento: mezcla                             1.569e-05 s  [1.657e-05 s, 1.557e-05 s, 1.569e-05 s]  cadenas largas, n=16, 45 comparaciones
+Ordenamiento: automatico                         1.020e-05 s  [1.019e-05 s, 1.020e-05 s, 1.021e-05 s]  cadenas largas, n=16, 58 comparaciones, uso insercion
+Ordenamiento: insercion                          2.918e-05 s  [2.918e-05 s, 2.858e-05 s, 2.922e-05 s]  cadenas largas, n=32, 199 comparaciones
+Ordenamiento: mezcla                             3.663e-05 s  [3.629e-05 s, 3.663e-05 s, 3.672e-05 s]  cadenas largas, n=32, 121 comparaciones
+Ordenamiento: automatico                         2.868e-05 s  [2.845e-05 s, 2.868e-05 s, 2.939e-05 s]  cadenas largas, n=32, 199 comparaciones, uso insercion
+Ordenamiento: insercion                          1.474e-04 s  [1.545e-04 s, 1.461e-04 s, 1.474e-04 s]  cadenas largas, n=64, 1077 comparaciones
+Ordenamiento: mezcla                             8.623e-05 s  [8.662e-05 s, 8.623e-05 s, 8.338e-05 s]  cadenas largas, n=64, 302 comparaciones
+Ordenamiento: automatico                         9.176e-05 s  [9.176e-05 s, 9.253e-05 s, 9.100e-05 s]  cadenas largas, n=64, 365 comparaciones, uso mezcla
+Ordenamiento: insercion                          5.259e-04 s  [5.311e-04 s, 5.259e-04 s, 5.203e-04 s]  cadenas largas, n=128, 3644 comparaciones
+Ordenamiento: mezcla                             1.969e-04 s  [1.928e-04 s, 1.969e-04 s, 1.999e-04 s]  cadenas largas, n=128, 738 comparaciones
+Ordenamiento: automatico                         2.117e-04 s  [2.117e-04 s, 2.126e-04 s, 2.079e-04 s]  cadenas largas, n=128, 865 comparaciones, uso mezcla
+Ordenamiento: insercion                          2.280e-03 s  [2.280e-03 s, 2.316e-03 s, 2.186e-03 s]  cadenas largas, n=256, 16224 comparaciones
+Ordenamiento: mezcla                             4.424e-04 s  [4.408e-04 s, 4.438e-04 s, 4.424e-04 s]  cadenas largas, n=256, 1727 comparaciones
+Ordenamiento: automatico                         4.998e-04 s  [4.998e-04 s, 5.014e-04 s, 4.675e-04 s]  cadenas largas, n=256, 1982 comparaciones, uso mezcla
+Ordenamiento: insercion                          3.968e-02 s  [4.103e-02 s, 3.968e-02 s, 3.899e-02 s]  cadenas largas, n=1024, 259395 comparaciones
+Ordenamiento: mezcla                             2.391e-03 s  [2.391e-03 s, 2.400e-03 s, 2.349e-03 s]  cadenas largas, n=1024, 8929 comparaciones
+Ordenamiento: automatico                         2.529e-03 s  [2.622e-03 s, 2.529e-03 s, 2.491e-03 s]  cadenas largas, n=1024, 9952 comparaciones, uso mezcla
+Ordenamiento: mezcla                             1.187e-02 s  [1.267e-02 s, 1.187e-02 s, 1.161e-02 s]  cadenas largas, n=4096, 43980 comparaciones
+Ordenamiento: automatico                         1.257e-02 s  [1.277e-02 s, 1.257e-02 s, 1.242e-02 s]  cadenas largas, n=4096, 48075 comparaciones, uso mezcla
+Rastro: decision de rastreadores                 7.020e-07 s  [7.430e-07 s, 7.020e-07 s, 6.780e-07 s]  1 rastreadores, s por decision
+Rastro: decision de rastreadores                 1.156e-06 s  [1.156e-06 s, 1.160e-06 s, 1.120e-06 s]  10 rastreadores, s por decision
+Rastro: decision de rastreadores                 1.145e-06 s  [1.197e-06 s, 1.145e-06 s, 1.144e-06 s]  100 rastreadores, s por decision
+Rastro: decision de rastreadores                 1.182e-06 s  [1.163e-06 s, 1.329e-06 s, 1.182e-06 s]  1000 rastreadores, s por decision
+Historial: 5 acciones, anotar y deshacer         3.104e-06 s  [3.399e-06 s, 3.104e-06 s, 3.032e-06 s]  1 cambios por accion, s por accion
+Historial: 5 acciones, anotar y deshacer         6.452e-06 s  [6.549e-06 s, 6.452e-06 s, 6.337e-06 s]  10 cambios por accion, s por accion
+Historial: 5 acciones, anotar y deshacer         3.704e-05 s  [3.722e-05 s, 3.704e-05 s, 3.679e-05 s]  100 cambios por accion, s por accion
+Historial: 5 acciones, anotar y deshacer         3.812e-04 s  [3.789e-04 s, 3.812e-04 s, 3.828e-04 s]  1000 cambios por accion, s por accion
+Agenda: EventQueue                               8.335e-02 s  [8.335e-02 s, 8.334e-02 s, 9.263e-02 s]  300 eventos, 20,000 extracciones
+Agenda: ReversibleEventQueue                     1.154e-01 s  [1.245e-01 s, 1.154e-01 s, 1.154e-01 s]  300 eventos, 20,000 extracciones, anotando cada cambio
