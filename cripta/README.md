@@ -8,7 +8,7 @@ El enunciado oficial está en `docs/proyecto_cripta.md` y es la referencia para 
 
 ## Estado actual
 
-El juego se puede jugar completo desde la consola, contra el API o sin conexión, y cada partida queda registrada para reproducirla. Lo que falta todavía es el guardado binario de la partida (§4.10): los comandos `guardar` y `cargar` existen, pero por ahora responden que no están disponibles.
+El juego se puede jugar completo desde la consola, contra el API o sin conexión. Cada partida queda registrada para reproducirla con `--replay`, y se puede guardar en un archivo binario propio (§4.10) para continuarla después con `--cargar`.
 
 | Parte | Módulos |
 | --- | --- |
@@ -45,6 +45,7 @@ Desde la carpeta `cripta/`:
 | --- | --- |
 | `python main.py` | Juega contra el API. Pregunta el nombre y la cripta |
 | `python main.py --offline` | Juega sin red, con el paquete de `datos_offline/`. Con `--offline CARPETA` usa otro paquete |
+| `python main.py --cargar ARCHIVO` | Continúa una partida guardada con el comando `guardar` |
 | `python main.py --replay partidas/ARCHIVO.log` | Reproduce una partida completa, sin interacción y sin la vista interactiva (§4.11). Funciona también con `--offline` |
 | `python main.py --bench` | Corre las mediciones de todos los subsistemas (§5.3). Tarda alrededor de un minuto |
 | `python main.py --puntajes [CRIPTA]` | Muestra la tabla de puntajes, de todas las criptas o de una |
@@ -72,7 +73,8 @@ Comandos dentro de la partida (con `ayuda` se ven en pantalla):
 | `sig`, `ant` | Ver el objeto siguiente o el anterior del inventario |
 | `ver [peso\|valor\|nombre]` | Mostrar el inventario, en su orden real u ordenado |
 | `retroceder` | Usar un pergamino de retroceso |
-| `guardar <archivo>`, `cargar <archivo>` | Guardar y cargar la partida (pendiente) |
+| `guardar <archivo>` | Guardar la partida en el archivo binario indicado |
+| `cargar <archivo>` | Solo al arrancar: `python main.py --cargar <archivo>`. Dentro de la partida indica ese comando |
 | `salir` | Terminar la sesión |
 
 Al terminar una partida el programa muestra el resultado, la registra en la tabla de puntajes si se ganó o se perdió, y muestra el reporte de red: solicitudes realizadas, presupuesto de la cripta, aciertos y fallos de caché (§5.1).
@@ -88,7 +90,7 @@ También desde la carpeta `cripta/`:
 | `python -m tools.simular_partida_bloque2` | Recorre una cripta usando solo el bloque 2 y muestra el reporte de solicitudes. Con `--offline datos_offline` no usa la red; con `--borrar-cache` fuerza un arranque en frío |
 | `python -m tools.descargar_datos_offline` | Descarga las criptas publicadas del API a `datos_offline/` |
 | `python -m tools.ejecutar_verificaciones` | Corre todas las pruebas y los benchmarks del bloque 2 y guarda la salida en `resultados_verificacion.txt` |
-| `python -m benchmark.bench_tabla_hash` | Mide un subsistema suelto (también `bench_cache_catalogo`, `bench_almacen_fichas`, `bench_precarga_contenido`, `scheduler_bench` y `persona3_bench`) |
+| `python -m benchmark.bench_tabla_hash` | Mide un subsistema suelto (también `bench_cache_catalogo`, `bench_almacen_fichas`, `bench_precarga_contenido`, `scheduler_bench` `persona3_bench` y `bench_almacen_partida`) |
 
 ## Organización del proyecto
 
@@ -107,8 +109,7 @@ Todos se crean dentro de la carpeta desde la que se ejecuta el programa (normalm
 | `partidas/` | Una bitácora de reproducción por partida, `<cripta>-<fecha>-<hora>.log`. La cabecera tiene la cripta, sus versiones y la semilla; después va una acción aceptada por línea |
 | `puntajes.txt` | Tabla de puntajes local (§2.12): una línea por partida terminada |
 | `cache_cripta/` | Caché persistente: fichas del catálogo (`catalogo/`) y esqueleto y contenido de cada cripta (`criptas/`). Se puede borrar sin problema; el programa la vuelve a llenar |
+| `<archivo>` de `guardar` | Partida guardada en formato binario propio (§4.10), en la ruta que se indique |
 | `resultados_verificacion.txt` | Salida de `tools.ejecutar_verificaciones` |
 
 La carpeta `datos_offline/` sí está en el repositorio: tiene `cripta-01` descargada del API real, para desarrollar y probar sin red. El código del programa nunca depende de su contenido, porque la revisión usa una cripta no publicada (§9).
-
-Pendiente: el archivo de guardado binario de la partida, cuando exista.
