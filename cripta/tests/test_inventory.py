@@ -83,6 +83,16 @@ class TestInventoryBasics(unittest.TestCase):
         inventory.drop_current()
         self.assertTrue(inventory.pick_up(make_item("b")))
 
+    def test_restore_copies_a_saved_inventory_without_the_rules(self):
+        """Lo usa la carga de partidas: no aplica el tope y no anota nada."""
+        inventory = Inventory(1)
+        inventory.restore(make_item("a"))
+        inventory.restore(make_scroll())
+
+        self.assertEqual(len(inventory), 2)
+        self.assertEqual(inventory.scroll_count(), 1)
+        self.assertFalse(inventory.pick_up(make_item("c")))
+
     def test_forward_and_backward(self):
         inventory = filled(5, "a", "b", "c")
         self.assertEqual(inventory.current().name, "a")

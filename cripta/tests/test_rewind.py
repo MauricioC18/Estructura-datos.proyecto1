@@ -356,5 +356,38 @@ class TestTheScrollItself(unittest.TestCase):
         self.assertTrue(game.player.is_alive)
 
 
+class TestTheInventoryNeverGoesOverTheMaximum(unittest.TestCase):
+    """El caso que §4.6 de DECISIONES.md dejaba abierto: soltar, recoger un
+    pergamino y retroceder hasta antes de soltar. Cada retroceso devuelve a lo
+    sumo un objeto y consume un pergamino, asi que el total no pasa del tope."""
+
+    def test_dropping_then_picking_up_a_scroll_and_rewinding_twice(self):
+        daggers = [
+            make_item("arma", "Daga", "itm_daga", f"i-daga-{number}")
+            for number in range(8)
+        ]
+        game, _ = build_game(
+            floor=[scroll("i-pergamino-suelo")], scrolls=2, items=daggers
+        )
+        inventory = game.player.inventory
+
+        self.assertTrue(inventory.is_full())
+
+        game.drop()
+        game.pick_up(0)
+        sizes = [len(inventory)]
+
+        for _ in range(2):
+            self.assertTrue(game.rewind().accepted)
+            sizes.append(len(inventory))
+
+        self.assertEqual(sizes, [10, 9, 9])
+        self.assertEqual(inventory.scroll_count(), 1)
+        self.assertEqual(
+            [item.instance_id for item in inventory if item.type_id == "itm_daga"],
+            [item.instance_id for item in daggers],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

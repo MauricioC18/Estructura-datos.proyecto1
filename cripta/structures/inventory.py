@@ -274,6 +274,22 @@ class Inventory:
 
         return True
 
+    def restore(self, item):
+        """Agrega al final sin mirar la capacidad y sin anotar en el historial.
+
+        Solo para reconstruir un inventario guardado. Cargar copia el estado
+        tal como estaba, no vuelve a aplicar las reglas del juego: si lo hiciera
+        con pick_up(), un objeto que no cupiera se perderia sin ningun aviso.
+        Tampoco se anota: armar el estado cargado no es una accion del jugador
+        que se pueda deshacer.
+        """
+        node = _Node(item)
+        self._items.append(node)
+        self._cursor = node
+
+        if is_rewind_scroll(item):
+            self._scrolls += 1
+
     def drop_current(self, player=None):
         """Quita el objeto que se esta viendo y lo devuelve, o None si no hay.
 
