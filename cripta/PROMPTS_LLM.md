@@ -8,45 +8,47 @@ Varios de los prompts de la sección 3 se dictaron por voz, de modo que aparecen
 
 Cuando un prompt consistió en pegar un documento completo, se describe el documento en lugar de copiarlo, para que este archivo siga siendo legible. Esos documentos están en el repositorio o disponibles si se solicitan.
 
+Del arranque del proyecto, el 2026-10-08, se conservan los cuatro prompts que aparecen en la sección 1. No se conserva el texto de otras consultas de esos primeros días, hechas con ChatGPT antes de que el registro se llevara de forma sistemática; se deja dicho acá en vez de reconstruirlas de memoria. A partir de la sección 2 el registro es completo.
+
 ---
 
-## 1. Preparación y arquitectura
+## 1. Preparación, arquitectura y arranque del repositorio
 
 Herramienta: ChatGPT
 
 Fecha: 2026-10-08
 
-Objetivo: Organizar la estructura inicial del proyecto CRIPTA, definir las responsabilidades de los módulos y establecer una distribución inicial del trabajo.
+Objetivo: Organizar la estructura inicial del proyecto CRIPTA, decidir qué archivos crear para que los cuatro integrantes pudieran empezar en paralelo, y redactar el documento inicial de arquitectura.
 
-Prompts utilizados:
+Prompts utilizados, en orden:
 
-- [Pegar aquí el prompt original utilizado.]
+```text
+Ocupo hacer un proyecto sobre programación en Python. Es sobre hacer un juego el cual tengo que conectar a una API y hacer ciertas cosas que me pide el profe específicamente en un documento. El documento ya casi te lo paso. Ocupo que me des la estructura y todas las instrucciones necesarias para que la IA me dé estructuradamente y siga correctamente las peticiones del archivo que te voy a pasar.
+```
 
-Uso en el proyecto: Se utilizó la respuesta como apoyo para preparar la estructura de carpetas y el documento inicial de arquitectura.
+```text
+Ya repartimos el trabajo. A mí me tocó la parte uno, pero ahora quiero como saltarme esta parte de la reunión. Me toca hacerlo a mí porque soy el que está como más dedicado al trabajo. Por más de que sea más trabajo para mí, prefiero hacerlo así para que se haya hecho. Me ayudaría saber qué pasos hacer para empezarlo y que todos tengamos una base mínima para poder empezar el trabajo ya, cada uno enfocándose en su parte.
+```
 
-Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
+```text
+Entonces hago una trama base y una main y implemento esas carpetas y la división de cada uno, pero la cosa es eso. En la estructura que me mandaste veo muchos archivos. Hay archivos que yo de momento no tocaré, ya que la mayoría no son míos. ¿Qué debería tocar? ¿Qué archivos debería crear? ¿Debería crearlos y ponerles un, no sé, un comentario de esto es de tal persona o algo así? La cosa es que después ellos no worry, porque el profe puso que comentarios no a menos que sean necesarios. No sé qué me recomiendas y trata de explicarme un poquito más conciso lo que es, qué tengo que hacer y qué me recomiendas hacer.
+```
 
-## 2. Diseño de la agenda de eventos
+```text
+Ya creé las carpetas y los archivos que me dijiste, como actor.py, game_state.py, game.py, event_queue.py y los demás. El main también lo agregué. ¿Me podrías pasar el texto para meterlo en arquitectura.markdown y después de ahí seguir para ver qué código y cómo debería empezar a hacerlo?
+```
 
-Herramienta: ChatGPT
+Uso en el proyecto: Se utilizó la respuesta para armar la estructura de carpetas del repositorio, decidir qué archivos crear de entrada y redactar la primera versión de `docs/ARQUITECTURA.md`, que es el documento donde quedaron escritas las interfaces entre los módulos de los cuatro integrantes.
 
-Fecha: [Fecha de la interacción]
+Cambios realizados por el estudiante: La decisión de fondo fue no esperar a una reunión para arrancar. En lugar de eso se dejó montada la estructura del repositorio con las carpetas de los cuatro módulos, para que cada integrante pudiera empezar por su parte sin depender de los demás; las carpetas que todavía no tenían código se conservaron en el repositorio con un archivo vacío, porque Git no guarda carpetas vacías. Se descartó la sugerencia de marcar cada archivo con un comentario indicando de quién era, porque el enunciado pide no poner comentarios salvo cuando sean necesarios; en su lugar el reparto quedó escrito una sola vez en la tabla de responsables de `docs/ARQUITECTURA.md`. También se decidió que las interfaces entre módulos se acordaran por escrito en ese documento antes de implementarlas, que es lo que después permitió que el motor se probara sin la API, sin la vista y sin las estructuras de los otros integrantes.
 
-Objetivo: Comprender y diseñar la agenda de eventos del motor del juego, comparando estructuras posibles antes de implementarla.
-
-Prompts utilizados:
-
-- [Pegar aquí el prompt original utilizado.]
-
-Uso en el proyecto: [Describir cómo se aprovechó la respuesta.]
-
-Cambios realizados por el estudiante: [Indicar las decisiones, modificaciones y pruebas realizadas.]
-
-## 3. Implementación del motor (Persona 1)
+## 2. Implementación del motor (Persona 1)
 
 Todas las entradas de esta sección corresponden a la misma herramienta: **Claude Opus, mediante Claude Code en VS Code**, con acceso a los archivos del repositorio.
 
-### 3.1 Contexto del proyecto e implementación de la agenda de eventos
+### 2.1 Contexto del proyecto e implementación de la agenda de eventos
+
+Herramienta: Claude
 
 Fecha: 2026-10-08
 
@@ -58,9 +60,11 @@ Prompts utilizados:
 
 Uso en el proyecto: La herramienta revisó los archivos del repositorio y confirmó que los seis archivos `.py` existentes estaban vacíos, que no existía la carpeta `tests/` ni `docs/DECISIONES.md`, y que por lo tanto nada de lo propuesto previamente estaba implementado ni probado. A partir de ahí se implementaron `model/event.py` y `structures/event_queue.py`, se creó `tests/test_event_queue.py` con 10 pruebas y se redactó la sección 4.1 de `docs/DECISIONES.md`.
 
-Cambios realizados por el estudiante: [Indicar qué se revisó y qué se aceptó.] Se aceptaron tres correcciones al diseño previo, planteadas tras consultar el enunciado: los identificadores de instancia pasaron de entero a texto, porque el servicio los entrega en ese formato según §3.3; `is_empty()` pasó a descartar las raíces canceladas, porque antes podía informar que la agenda no estaba vacía cuando ya no quedaba ningún evento ejecutable; y se señaló que los ids de instancia en texto dejan ambiguo el orden de activación de §2.4.
+Cambios realizados por el estudiante: Se aceptaron tres correcciones al diseño previo, planteadas tras consultar el enunciado: los identificadores de instancia pasaron de entero a texto, porque el servicio los entrega en ese formato según §3.3; `is_empty()` pasó a descartar las raíces canceladas, porque antes podía informar que la agenda no estaba vacía cuando ya no quedaba ningún evento ejecutable; y se señaló que los ids de instancia en texto dejan ambiguo el orden de activación de §2.4.
 
-### 3.2 Estilo de los comentarios en el código
+### 2.2 Estilo de los comentarios en el código
+
+Herramienta: Claude
 
 Fecha: 2026-10-08
 
@@ -74,7 +78,9 @@ Uso en el proyecto: Se rechazó una primera versión de `structures/event_queue.
 
 Cambios realizados por el estudiante: Decisión propia del estudiante, aplicada al resto del proyecto.
 
-### 3.3 Reglas obligatorias de trabajo
+### 2.3 Reglas obligatorias de trabajo
+
+Herramienta: Claude
 
 Fecha: 2026-10-08
 
@@ -88,9 +94,11 @@ Prompts utilizados:
 
 Uso en el proyecto: Las reglas se aplicaron al resto del desarrollo. La aclaración sobre los identificadores llevó a revisar el enunciado y a concluir que §2 solo exige que el programa sea reproducible consigo mismo, no que coincida con el de otros grupos, de modo que la comparación lexicográfica del identificador completo es suficiente y además no depende del formato de ids de una cripta concreta, que §9 prohíbe asumir.
 
-Cambios realizados por el estudiante: [Indicar qué reglas se ajustaron después de aplicarlas.]
+Cambios realizados por el estudiante: Se fijaron las reglas antes de escribir codigo y se respondieron las dudas que la herramienta planteo sobre ellas. La decision de fondo que salio de ahi es que nunca se modifica el tiempo de un evento que ya esta en la agenda: se cancela y se vuelve a programar con un numero de secuencia nuevo, porque cambiarlo adentro romperia el invariante del monticulo sin lanzar ninguna excepcion. Las reglas se aplicaron despues a todo el modulo y no hubo que ajustarlas.
 
-### 3.4 Reloj virtual y contador de secuencia
+### 2.4 Reloj virtual y contador de secuencia
+
+Herramienta: Claude
 
 Fecha: 2026-10-08
 
@@ -104,9 +112,11 @@ Prompts utilizados:
 
 Uso en el proyecto: De este intercambio salieron tres decisiones que están documentadas en `docs/DECISIONES.md`. Primera, que el contador de secuencia **no** necesita restaurarse al retroceder, porque ese número solo se usa para comparar eventos entre sí y los eventos restaurados son todos menores que el valor del contador en ese instante, de modo que el orden resultante es idéntico se restaure o no. Segunda, que el reloj **sí** debe restaurarse, porque su valor se usa en aritmética, en la comparación de antigüedad del rastro y en la tabla de puntajes. Tercera, que `rewind_clock_to()` no calcula el instante de destino sino que lo recibe del historial reversible, lo que impone un requisito a la Persona 3. Se implementó `model/game_state.py` con el reloj de solo lectura y 14 pruebas.
 
-Cambios realizados por el estudiante: [Indicar qué se verificó y qué se aceptó.] En la segunda intervención el estudiante propuso no modificar el reloj y llevar solo un contador lineal; al contrastarlo contra §2.11 y §4.6 del enunciado se comprobó que el reloj sí debe restaurarse, y se separaron los dos conceptos.
+Cambios realizados por el estudiante: En la segunda intervención el estudiante propuso no modificar el reloj y llevar solo un contador lineal; al contrastarlo contra §2.11 y §4.6 del enunciado se comprobó que el reloj sí debe restaurarse, y se separaron los dos conceptos.
 
-### 3.5 Control de versiones
+### 2.5 Control de versiones
+
+Herramienta: Claude
 
 Fecha: 2026-10-08
 
@@ -121,7 +131,9 @@ Uso en el proyecto: Se configuró la identidad del repositorio con el nombre y e
 
 Cambios realizados por el estudiante: Decisión propia sobre el nombre de la rama y la identidad de los commits.
 
-### 3.6 Revisión de los ejemplos del curso
+### 2.6 Revisión de los ejemplos del curso
+
+Herramienta: Claude
 
 Fecha: 2026-10-12
 
@@ -136,7 +148,9 @@ Uso en el proyecto: Se comprobó que el único montículo del curso es la funci�
 
 Cambios realizados por el estudiante: Decisión propia de no incorporar el análisis al Documento de Decisiones y de mantener el material del curso fuera del repositorio.
 
-### 3.7 Plan de trabajo sin depender del resto del grupo
+### 2.7 Plan de trabajo sin depender del resto del grupo
+
+Herramienta: Claude
 
 Fecha: 2026-10-13
 
@@ -150,7 +164,9 @@ Uso en el proyecto: Se produjo un plan por pasos. Se decidió no crear `model/ro
 
 Cambios realizados por el estudiante: Decisión propia de no definir `Room` ni el rastro, para no invadir el trabajo de los compañeros.
 
-### 3.8 Cambios solicitados por la Persona 4
+### 2.8 Cambios solicitados por la Persona 4
+
+Herramienta: Claude
 
 Fecha: 2026-10-14
 
@@ -163,9 +179,11 @@ Prompts utilizados:
 
 Uso en el proyecto: Se verificó en el repositorio que la coma final reportada no existía. Se agregaron `GameState.restore()`, `GameState.random_state()`, `EventQueue.active_events()` y los campos `amount`, `room_id`, `direction` e `instance_id` a `Event`. Se cambió `Event` para que guarde la referencia al objeto `Actor` en lugar de su identificador, porque buscarlo costaría O(n) por evento y §7 prohíbe usar `dict` como índice. Se dejó documentado en `docs/ARQUITECTURA.md` el contrato de `Game` con el controlador y la diferencia entre cargar una partida y retroceder, que en el grupo se estaba confundiendo.
 
-Cambios realizados por el estudiante: [Indicar qué se comunicó a la Persona 4 y qué se acordó.]
+Cambios realizados por el estudiante: Se decidio atender primero lo que pedia la Persona 4, aunque no estuviera en el plan propio de ese dia, para no dejarla bloqueada. De ahi salieron el contrato publico de `Game` que el controlador necesitaba y la preparacion del modelo para guardar y cargar: `GameState.restore()` y `EventQueue.active_events()`. Se le comunico que `restore()` es para cargar una partida y no para el pergamino de retroceso, porque son dos casos distintos, y que el guardado debe persistir reloj, contador de secuencia y estado del generador junto con los eventos activos.
 
-### 3.9 Bucle del motor, actores y enemigos
+### 2.9 Bucle del motor, actores y enemigos
+
+Herramienta: Claude
 
 Fecha: 2026-10-14
 
@@ -178,9 +196,11 @@ Prompts utilizados:
 
 Uso en el proyecto: Se implementaron `model/actor.py`, `model/player.py`, `model/enemy.py` y `model/game.py`, con el bucle de eventos, el combate de §2.6, la activación de enemigos de §2.4 y el descarte de eventos de actores muertos. Se verificaron los tiempos contra el ejemplo de §2.13 del enunciado. Durante la escritura de las pruebas se detectó un error: un actor conservaba la referencia a un evento ya ejecutado, de modo que un cambio de velocidad en ese momento lo habría dejado con dos acciones pendientes sin producir ninguna excepción.
 
-Cambios realizados por el estudiante: [Indicar qué se revisó del bucle y del combate.]
+Cambios realizados por el estudiante: Se reviso que el bucle se detuviera exactamente en la decision del jugador, de modo que una llamada a una accion fuera el ciclo completo que mide la seccion 5.2 sin instrumentar nada. Del combate se verifico la formula de la seccion 2.6 con el generador propio del estado, el minimo de un punto de dano, y que un actor muerto no ejecute sus eventos futuros. Se dejo el descarte de esos eventos antes de mover el reloj, porque un evento que no se ejecuta no debe adelantar el tiempo.
 
-### 3.10 Efectos temporales y mediciones de rendimiento
+### 2.10 Efectos temporales y mediciones de rendimiento
+
+Herramienta: Claude
 
 Fecha: 2026-10-14
 
@@ -192,9 +212,11 @@ Prompts utilizados:
 
 Uso en el proyecto: Se implementaron el veneno, la regeneración, el cambio de velocidad y la antorcha, más el antídoto. Se decidió que el veneno programe sus cinco activaciones de una vez, porque su duración e intervalo son constantes, lo que evita tener objetos de efecto con estado y vuelve trivial la cancelación. `Game` pasó a recibir la bitácora de mensajes desde fuera, de modo que la bitácora circular de la Persona 3 encaje sin modificar el motor. Se escribió `benchmark/scheduler_bench.py`, que mide el montículo contra una lista sin ordenar y el ciclo completo de eventos, y con esos números se completaron los dos apartados de evidencia empírica que estaban pendientes en `docs/DECISIONES.md`.
 
-Cambios realizados por el estudiante: [Indicar qué se revisó de los efectos y de las mediciones.]
+Cambios realizados por el estudiante: Se reviso que el veneno programara sus cinco pulsos de una vez, lo que vuelve trivial al antidoto: cancelar eventos que ya estan identificados. La regeneracion se dejo encadenada, un pulso programa el siguiente, porque no tiene duracion conocida. El cambio de velocidad se dejo del lado del motor y no del efecto, para no crear una dependencia circular entre los dos modulos. De las mediciones se acepto comparar el monticulo contra una lista sin ordenar, que es la alternativa que la seccion 8 pide medir directamente.
 
-### 3.11 Redacción del Documento de Decisiones
+### 2.11 Redacción del Documento de Decisiones
+
+Herramienta: Claude
 
 Fecha: 2026-10-14
 
@@ -207,9 +229,11 @@ Prompts utilizados:
 
 Uso en el proyecto: Se reescribió `docs/DECISIONES.md` conservando íntegros el contenido técnico, las complejidades y todas las mediciones, y cambiando únicamente la redacción. Se produjo además una guía de estudio personal, que por decisión del estudiante no se sube al repositorio y está incluida en el `.gitignore`. Se completó esta sección del registro de prompts.
 
-Cambios realizados por el estudiante: [Indicar qué partes del Documento de Decisiones se reescribieron con palabras propias.]
+Cambios realizados por el estudiante: Se pidio reescribir el documento con lenguaje mas llano pero sin volverlo predecible, y se reviso que cada seccion explicara el porque y no solo el que. Ademas se decidio que la guia de estudio personal no se sube al repositorio en ningun momento, igual que el paquete de ejemplos del curso, y los dos quedaron en el `.gitignore`.
 
-### 3.12 Frecuencia medida de las operaciones y revisión del motor
+### 2.12 Frecuencia medida de las operaciones y revisión del motor
+
+Herramienta: Claude
 
 Fecha: 2026-10-14
 
@@ -225,9 +249,11 @@ Uso en el proyecto: Se agregaron a `Game` los contadores `player_actions`, `enem
 
 La revisión encontró dos errores que no producían ninguna excepción: dos efectos de velocidad encimados dejaban al actor con una velocidad permanente equivocada, y una partida terminada seguía aceptando acciones y sumándolas al contador. Se corrigieron los dos y se agregaron pruebas que los fijan.
 
-Cambios realizados por el estudiante: [Indicar qué se revisó de los contadores y de las correcciones.]
+Cambios realizados por el estudiante: La revision contra el enunciado destapo dos errores que no daban ninguna senal. El primero: dos pociones de velocidad encadenadas dejaban al actor con una velocidad equivocada para siempre, porque la segunda guardaba como valor a restaurar el que habia dejado la primera; se corrigio restaurando el valor original antes de aplicar el nuevo y se verifico con tres pociones seguidas. El segundo: una partida terminada seguia aceptando acciones, inflaba el contador y programaba eventos; se corrigio revisando el estado al principio de cada accion publica. Se acepto medir la frecuencia de las operaciones en vez de estimarla, porque la seccion 8 pide la frecuencia medida.
 
-### 3.13 Revisión e integración del bloque 2
+### 2.13 Revisión e integración del bloque 2
+
+Herramienta: Claude
 
 Fecha: 2026-10-15
 
@@ -242,9 +268,11 @@ Uso en el proyecto: Se hizo una fusión de prueba en una rama temporal para comp
 
 Se detectó que el Traductor no lee ningún campo de regeneración de la ficha del catálogo, de modo que `Enemy.regeneration` siempre llega en cero y la regla de §2.10 no se aplicaría si la cripta de la revisión trae un enemigo que la declare.
 
-Cambios realizados por el estudiante: [Indicar qué se comunicó a la Persona 2 sobre la regeneración y qué se acordó.]
+Cambios realizados por el estudiante: Se reviso la rama de la Persona 2 antes de fusionarla y quedo una duda abierta: los enemigos con regeneracion no aparecian en los datos. Se le consulto y confirmo que el esquema del servicio no trae ese campo, de modo que la regeneracion queda implementada en el motor pero sin datos que la activen en la cripta de desarrollo. Tambien se cerro la duda del nombre de los comportamientos: el servicio envia el texto con tilde y el traductor lo convierte, asi que el motor trabaja con sus propias constantes.
 
-### 3.14 Movimiento, puertas, trampas y comportamiento errante
+### 2.14 Movimiento, puertas, trampas y comportamiento errante
+
+Herramienta: Claude
 
 Fecha: 2026-10-15
 
@@ -259,9 +287,11 @@ Uso en el proyecto: Se implementaron `move()` y `open_door()`, las trampas al en
 
 Jugando la cripta real apareció un error que las pruebas unitarias no habían detectado: el motor comparaba el campo `abre` de la llave contra la llave que pide la puerta, y con los datos reales nunca coincide. §2.7 dice que la coincidencia es contra el id de la ficha. Las pruebas pasaban porque construían la llave con el mismo malentendido que el código.
 
-Cambios realizados por el estudiante: [Indicar qué se revisó y qué se decidió.]
+Cambios realizados por el estudiante: Se decidio implementar de una vez todo lo que dependia de las clases de sala, en lugar de ir pieza por pieza, porque ya estaban disponibles. Se reviso contra el enunciado que entrar a una sala active solo a los enemigos de esa sala, que una puerta sea el mismo objeto desde sus dos lados, que la trampa se dispare al entrar y se rearme despues, y que el errante solo considere salidas con la puerta abierta, porque un enemigo no puede abrir puertas.
 
-### 3.15 Revisión de la rama de la Persona 4 y coordinación con el grupo
+### 2.15 Revisión de la rama de la Persona 4 y coordinación con el grupo
+
+Herramienta: Claude
 
 Fecha: 2026-10-15
 
@@ -278,9 +308,11 @@ Aparecieron dos errores, los dos del motor y no de su código: escribir cualquie
 
 Se redactaron además los mensajes de coordinación para la Persona 3 y la Persona 4.
 
-Cambios realizados por el estudiante: [Indicar qué se comunicó al grupo y qué se acordó.]
+Cambios realizados por el estudiante: Revisar la rama de la Persona 4 destapo dos errores propios. El primero es el mas instructivo de todo el modulo: la llave se emparejaba con el campo `opens` del objeto cuando la seccion 2.7 pide que coincida con su `type_id`, y las pruebas unitarias no lo detectaron porque repetian el mismo malentendido; aparecio al jugar la cripta real. El segundo era de orden de los mensajes: el dano de la trampa se registraba antes de anunciar la entrada a la sala, asi que se leia al reves. Al grupo se le comunico que el motor ya exponia lo que el controlador necesitaba y que las dos correcciones estaban en la rama propia.
 
-### 3.16 Nueva medición del presupuesto de procesamiento
+### 2.16 Nueva medición del presupuesto de procesamiento
+
+Herramienta: Claude
 
 Fecha: 2026-10-15
 
@@ -294,9 +326,11 @@ Uso en el proyecto: La medición anterior era insuficiente, porque el jugador so
 
 De los datos salió una conclusión que antes no se podía sacar: lo que llena la agenda es la cantidad de enemigos activos y no el tamaño de la cripta, lo que responde directamente a una de las preguntas de orientación del enunciado.
 
-Cambios realizados por el estudiante: [Indicar qué se revisó de las mediciones.]
+Cambios realizados por el estudiante: Se acepto rehacer la medicion porque la anterior usaba un escenario sintetico que no representaba una partida: no habia movimiento entre salas ni puertas ni trampas. Se reviso que el escenario nuevo recorriera la cripta de punta a punta abriendo lo que encontrara cerrado, y que el numero reportado fuera el ciclo completo entre dos decisiones del jugador, que es lo que limita la seccion 5.2.
 
-### 3.17 Integración del bloque de la Persona 3 y el pergamino de retroceso
+### 2.17 Integración del bloque de la Persona 3 y el pergamino de retroceso
+
+Herramienta: Claude
 
 Fecha: 2026-10-16
 
@@ -311,9 +345,11 @@ Uso en el proyecto: Se conectaron la bitácora circular, el módulo de ordenamie
 
 Aparecieron dos cosas al probar. La respuesta a una pregunta que la Persona 3 había dejado abierta: la sala destino se marca con el reloj del instante de la acción y no al terminar su costo, porque §2.5 dice que el jugador aparece en la sala al ejecutarla y el ejemplo de §2.13 lo confirma. Y una decisión propia que se corrigió: el retroceso funciona con la partida terminada, porque §2.11 no pone esa condición y un pergamino que no sirva cuando al jugador lo matan no sirve para nada.
 
-Cambios realizados por el estudiante: [Indicar qué se revisó y qué se decidió.]
+Cambios realizados por el estudiante: Se decidio que el motor anote el cambio inverso de cada modificacion, en los veintisiete lugares donde cambia el estado, en vez de guardar copias, porque la seccion 2.11 prohibe las copias. Para no tener que preguntar si hay historial en cada uno de esos lugares se uso un objeto nulo. Una prueba de la Persona 3 descarto una condicion que se habia agregado de mas: se habia impedido retroceder con la partida terminada, y la seccion 2.11 no pone esa condicion, asi que un jugador muerto si puede volver. Tambien se acordo con ella el ajuste del cursor del inventario y se adopto su verificador de retroceso.
 
-### 3.18 Integración final y carga de partidas guardadas
+### 2.18 Integración final y carga de partidas guardadas
+
+Herramienta: Claude
 
 Fecha: 2026-10-18
 
@@ -330,9 +366,111 @@ Probando apareció que los efectos activos se pueden deducir de la agenda, porqu
 
 Se unificó el Documento de Decisiones en un solo archivo con las secciones en el orden del §4, y quedó a la vista que faltan las secciones 4.2, 4.3, 4.4 y 4.10.
 
-Cambios realizados por el estudiante: [Indicar qué se comunicó al grupo y qué se acordó.]
+Cambios realizados por el estudiante: Se decidio integrar en la rama propia el trabajo de los otros tres y verificar que las cuatro partes funcionaran juntas antes de abrir cualquier pedido de incorporacion. Se unifico el Documento de Decisiones en un solo archivo, con las secciones en el orden del enunciado, y se le comunico al grupo que las secciones de la Persona 3 ya estaban adentro y que su archivo aparte se habia eliminado. Del lado del motor se dejo resuelto lo que el guardado necesitaba, `Game.load()`, que arma una partida guardada sin repetir el trabajo de inicio de partida; se le advirtio al grupo que usar el constructor normal para cargar dejaria la partida mal sin dar ningun error.
 
-## 4. Revisión de interfaces existentes y contrato de la Persona 4
+
+### 2.19 Auditoría final de la parte del motor contra el Apéndice B
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-10-18
+
+Objetivo: Revisar si quedaba algo pendiente de la parte propia (motor, agenda, reloj, actores, combate y enemigos) antes de la entrega, cruzando los catorce casos del Apéndice B contra las pruebas y verificando que los números del Documento de Decisiones siguieran vigentes después de la última medición.
+
+Prompts utilizados:
+
+```text
+revisa si queda algo de mi parte?
+```
+
+Uso en el proyecto: Dos pruebas nuevas en `tests/test_rewind.py` y correcciones de cifras y una sección nueva en `docs/DECISIONES.md`.
+
+Cambios realizados por el estudiante: Se revisaron los catorce casos del Apéndice B uno por uno contra las pruebas del motor. Trece corresponden a esta parte y doce ya estaban cubiertos; el que faltaba era el del pergamino recogido dentro del intervalo revertido. Antes de escribir la prueba se verificó que la excepción de §2.11 estuviera aplicada en los dos lugares que tienen que concordar, el suelo en `Game` y el contador en `Inventory`, y estaban correctos, así que se agregaron las dos pruebas que lo dejan demostrado en ambos sentidos. En el Documento de Decisiones se corrigió la razón contra el tope de §5.2, que había quedado en sesenta veces cuando correspondía a la medición anterior y con 0.4403 ms son cuarenta y cinco, y se actualizaron los conteos de pruebas de `test_game.py`, `test_rewind.py` y el total del proyecto. Se agregó la sección que deja constancia de la excepción de los pergaminos.
+
+### 2.20 Guardado binario de la partida (sección 4.10)
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-10-18
+
+Objetivo: Implementar la sección 4.10 del enunciado, que no tenía responsable asignado: el archivo binario de formato propio, la recuperación de una sala sin leer el archivo completo, la detección de versión incompatible y la comparación contra JSON.
+
+Prompts utilizados: la petición fue elegir la opción 2 de las que se ofrecieron al cerrar la auditoría de la entrada 2.19, es decir, tomar la sección 4.10 aprovechando que `Game.load()` ya estaba resuelto del lado del motor. No hubo más texto.
+
+Uso en el proyecto: `adapters/almacen_partida.py`, `benchmark/bench_almacen_partida.py`, `tests/test_almacen_partida.py`, `tests/test_bench_almacen_partida.py`, la medición `docs/mediciones/persona1/guardado_binario_2026-10-18.txt`, la sección 4.10 de `docs/DECISIONES.md` y la actualización de responsables en `docs/ARQUITECTURA.md`.
+
+Cambios realizados por el estudiante: Antes de escribir nada se revisaron las cuatro ramas del grupo para confirmar que nadie había empezado la sección, y se decidió no inventar un formato propio sino seguir el de `adapters/almacen_fichas.py` de la Persona 2, que ya tenía firma, versión, índice ordenado y búsqueda binaria, para que la entrega no quedara con dos estilos de persistencia binaria. El formato se diseñó alrededor del requisito de leer una sala sola: encabezado de tamaño fijo, bloque global, un bloque por sala y el índice al final con su posición anotada en el encabezado. Se decidió que el archivo guarde el estado completo en vez de solo los identificadores, aunque la alternativa ahorra hasta un 60 %, para que una partida guardada no quede inservible si cambia la versión del catálogo; esa alternativa se midió para poder decir con números qué costó la decisión. Dos problemas se resolvieron durante la implementación: que una puerta es el mismo objeto desde sus dos salas, lo que obligó a guardarla en los dos bloques y a compartirla al cargar, y que al medir la alternativa descartada poner los campos en cero no ahorraba bytes porque los enteros del formato son de ancho fijo, de modo que hubo que armar el formato mínimo de verdad omitiendo los campos. La medición dio un resultado contrario a la decisión en una de las tres comparaciones: cargar la partida completa es entre 1.7 y 2 veces más lento que JSON, porque el módulo `json` está escrito en C. Se compilaron los formatos de `struct` una sola vez, lo que recuperó un 15 %, y se decidió reportar el número tal como quedó en el apartado de evidencia empírica y en el de límites conocidos, en vez de omitirlo.
+
+### 2.21 Conexión del guardado al programa y revisión de ramas
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-10-18
+
+Objetivo: Confirmar que nadie del grupo había empezado el guardado antes de subir el trabajo, y después conectar el guardado y el cargado a los comandos del programa.
+
+Prompts utilizados:
+
+```text
+Ok, perfecto. Primero revisa las ramas a ver si ya han subido algo sobre ese tema para no hacer el trabajo doble. Y después eh, comitemos todo subimos ese trabajo a mi rama y luego vemos si hay que llegue con el guardar, cargar, yo mismo en el main, para ver si no vamos a hacer trabajo en vano.
+```
+
+Uso en el proyecto: `controller/application.py`, `controller/commands.py`, `main.py`, `adapters/almacen_partida.py`, `tests/test_guardado_en_la_aplicacion.py` y las secciones 4.10 y de pendientes de `docs/DECISIONES.md`.
+
+Cambios realizados por el estudiante: Antes de subir se revisaron las cuatro ramas remotas, los archivos de todas ellas y los mensajes de commit, y se confirmó que nadie tenía nada del guardado binario. Al revisar si valía la pena conectarlo al programa se encontró que la Persona 4 ya había construido toda la capa de comandos, con `guardar` y `cargar` interpretados y excluidos de la bitácora de reproducción, y un comentario en `controller/application.py` que decía que al exponerse el guardado se conectaran ahí, así que no era trabajo en vano. Se decidió que guardar funcione dentro de la partida y que cargar sea una opción de arranque, `--cargar ARCHIVO`, porque la bitácora de §4.11 guarda la semilla y las acciones desde el inicio y cargar a media sesión la dejaría reproduciendo algo que no ocurrió, lo que §4.11 prohíbe; el comando `cargar` de adentro del juego explica eso en vez de quedar sin respuesta. Se corrigió un problema que habría fallado en silencio: el inventario sale del archivo sin el historial del retroceso, porque el historial necesita el `GameState` que se arma después de leer, de modo que las acciones posteriores a cargar no se habrían podido deshacer con un pergamino; se vuelve a armar el inventario con el historial puesto y con los mismos objetos, para que el equipo siga apuntando al objeto que está adentro. También se comprobó que `cargar_contenido_de_sala` de la Persona 2 es idempotente, de modo que una partida cargada no duplica enemigos al moverse. Se verificó de punta a punta con los datos sin conexión que jugar de corrido y jugar cortando con un guardado terminan en el mismo estado. Dos pruebas nuevas fallaron por suposiciones equivocadas propias y no del código: el guardado crea las carpetas que falten a propósito, y en `cripta-01` el jugador empieza sin pergaminos, así que el retroceso se rechaza con razón; las dos se reescribieron para medir lo que de verdad importaba.
+
+### 2.22 Traer los cambios de main a la rama propia
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-10-28
+
+Objetivo: Traer a la rama propia la versión más reciente del repositorio y comprobar que no se perdiera nada del trabajo propio en las integraciones.
+
+Prompts utilizados:
+
+```text
+Ya estan todas las partes terminadas?
+```
+
+```text
+Ok, ocupo que revises la versión más nueva que haya en el GitHub y de ahí traigas todos esos cambios de la última versión a mi rama. Después de eso, quisiera que pienses si se va a perder algo de la mía para no que no sea así. Y que me digas qué puede ser.
+```
+
+Uso en el proyecto: `benchmark/bench_almacen_partida.py` y la sección 4.10 de `docs/DECISIONES.md`.
+
+Cambios realizados por el estudiante: Antes de traer nada se guardaron los cambios locales sin commitear, para no perderlos. Se comprobó que la rama propia estuviera contenida por completo en `main` y que las once secciones de §4 y la 4.10 entera siguieran ahí, incluidos los apartados de §8. El avance de la rama fue directo, sin conflictos. Al revisar el trabajo local sin commitear se encontró que la Persona 4 ya había hecho casi lo mismo mientras tanto: conectar el guardado a `--bench` y actualizar el README, así que esos cambios locales se descartaron por duplicados. Quedaron dos cosas que sí faltaban. Una es que la medición comparaba un guardado binario con `fsync` contra un guardado JSON sin `fsync`, de modo que el formato propio pagaba una escritura durable y el otro no; se igualó y se dejó escrito por qué, porque es la clase de detalle que invalida una comparación. La otra es que §5.3 pide medir las operaciones de guardado y el Documento de Decisiones solo reportaba las de carga, así que se agregó la tabla con las cifras ya parejas. También se verificó que el cambio que la Persona 3 hizo dentro del módulo de guardado, usar `restore()` en vez de `pick_up()` al reconstruir el inventario, corrige un defecto real del código propio: `pick_up()` descarta el objeto en silencio si el inventario está lleno.
+
+### 2.23 Revisión de la entrega contra el enunciado
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-10-28
+
+Objetivo: Revisar el proyecto entero contra los requisitos del enunciado antes de entregarlo, y dejar registradas las decisiones de trabajo que se tomaron.
+
+Prompts utilizados:
+
+```text
+Si mezclamos design main y que no sé qué tan importantes sean los míos, trae la última versión, del trabajo, y ponla aquí. Y después de eso, no nada más. Simplemente trae la última versión del trabajo a mi rama.
+```
+
+```text
+Ok, perfecto. Ahora ocupo que revises todo, en mi trabajo en esa rama para ver si lo puedo entregar. Ocupo que cumpla las cosas. Esto incluyendo todos los archivos. Los prompts LM agrega tú las decisiones que tomamos. Tú supiste mi decisión. Entonces, redáctalo y si ocupas alguna pregunta, ok, Mau, ¿qué pasaste aquí? Dímelo, pero antes de todo esto. Y hazme preguntas sobre cómo quieres que haga las cosas. O cómo yo quiero que tú hagas las cosas antes de.
+```
+
+Decisiones de trabajo tomadas en esta sesión, a pedido del estudiante y antes de empezar la revisión:
+
+1. **Alcance:** revisar todo lo entregable y no solo la parte propia, porque §9 exige que cada integrante pueda explicar cualquier decisión del Documento de Decisiones y la nota del proyecto es grupal.
+2. **Qué hacer con lo que se encuentre:** corregir únicamente los archivos propios y reportar lo ajeno con un mensaje listo para el grupo, en vez de modificar código de los compañeros a pocos días de la entrega.
+3. **Trabajo local sin commitear:** recuperar los dos cambios que se habían apartado, porque §5.3 pide medir las operaciones de guardado y el documento solo reportaba las de carga, y porque la comparación contra JSON estaba sesgada.
+4. **Rama remota:** no subir nada en esta sesión. La rama local quedó al día con `main`; publicarla es una decisión aparte.
+
+Uso en el proyecto: `PROMPTS_LLM.md`, `benchmark/bench_almacen_partida.py` y la sección 4.10 de `docs/DECISIONES.md`.
+
+Cambios realizados por el estudiante: La revisión se hizo contra las secciones 4 a 10 del enunciado y el Apéndice B. Se comprobó que las once secciones de §4 tienen los seis apartados que exige §8 y la frecuencia medida de las operaciones; que no se usa `dict` como índice ni `sorted()` en el código del programa (§7 y §4.9); que no hay identificadores, nombres de cripta ni números de sala escritos en el código (§9); que `--bench` y `--replay` no instancian la vista interactiva (§6); que `--bench` mide los nueve subsistemas sin fallos, incluidos los siete que enumera §5.3; que el ciclo del motor toma 0.1877 ms contra los 20 ms de §5.2; que la interfaz tiene los quince comandos mínimos de §10.2; y que los catorce casos del Apéndice B tienen prueba. Se verificó a mano una vuelta completa del programa sin conexión: jugar, guardar, cargar el guardado, y reproducir con `--replay` la bitácora de la sesión cargada, que dio el mismo resultado que la sesión en vivo. Se corrigió una cosa propia: el `dict` que usa la alternativa descartada del benchmark de §4.10 quedó marcado como que existe solo para medir y no se usa en el programa, siguiendo la convención que el grupo ya había usado en `bench_tabla_hash.py`.
+
+## 3. Revisión de interfaces existentes y contrato de la Persona 4
 
 Herramienta: Claude (Claude Sonnet 5.5), mediante la interfaz de chat de claude.ai
 
@@ -346,11 +484,11 @@ Prompts utilizados:
 
 Uso en el proyecto: Se utilizó la respuesta para identificar huecos que afectan a la Persona 4: la interfaz de `Game` aún no existe, `GameState` no permite restaurar el contador de secuencia ni el estado del generador aleatorio, `EventQueue` no permite listar los eventos activos, `Event` carece de los datos necesarios para serializar efectos, y la propiedad de `adapters/persistence.py` y de la tabla de puntajes no está asignada. También se utilizó para proponer un contrato `Game` ↔ controlador y un formato de log de replay.
 
-Cambios realizados por el estudiante: [Indicar qué se verificó en el repositorio (por ejemplo, la coma final en `rewind_clock_to`), qué propuestas se aceptaron o descartaron y qué se acordó con el grupo.]
+Cambios realizados por el estudiante: Se verificaron los hallazgos contra el repositorio antes de aceptarlos, y uno resulto falso: la coma final que se reportaba en `rewind_clock_to` no existia, y de haber existido las pruebas del reloj habrian fallado, porque el metodo habria devuelto una tupla. Los otros cuatro pedidos si eran reales y se aceptaron: el contrato publico de `Game`, restaurar el contador de secuencia y el estado del generador, listar los eventos activos de la agenda, y los campos que `Event` necesitaba para los efectos. Se descarto guardar la agenda en la bitacora de reproduccion, porque esa bitacora registra las acciones del jugador y no los eventos. Quedo sin asignar la propiedad del guardado binario, que se decidio mas adelante.
 
-Nota posterior: la coma final reportada en `rewind_clock_to` se verificó contra el archivo del repositorio y no existe. Los otros cuatro pedidos se implementaron el 2026-10-14, según la entrada 3.8.
+Nota posterior: la coma final reportada en `rewind_clock_to` se verificó contra el archivo del repositorio y no existe. Los otros cuatro pedidos se implementaron el 2026-10-14, según la entrada 2.8.
 
-## 5. Resumen de puntos para la reunión del grupo
+## 4. Resumen de puntos para la reunión del grupo
 
 Herramienta: Claude (Claude Sonnet 5.5), mediante la interfaz de chat de claude.ai
 
@@ -364,13 +502,13 @@ Prompts utilizados:
 
 Uso en el proyecto: Se utilizó la respuesta como guía para la reunión del grupo: interfaz pendiente de `Game`, cambios solicitados a `GameState`, `EventQueue` y `Event`, reparto de archivos de persistencia, decisiones abiertas sobre el log de replay y formato de log propuesto.
 
-Cambios realizados por el estudiante: [Indicar qué puntos se discutieron con el grupo y qué se decidió.]
+Cambios realizados por el estudiante: Se llevaron los puntos a la reunion y se acordo el reparto de lo que estaba sin dueno: la bitacora de reproduccion y la tabla de puntajes quedaron del lado de la Persona 4, y la persistencia del catalogo y de la cripta, del lado de la Persona 2. Se acordo tambien que el motor expondria lo que el controlador necesitaba sin conocer la vista, y que las estructuras de la Persona 3 se le pasarian al motor desde afuera en vez de que el motor las construyera.
 
-## 6. API, caché y persistencia (Persona 2)
+## 5. API, caché y persistencia (Persona 2)
 
-Registro de la Persona 2. Los prompts se reproducen tal cual, incluidos los errores de escritura. En la entrada 6.2 se pegaron dos textos de un compañero, que se describen en lugar de copiarlos. Algunos mensajes de coordinación (por ejemplo, avisos de pausa) no se registraron porque no pidieron nada sobre el proyecto.
+Registro de la Persona 2. Los prompts se reproducen tal cual, incluidos los errores de escritura. En la entrada 5.2 se pegaron dos textos de un compañero, que se describen en lugar de copiarlos. Algunos mensajes de coordinación (por ejemplo, avisos de pausa) no se registraron porque no pidieron nada sobre el proyecto.
 
-### 6.1 Análisis del enunciado y del programa del curso
+### 5.1 Análisis del enunciado y del programa del curso
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -390,7 +528,7 @@ Uso en el proyecto: Se usó para entender el alcance del proyecto y relacionar l
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.2 Revisión del flujo de trabajo y de la distribución del grupo
+### 5.2 Revisión del flujo de trabajo y de la distribución del grupo
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -417,7 +555,7 @@ Uso en el proyecto: Se creó el registro de prompts del bloque 2, se compararon 
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.3 Fecha de entrega y plan de trabajo
+### 5.3 Fecha de entrega y plan de trabajo
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -435,7 +573,7 @@ Uso en el proyecto: Plan de trabajo diario del bloque 2 para las dos fechas posi
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.4 Análisis del bloque 2
+### 5.4 Análisis del bloque 2
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -453,7 +591,7 @@ Uso en el proyecto: Lista de requisitos del bloque 2, costo en solicitudes de un
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.5 Supuestos para lo que el enunciado no define
+### 5.5 Supuestos para lo que el enunciado no define
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -473,7 +611,7 @@ Uso en el proyecto: Supuestos documentados en `docs/BLOQUE_2_PARA_EL_GRUPO.md` (
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.6 `dict` frente a una tabla hash propia
+### 5.6 `dict` frente a una tabla hash propia
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -491,7 +629,7 @@ Uso en el proyecto: Script de comparación `dict` contra tabla propia; confirmó
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.7 Elección de la función hash e implementación de `TablaHash`
+### 5.7 Elección de la función hash e implementación de `TablaHash`
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -515,7 +653,7 @@ Uso en el proyecto: `structures/tabla_hash.py` y `structures/funciones_hash.py` 
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.8 Benchmark de la tabla hash e interfaz `FuenteDatos`
+### 5.8 Benchmark de la tabla hash e interfaz `FuenteDatos`
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -537,7 +675,7 @@ Uso en el proyecto: `adapters/fuente_datos.py` (contrato común, errores y cuent
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.9 Benchmark con calentamiento del procesador
+### 5.9 Benchmark con calentamiento del procesador
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -557,7 +695,7 @@ Uso en el proyecto: Interpretación de la segunda corrida del benchmark de la ta
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.10 Métodos abstractos de `FuenteDatos`
+### 5.10 Métodos abstractos de `FuenteDatos`
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -575,7 +713,7 @@ Uso en el proyecto: Aclaración: `FuenteHttp` y `FuenteOffline` implementan el c
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.11 `FuenteHttp`, `FuenteOffline` y descarga de datos para el modo offline
+### 5.11 `FuenteHttp`, `FuenteOffline` y descarga de datos para el modo offline
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -594,7 +732,7 @@ Uso en el proyecto: `adapters/fuente_http.py`, `adapters/fuente_offline.py`, `to
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.12 Carpeta desde la que se ejecutan las pruebas
+### 5.12 Carpeta desde la que se ejecutan las pruebas
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -612,7 +750,7 @@ Uso en el proyecto: Instrucciones para ejecutar las pruebas desde la carpeta cor
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.13 Primera conexión real con el API
+### 5.13 Primera conexión real con el API
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -632,7 +770,7 @@ Uso en el proyecto: Confirmación de la conexión real y de las 7 solicitudes de
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.14 Revisión de los datos reales de `cripta-01`
+### 5.14 Revisión de los datos reales de `cripta-01`
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -652,7 +790,7 @@ Uso en el proyecto: Hallazgos sobre puertas declaradas desde un solo lado y el c
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.15 Caché LRU del catálogo
+### 5.15 Caché LRU del catálogo
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -670,7 +808,7 @@ Uso en el proyecto: `structures/cache_catalogo.py`, sus pruebas y su benchmark.
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.16 Almacén de fichas en disco
+### 5.16 Almacén de fichas en disco
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -688,7 +826,7 @@ Uso en el proyecto: `adapters/almacen_fichas.py`, sus pruebas y su benchmark.
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.17 Proyecto en una sola carpeta, con README y verificación automática
+### 5.17 Proyecto en una sola carpeta, con README y verificación automática
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -706,7 +844,7 @@ Uso en el proyecto: README, `tools/ejecutar_verificaciones.py` y proyecto ordena
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.18 Resultados de la verificación y diseño del `GestorCatalogo`
+### 5.18 Resultados de la verificación y diseño del `GestorCatalogo`
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -726,7 +864,7 @@ Uso en el proyecto: Interpretación de la primera medición oficial y propuesta 
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.19 Implementación del `GestorCatalogo`
+### 5.19 Implementación del `GestorCatalogo`
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -745,7 +883,7 @@ Uso en el proyecto: `repository/gestor_catalogo.py`, `structures/lista_sin_repet
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.20 Comprobación de un archivo enviado aparte
+### 5.20 Comprobación de un archivo enviado aparte
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -763,7 +901,7 @@ Uso en el proyecto: Confirmación de que el archivo enviado aparte era idéntico
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.21 Segunda medición y diseño de la precarga por BFS
+### 5.21 Segunda medición y diseño de la precarga por BFS
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -783,7 +921,7 @@ Uso en el proyecto: Comparación de la segunda medición y explicación de la pr
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.22 `GestorContenido` con precarga por BFS
+### 5.22 `GestorContenido` con precarga por BFS
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -801,7 +939,7 @@ Uso en el proyecto: `structures/grafo_salas.py`, `repository/gestor_contenido.py
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.23 Tercera medición y medianas
+### 5.23 Tercera medición y medianas
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -821,7 +959,7 @@ Uso en el proyecto: Medianas de las tres corridas en `docs/mediciones/bloque2/`.
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.24 `RepositorioCripta`, persistencia por versión y guía para el grupo
+### 5.24 `RepositorioCripta`, persistencia por versión y guía para el grupo
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -839,7 +977,7 @@ Uso en el proyecto: `repository/repositorio_cripta.py`, `adapters/almacen_cripta
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.25 Presupuesto de solicitudes medido contra el API real
+### 5.25 Presupuesto de solicitudes medido contra el API real
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -859,7 +997,7 @@ Uso en el proyecto: Evidencia en `docs/mediciones/bloque2/presupuesto_api_real_2
 
 Cambios realizados por el estudiante: [Indicar qué se revisó, modificó o decidió después de evaluar la propuesta.]
 
-### 6.26 `Traductor` y clases de sala, objeto y trampa
+### 5.26 `Traductor` y clases de sala, objeto y trampa
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -883,7 +1021,7 @@ Uso en el proyecto: `repository/traductor.py`, `model/room.py`, `model/item.py`,
 
 Cambios realizados por el estudiante:  Ante la pregunta de cómo hacer el Traductor, se eligió la opción completa con clases propias (`model/room.py`, `model/item.py`, `model/trap.py`), porque las clases de sala, objeto y trampa no existían en ninguna rama y sin ellas el Traductor quedaba a medias. Se aceptaron los acuerdos propuestos: una sola puerta compartida por cada paso entre dos salas, los enemigos fuera de `Room` (en la lista de `Game`), los objetos que suelta un enemigo creados de antemano y el comportamiento del API traducido a las constantes de `Enemy`. Antes de agregar los archivos se comprobó que la rama local estaba igual que la de GitHub (`git rev-parse HEAD^{tree}`), y después se verificaron las 373 pruebas y la simulación sin conexión. Los cambios se subieron en el commit 480e6d2 de la rama `Parte_2-API-cache-persistencia`.
 
-### 6.27 Verificación del `Traductor` contra el API real
+### 5.27 Verificación del `Traductor` contra el API real
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -905,7 +1043,7 @@ Uso en el proyecto: Evidencia en `docs/mediciones/bloque2/presupuesto_api_real_2
 
 Cambios realizados por el estudiante: Se ejecutó la simulación contra el API real con la caché borrada y después otra vez con la caché llena. Se obtuvieron 7 de 9 solicitudes en frío y 3 de 9 en caliente, y el Traductor creó 6 salas, 3 enemigos, 8 objetos en el suelo, 2 objetos que sueltan los enemigos y 1 trampa. También se verificaron las 373 pruebas. Se decidió guardar esta segunda medición como evidencia junto a la primera, en `docs/mediciones/bloque2/`. Se aclaró cuál de los archivos enviados correspondía al código y cuál a la documentación, y todo se subió en el mismo commit 480e6d2.
 
-### 6.28 Revisión del proyecto integrado y regeneración de enemigos
+### 5.28 Revisión del proyecto integrado y regeneración de enemigos
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -939,7 +1077,7 @@ Uso en el proyecto: Revisión de la integración (pruebas, simulación y una par
 
 Cambios realizados por el estudiante: Se unieron en una rama local de revisión (`revision-integracion`) las ramas de las personas 1 y 4 con la del bloque 2, sin conflictos, y se comprobó que pasaban las 521 pruebas y la simulación sin conexión. Sobre la observación de la persona 1, se revisó la evidencia del contrato del API (`/openapi.json`, versión 1.0.0): el esquema `Enemy` es cerrado y no tiene ningún campo de regeneración. Por eso se decidió no adivinar el nombre de un campo y dejar `regeneration` en 0 (S13), agregando en el Traductor un aviso en el reporte final por si el API llega a enviar un campo que el programa no conoce. Los cambios se aplicaron en la rama `Parte_2-API-cache-persistencia` y no en la de revisión, y se verificaron las 380 pruebas antes de subirlos. Los problemas de integración que dependen de otros integrantes (cargar la sala desde el controlador, `main.py`, la vista y el bloque de la persona 3) se comunican al grupo en lugar de modificar sus archivos.
 
-## 7. Integración, `main.py`, reproducción y puntajes (Persona 4)
+## 6. Integración, `main.py`, reproducción y puntajes (Persona 4)
 
 Herramienta: Claude Code (Claude Opus 5.5), en la terminal sobre el repositorio local
 
@@ -975,7 +1113,7 @@ Uso en el proyecto: Se usó la revisión para listar los pendientes de la Person
 
 Cambios realizados por el estudiante: Se revisó la propuesta del compañero sobre el guardado y se decidió que él lo implemente completo, porque depende de los internos del motor. Se verificó con `cripta-01` sin conexión que una partida registrada se reproduce igual (muerte en el instante 198 con semilla 5), que un log con otra versión se rechaza y que `--bench` corre las seis suites. Se subió la rama `Parte_4-MVC-replay-bench`.
 
-### 6.29 Revisión del proyecto completo y secciones 4.2 a 4.4 del Documento de Decisiones
+### 5.29 Revisión del proyecto completo y secciones 4.2 a 4.4 del Documento de Decisiones
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
 
@@ -1045,7 +1183,7 @@ Steven, dale al PR a main cuando quieras. Ya verifiqué que las cuatro partes fu
 Erick, en tus pendientes decís que la frecuencia del historial es una cota inferior porque el motor no anotaba sus cambios. Ya los anota, son 27 lugares. Cuando repitas esa medición te va a dar bastante más alto. Y tus cifras están corridas en Python 3.13 sobre Linux; conviene repetirlas en la máquina del grupo antes de entregar, como vos mismo anotaste."
 ```
 
-Mensajes del 15 de octubre que completan la entrada 6.28:
+Mensajes del 15 de octubre que completan la entrada 5.28:
 
 ```text
 Ayudame a llenar esa parte con la explicacion necesaria de acuerdo a lo realizado en el proyecto y los cambios
@@ -1061,57 +1199,7 @@ Uso en el proyecto: Revisión del proyecto integrado (pruebas, una partida con `
 
 Cambios realizados por el estudiante: Se unieron las ramas de los cuatro integrantes en la rama local de revisión y se verificaron las 741 pruebas y las opciones de `main.py`. A partir del mensaje del grupo, se pidió escribir las secciones 4.2 a 4.4 con los seis apartados de §8 usando las mediciones del 13 y 14 de octubre. Como §8.1 pide la frecuencia medida de las operaciones y no la teníamos, se decidió agregar un benchmark que la cuenta, y se aceptó que la comparación de políticas FIFO y LFU quede razonada y declarada como no medida. Las secciones se pegaron en el `DECISIONES.md` unificado por la persona 1, después de la 4.1.
 
-### 6.30 Auditoría final de la parte del motor contra el Apéndice B
-
-Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
-
-Fecha: 2026-10-18
-
-Objetivo: Revisar si quedaba algo pendiente de la parte propia (motor, agenda, reloj, actores, combate y enemigos) antes de la entrega, cruzando los catorce casos del Apéndice B contra las pruebas y verificando que los números del Documento de Decisiones siguieran vigentes después de la última medición.
-
-Prompts utilizados:
-
-```text
-revisa si queda algo de mi parte?
-```
-
-Uso en el proyecto: Dos pruebas nuevas en `tests/test_rewind.py` y correcciones de cifras y una sección nueva en `docs/DECISIONES.md`.
-
-Cambios realizados por el estudiante: Se revisaron los catorce casos del Apéndice B uno por uno contra las pruebas del motor. Trece corresponden a esta parte y doce ya estaban cubiertos; el que faltaba era el del pergamino recogido dentro del intervalo revertido. Antes de escribir la prueba se verificó que la excepción de §2.11 estuviera aplicada en los dos lugares que tienen que concordar, el suelo en `Game` y el contador en `Inventory`, y estaban correctos, así que se agregaron las dos pruebas que lo dejan demostrado en ambos sentidos. En el Documento de Decisiones se corrigió la razón contra el tope de §5.2, que había quedado en sesenta veces cuando correspondía a la medición anterior y con 0.4403 ms son cuarenta y cinco, y se actualizaron los conteos de pruebas de `test_game.py`, `test_rewind.py` y el total del proyecto. Se agregó la sección que deja constancia de la excepción de los pergaminos.
-
-### 6.31 Guardado binario de la partida (sección 4.10)
-
-Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
-
-Fecha: 2026-10-18
-
-Objetivo: Implementar la sección 4.10 del enunciado, que no tenía responsable asignado: el archivo binario de formato propio, la recuperación de una sala sin leer el archivo completo, la detección de versión incompatible y la comparación contra JSON.
-
-Prompts utilizados: la petición fue elegir la opción 2 de las que se ofrecieron al cerrar la auditoría de la entrada 6.30, es decir, tomar la sección 4.10 aprovechando que `Game.load()` ya estaba resuelto del lado del motor. No hubo más texto.
-
-Uso en el proyecto: `adapters/almacen_partida.py`, `benchmark/bench_almacen_partida.py`, `tests/test_almacen_partida.py`, `tests/test_bench_almacen_partida.py`, la medición `docs/mediciones/persona1/guardado_binario_2026-10-18.txt`, la sección 4.10 de `docs/DECISIONES.md` y la actualización de responsables en `docs/ARQUITECTURA.md`.
-
-Cambios realizados por el estudiante: Antes de escribir nada se revisaron las cuatro ramas del grupo para confirmar que nadie había empezado la sección, y se decidió no inventar un formato propio sino seguir el de `adapters/almacen_fichas.py` de la Persona 2, que ya tenía firma, versión, índice ordenado y búsqueda binaria, para que la entrega no quedara con dos estilos de persistencia binaria. El formato se diseñó alrededor del requisito de leer una sala sola: encabezado de tamaño fijo, bloque global, un bloque por sala y el índice al final con su posición anotada en el encabezado. Se decidió que el archivo guarde el estado completo en vez de solo los identificadores, aunque la alternativa ahorra hasta un 60 %, para que una partida guardada no quede inservible si cambia la versión del catálogo; esa alternativa se midió para poder decir con números qué costó la decisión. Dos problemas se resolvieron durante la implementación: que una puerta es el mismo objeto desde sus dos salas, lo que obligó a guardarla en los dos bloques y a compartirla al cargar, y que al medir la alternativa descartada poner los campos en cero no ahorraba bytes porque los enteros del formato son de ancho fijo, de modo que hubo que armar el formato mínimo de verdad omitiendo los campos. La medición dio un resultado contrario a la decisión en una de las tres comparaciones: cargar la partida completa es entre 1.7 y 2 veces más lento que JSON, porque el módulo `json` está escrito en C. Se compilaron los formatos de `struct` una sola vez, lo que recuperó un 15 %, y se decidió reportar el número tal como quedó en el apartado de evidencia empírica y en el de límites conocidos, en vez de omitirlo.
-
-### 6.32 Conexión del guardado al programa y revisión de ramas
-
-Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
-
-Fecha: 2026-10-18
-
-Objetivo: Confirmar que nadie del grupo había empezado el guardado antes de subir el trabajo, y después conectar el guardado y el cargado a los comandos del programa.
-
-Prompts utilizados:
-
-```text
-Ok, perfecto. Primero revisa las ramas a ver si ya han subido algo sobre ese tema para no hacer el trabajo doble. Y después eh, comitemos todo subimos ese trabajo a mi rama y luego vemos si hay que llegue con el guardar, cargar, yo mismo en el main, para ver si no vamos a hacer trabajo en vano.
-```
-
-Uso en el proyecto: `controller/application.py`, `controller/commands.py`, `main.py`, `adapters/almacen_partida.py`, `tests/test_guardado_en_la_aplicacion.py` y las secciones 4.10 y de pendientes de `docs/DECISIONES.md`.
-
-Cambios realizados por el estudiante: Antes de subir se revisaron las cuatro ramas remotas, los archivos de todas ellas y los mensajes de commit, y se confirmó que nadie tenía nada del guardado binario. Al revisar si valía la pena conectarlo al programa se encontró que la Persona 4 ya había construido toda la capa de comandos, con `guardar` y `cargar` interpretados y excluidos de la bitácora de reproducción, y un comentario en `controller/application.py` que decía que al exponerse el guardado se conectaran ahí, así que no era trabajo en vano. Se decidió que guardar funcione dentro de la partida y que cargar sea una opción de arranque, `--cargar ARCHIVO`, porque la bitácora de §4.11 guarda la semilla y las acciones desde el inicio y cargar a media sesión la dejaría reproduciendo algo que no ocurrió, lo que §4.11 prohíbe; el comando `cargar` de adentro del juego explica eso en vez de quedar sin respuesta. Se corrigió un problema que habría fallado en silencio: el inventario sale del archivo sin el historial del retroceso, porque el historial necesita el `GameState` que se arma después de leer, de modo que las acciones posteriores a cargar no se habrían podido deshacer con un pergamino; se vuelve a armar el inventario con el historial puesto y con los mismos objetos, para que el equipo siga apuntando al objeto que está adentro. También se comprobó que `cargar_contenido_de_sala` de la Persona 2 es idempotente, de modo que una partida cargada no duplica enemigos al moverse. Se verificó de punta a punta con los datos sin conexión que jugar de corrido y jugar cortando con un guardado terminan en el mismo estado. Dos pruebas nuevas fallaron por suposiciones equivocadas propias y no del código: el guardado crea las carpetas que falten a propósito, y en `cripta-01` el jugador empieza sin pergaminos, así que el retroceso se rechaza con razón; las dos se reescribieron para medir lo que de verdad importaba.
-
-## 8. Inventario, retroceso, rastro, bitácora y ordenamientos (Persona 3)
+## 7. Inventario, retroceso, rastro, bitácora y ordenamientos (Persona 3)
 
 Herramienta: no indicada por el integrante.
 

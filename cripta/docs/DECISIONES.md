@@ -1615,6 +1615,22 @@ veces más. El binario casi no crece porque salta al bloque; el JSON crece con e
 archivo porque lo convierte entero. Eso es la prueba de que el acceso por sala
 funciona, y no solo de que es más rápido.
 
+**Guardar la partida.** §5.3 pide medir las operaciones de guardado, no solo las de
+carga. Los dos formatos escriben con `fsync`, para que la comparación sea entre dos
+guardados igual de durables: sin eso el formato propio pagaría una escritura segura y
+el JSON no, y la diferencia medida no sería la del formato.
+
+| Escenario | Binario | JSON | JSON / binario |
+| --- | ---: | ---: | ---: |
+| 6 salas | 1.110 ms | 1.285 ms | 1.16x |
+| 40 salas | 1.563 ms | 3.589 ms | 2.30x |
+| 200 salas | 5.029 ms | 15.379 ms | 3.06x |
+
+Acá gana el formato propio y la ventaja crece con la cripta. Es lo esperable: escribe
+menos de la mitad de los bytes y no convierte cada número a texto. Vale notar que es la
+cara opuesta de la tabla siguiente: escribir con `struct` es barato, y lo que cuesta es
+volver a leerlo campo por campo desde Python.
+
 **Cargar la partida completa. Acá el formato propio pierde**, y conviene decirlo
 con el número y no esconderlo:
 

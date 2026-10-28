@@ -29,6 +29,7 @@ mientras se juega.
 Ejecutar desde la carpeta cripta/:  python -m benchmark.bench_almacen_partida
 """
 import json
+import os
 import struct
 import tempfile
 import time
@@ -167,7 +168,12 @@ def _objeto_desde_json(crudo):
 
 
 def guardar_en_json(juego, ruta, versiones=("", "", "")):
-    """El mismo estado que guarda AlmacenPartida, en un solo archivo JSON."""
+    """El mismo estado que guarda AlmacenPartida, en un solo archivo JSON.
+
+    Escribe con fsync, igual que AlmacenPartida.guardar(). Sin eso la
+    comparacion de tiempos mentiria: el formato propio pagaria una escritura
+    durable y el JSON no, y la diferencia que se mide no seria la del formato.
+    """
     id_cripta, version_cripta, version_catalogo = versiones
     state = juego.state
 
@@ -287,6 +293,8 @@ def guardar_en_json(juego, ruta, versiones=("", "", "")):
 
     with open(ruta, "w", encoding="utf-8") as archivo:
         json.dump(contenido, archivo)
+        archivo.flush()
+        os.fsync(archivo.fileno())
 
     return ruta.stat().st_size
 
@@ -298,7 +306,7 @@ def cargar_desde_json(ruta):
 
     room_map = RoomMap()
     enemies = []
-    puertas = {}
+    puertas = {}  # solo para medir la alternativa descartada; no se usa en el programa (§7)
 
     for cruda in contenido["rooms"]:
         room = Room(cruda["room_id"], cruda["name"])
