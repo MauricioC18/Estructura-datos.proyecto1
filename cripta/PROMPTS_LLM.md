@@ -1413,3 +1413,25 @@ Explícame en palabras sencillas lo que sea complicado y espera mi confirmación
 Uso en el proyecto: `structures/inventory.py`, `structures/history.py`, `structures/trail.py`, `structures/circular_log.py` y `structures/sorting.py`, con sus pruebas en `tests/` (incluido el ayudante `tests/verificar_retroceso.py`), los benchmarks `benchmark/persona3_bench.py`, `benchmark/persona3_frecuencias.py` y `benchmark/persona3_corridas.py`, las mediciones de `docs/mediciones/persona3/` y las secciones 4.5 a 4.9 de `docs/DECISIONES.md`.
 
 Cambios realizados por el estudiante: El prompt pide expresamente ir por etapas, esperar confirmación antes de generar el código completo y tratar todo lo generado como una propuesta para revisar. Las mediciones mostraron un defecto en la primera versión de la selección de `sort`: con datos rotados escogía inserción y llegaba a tardar 64 veces lo que tarda mezcla. Se corrigió subiendo el umbral a 32 y agregando el tope de desplazamientos, y se volvió a medir. Ambas versiones quedaron documentadas en §4.9 del Documento de Decisiones.
+
+### 2.24 Arranque de la segunda parte: reparto, spec-kit y constitución
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Repartir el trabajo de la segunda parte entre los cuatro integrantes, instalar spec-kit sobre el repositorio existente y redactar la constitución que exige §2.3 del enunciado.
+
+Prompts utilizados:
+
+```text
+Ok, perfecto. ¿Ya viste la decisión o ya leíste, me imagino, el segundo proyecto EDI, el Markdown que te voy a marcar aquí como contexto? Y después de eso quisiera que me dijeses cómo dividirlo en los cuatro compañeros, que somos del grupo, ya sea Steven, Eric, y Mauricio, y yo que también soy Mauricio, pero mi nombre es Carlos Mauricio. Quisiera que lo dijeses en las cuatro para que todo eso sea lo más fácil posible y que lo dividas de forma equitativa, ya sea en tiempo y en esfuerzo, y en complejidad. Esto para que nadie se pueda quejar de que le tocó una parte más peor que otra. [...] y que también me dices como especificaciones y un prompt si puedes para pasárselo a mis compañeros
+```
+
+```text
+Sí, dale, instalá spec-kit y hacé la constitución
+```
+
+Uso en el proyecto: `docs/REPARTO_PROYECTO2.md`, `docs/PROMPT_SDD_PARA_EL_GRUPO.md`, `.specify/memory/constitution.md` y la sección nueva del `README.md`.
+
+Cambios realizados por el estudiante: Se revisó el estado real del repositorio antes de planificar y se encontró que no había ningún avance de la segunda parte: sin commits desde el 28 de octubre, sin spec-kit inicializado y con el enunciado sin subir, a dos días de la entrega. Se decidió, pese a la advertencia sobre el riesgo, intentar las cuatro capacidades completas en vez de reducir el alcance. El reparto se hizo siguiendo lo que cada integrante ya dominaba de la primera parte, para no gastar tiempo en volver a aprender módulos ajenos, y se compensó el desbalance de pesos de la rúbrica asignando a la Persona 4 las banderas nuevas de todo el equipo, la integración de `--bench` y el README. Se identificó además el orden que desbloquea al resto: la constitución la sube una sola persona porque `specify init` escribe en la raíz, y los campos nuevos del traductor son prerrequisito de las otras tres capacidades. Se fijó spec-kit en la versión v1.4.1, la más reciente publicada, y se descubrió que el enunciado menciona la bandera `--ai`, que corresponde a la versión 1.1 y que en la 1.4.1 se llama `--integration`. La constitución se redactó con los siete principios que pide §2.3, en palabras del grupo y apoyados en lo que la primera parte ya hacía, y se agregó la lista concreta de dependencias prohibidas para que el agente la tenga presente en la fase de plan y no al implementar. También se detectó que el enunciado remite a una sección 2.7 que no existe en el documento, lo que quedó como pregunta para el profesor.

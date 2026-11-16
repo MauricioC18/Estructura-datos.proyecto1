@@ -27,6 +27,28 @@ Las dependencias están en `requirements.txt`. Se instalan con:
 pip install -r requirements.txt
 ```
 
+### Desarrollo dirigido por especificaciones (segunda parte)
+
+La segunda parte se desarrolla con GitHub spec-kit. Todo el grupo usa la misma
+version, fijada:
+
+```
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@v1.4.1
+```
+
+| | |
+| --- | --- |
+| Version de spec-kit | **v1.4.1** |
+| Agente de programacion | **Claude Code** |
+
+El repositorio ya esta inicializado: `.specify/` y `.claude/` estan versionados,
+asi que **no hay que volver a correr `specify init`**; basta con `git pull`. Los
+principios que gobiernan el proyecto estan en `.specify/memory/constitution.md` y
+las especificaciones de cada capacidad en `specs/`.
+
+Nota: el enunciado menciona la bandera `--ai`, que es de la version 1.1 de
+spec-kit. En la 1.4.1 se llama `--integration`.
+
 ## Ejecutar las pruebas
 
 Desde la carpeta `cripta/`:
