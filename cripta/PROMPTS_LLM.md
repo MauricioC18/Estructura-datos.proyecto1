@@ -1717,3 +1717,23 @@ Sí, hazlo ahora, en UN commit aparte posterior al de la spec: agrega FR-038 a T
 Uso en el proyecto: `specs/003-niebla-ir-a/tasks.md`, `specs/003-niebla-ir-a/plan.md` y `cripta/tests/test_viaje.py`.
 
 Cambios realizados por el estudiante: Se respetó el orden que exige la constitución: la especificación primero, en su propia confirmación, y después lo que depende de ella. La prueba ya comprobaba el comportamiento; solo citaba el requisito equivocado, que es justo lo que se revisa en la defensa al seguir un requisito hasta su prueba.
+
+### 2.38 Segundo tramo de la niebla de guerra: viaje, mediciones y documentación
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Implementar el bucle del viaje «ir a» en el controlador, las mediciones de `--bench` del mapa conocido y un borrador de la sección §5.3 del Documento de Decisiones, sin tocar archivos de otros integrantes.
+
+Prompts utilizados:
+
+```text
+Continúa /speckit-implement para specs/003-niebla-ir-a, segundo tramo. Haz SOLO tareas pendientes que NO requieran modificar model/game.py ni adapters/almacen_partida.py: 1. El bucle de viaje del controlador (T025 a T028) y sus pruebas, hasta donde se pueda probar con el motor actual. 2. Las mediciones de --bench (T042 a T044), con criptas sintéticas deterministas por semilla en tres tamaños crecientes, más cada cripta del paquete sin conexión, midiendo directamente las alternativas descartadas del plan. No inventes números. 3. Un borrador de la sección §5.3 de DECISIONES.md y la parte del README que me corresponda (T045 a T047), en un commit aparte.
+
+[El prompt completo repite las prohibiciones de §6.2, pide que cada prueba cite sus FR, commits pequeños sin push y sin cambiar de rama, y que si la especificación o el plan resultan incorrectos se avise en vez de corregirlos en silencio.]
+```
+
+Uso en el proyecto: `cripta/controller/game_controller.py`, `cripta/controller/application.py`, `cripta/view/console_view.py`, `cripta/tests/test_ir_a.py`, `cripta/benchmark/bench_mapa_conocido.py`, `cripta/benchmark/benchmark.py`, la sección de resultados de `specs/003-niebla-ir-a/plan.md`, el borrador de §5.3 en `cripta/docs/DECISIONES.md` y `cripta/README.md`.
+
+Cambios realizados por el estudiante: Las mediciones contradijeron al plan en dos puntos, y se reportaron sin cambiar ninguna decisión. Primero, la clave entera de las puertas, elegida en parte por ser más barata que una de texto, resultó el doble de cara, porque hay que buscar por qué dirección sale la puerta; sigue siendo la única correcta, pero el motivo de costo no se sostiene. Segundo, y más grave, un paso de «ir a» con el mapa conocido completo no cumple los 5 ms a partir de 400 salas, y la alternativa que el plan tenía prevista para ese caso, reutilizar la búsqueda durante el viaje, solo baja el promedio y no el primer paso. Antes de reportarlo se midió por separado la misma búsqueda con las vecinas reales, para saber si el problema era el mapa conocido o la búsqueda: la búsqueda misma ya supera el límite en mapas medianos, y el mapa conocido le agrega cerca de un setenta por ciento. Como el paquete sin conexión todavía no trae la cripta de referencia, no se puede decir si FR-036 se cumple en la condición del enunciado; queda para el grupo. Además, tres pruebas fallaron al primer intento por topologías mal armadas en las propias pruebas, no por el código.
