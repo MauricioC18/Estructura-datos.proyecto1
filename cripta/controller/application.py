@@ -609,12 +609,23 @@ def _consultar_historia(game, argumento):
     empieza con # para un numero de accion, asi que no hay que volver a
     interpretar el texto aca.
     """
+    if isinstance(argumento, str) and argumento.startswith("#"):
+        return consultar_accion(game, int(argumento[1:]), reconstruir_con_mapa_conocido)
+
+    return consultar_instante(game, argumento, reconstruir_con_mapa_conocido)
+
+
+def reconstruir_con_mapa_conocido(bloque):
+    """Reconstruye una copia de la linea de tiempo con su mapa conocido.
+
+    reconstruir_desde_copia acepta quien cree un mapa conocido vacio sobre el
+    mapa de salas reconstruido e importa en el el conocimiento de la copia;
+    al repetir acciones, el motor reconstruido sigue avisandole. Asi el
+    resumen de un instante informa lo que el jugador sabia entonces (FR-016).
+    """
     from adapters.almacen_partida import reconstruir_desde_copia
 
-    if isinstance(argumento, str) and argumento.startswith("#"):
-        return consultar_accion(game, int(argumento[1:]), reconstruir_desde_copia)
-
-    return consultar_instante(game, argumento, reconstruir_desde_copia)
+    return reconstruir_desde_copia(bloque, MapaConocido)
 
 
 def _saved_game_problem(path, repository):
