@@ -81,7 +81,22 @@ class _Candidata:
 class RutasMasBaratas:
     """Costos mínimos desde una sala, cortados en un presupuesto de costo."""
 
-    def __init__(self, vecinas_abiertas, origen, corte=None):
+    def __init__(self, vecinas_abiertas, origen, corte=None, *, parar_en=None):
+        """parar_en es opcional y solo se pasa por nombre. Sin él, la búsqueda
+        es exactamente la de siempre (la que usa el cazador).
+
+        Con parar_en, la búsqueda se detiene en cuanto asienta esa sala. Lo
+        usa el viaje «ir a», que solo necesita el primer paso desde la sala
+        del jugador. El primer paso sigue siendo el mismo que con la búsqueda
+        completa: las vecinas que cumplen costo + distancia = d tienen
+        distancia menor que d, porque todo costo es al menos 1, así que ya
+        están asentadas cuando se asienta la sala; y una vecina no asentada
+        tiene distancia de al menos d, así que nunca cumple la igualdad. Si la
+        búsqueda se detuvo, solo son definitivas las distancias de las salas
+        asentadas, y pedir el primer paso desde una sala no asentada es un
+        error. Si la sala nunca se alcanza, la búsqueda llega al final como
+        sin parar_en y todo es definitivo.
+        """
         if corte is not None and (isinstance(corte, bool) or not isinstance(corte, int)):
             raise ValueError(f"El corte debe ser un entero o None: {corte!r}")
         if corte is not None and corte < 0:
@@ -90,7 +105,10 @@ class RutasMasBaratas:
         self._vecinas_abiertas = vecinas_abiertas
         self._origen = origen
         self._corte = corte
+        self._parar_en = parar_en
         self._distancias = TablaHash()
+        self._asentadas = TablaHash()
+        self._se_detuvo = False
         self._calcular()
 
     @property
@@ -118,6 +136,12 @@ class RutasMasBaratas:
         costo mínimo, gana la de menor id; entre dos salidas abiertas hacia
         esa misma vecina, la más barata.
         """
+        if self._se_detuvo and not self._asentadas.contiene(id_sala):
+            raise ValueError(
+                f"La búsqueda se detuvo en la sala {self._parar_en} y la sala "
+                f"{id_sala} no quedó asentada: su distancia no es definitiva."
+            )
+
         distancia = self._distancias.obtener(id_sala)
 
         if distancia is None or distancia == 0:
@@ -146,7 +170,7 @@ class RutasMasBaratas:
         self._distancias.insertar(self._origen, 0)
         pendientes = EventQueue()
         pendientes.push(_Candidata(0, self._origen))
-        asentadas = TablaHash()
+        asentadas = self._asentadas
 
         while True:
             candidata = pendientes.pop()
@@ -160,6 +184,10 @@ class RutasMasBaratas:
                 continue
 
             asentadas.insertar(id_sala, True)
+
+            if id_sala == self._parar_en:
+                self._se_detuvo = True
+                return
 
             for id_vecina, costo, _ in self._vecinas_abiertas(id_sala):
                 if asentadas.contiene(id_vecina):
