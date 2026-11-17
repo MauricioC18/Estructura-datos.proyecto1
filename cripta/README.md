@@ -59,13 +59,15 @@ python -m unittest discover -s tests -t . -v
 
 En Windows también funciona `py` en lugar de `python`.
 
+Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1205 pruebas, todas pasan**, medido con Python 3.12.3. Dos de ellas se cuentan como *fallos esperados* (ver «Lo que todavía no funciona»).
+
 ### Pruebas de aceptación por capacidad
 
 Cada prueba cita en su docstring el requisito (`FR-xxx`) de la especificación que comprueba (§2.5). Para correr solo las de una capacidad, también desde `cripta/`:
 
 | Capacidad | Especificación | Comando |
 | --- | --- | --- |
-| Niebla de guerra e «ir a» | `specs/003-niebla-ir-a/spec.md` | `python -m unittest discover -s tests -t . -p "test_mapa_conocido.py"`, y lo mismo con `test_viaje.py`, `test_ir_a.py` y `test_vista_mapa_conocido.py` |
+| Niebla de guerra e «ir a» | `specs/003-niebla-ir-a/spec.md` | `python -m unittest discover -s tests -t . -p "test_mapa_conocido.py"`, y lo mismo con `test_viaje.py`, `test_ir_a.py`, `test_ir_a_sentido.py`, `test_equivalencia_sentido.py`, `test_niebla.py`, `test_niebla_guardado.py`, `test_comando_mapa.py`, `test_vista_mapa_conocido.py`, `test_vista_sala_actual.py`, `test_historia_mapa_conocido.py`, `test_parada_anticipada.py` y `test_reutilizar_ruta.py` |
 
 Las mediciones de esta capacidad están en la suite «Mapa conocido y viaje ir a» de `python main.py --bench`.
 
@@ -79,6 +81,7 @@ Desde la carpeta `cripta/`:
 | `python main.py --offline` | Juega sin red, con el paquete de `datos_offline/`. Con `--offline CARPETA` usa otro paquete |
 | `python main.py --cargar ARCHIVO` | Continúa una partida guardada con el comando `guardar` |
 | `python main.py --replay partidas/ARCHIVO.log` | Reproduce una partida completa, sin interacción y sin la vista interactiva (§4.11). Funciona también con `--offline` |
+| `python main.py --replay partidas/ARCHIVO.log --hasta T` | Reproduce la partida y al final imprime el estado del instante `T`, el mismo resumen que el comando `historia`, sin la vista interactiva. **Ver la nota sobre la línea de tiempo más abajo** |
 | `python main.py --bench` | Corre las mediciones de todos los subsistemas (§5.3). Tarda alrededor de un minuto |
 | `python main.py --puntajes [CRIPTA]` | Muestra la tabla de puntajes, de todas las criptas o de una |
 
@@ -91,6 +94,7 @@ Otras opciones:
 | `--nombre TEXTO` | Nombre del jugador para la tabla de puntajes |
 | `--cache-size N` | Tope de fichas del catálogo en memoria, 25 por omisión (§4.4) |
 | `--cache CARPETA` | Carpeta de la caché persistente, `cache_cripta` por omisión |
+| `--checkpoint-cada K` | Acciones del jugador entre dos copias completas del estado de la línea de tiempo, 50 por omisión; tiene que ser al menos 1 |
 
 Comandos dentro de la partida (con `ayuda` se ven en pantalla):
 
@@ -107,8 +111,9 @@ Comandos dentro de la partida (con `ayuda` se ven en pantalla):
 | `retroceder` | Usar un pergamino de retroceso |
 | `guardar <archivo>` | Guardar la partida en el archivo binario indicado |
 | `cargar <archivo>` | Deja la partida actual y continúa la guardada, con una bitácora nueva. Si el archivo no sirve, se sigue en la partida actual |
-| `mapa` | Ver las salas exploradas, sus salidas y las salas avistadas (niebla de guerra, §3.3). *Pendiente*: se activa cuando el motor avise al mapa conocido |
-| `ir a <sala>` | Viajar a una sala explorada por la ruta conocida más barata, un movimiento por paso (§3.4); al detenerse dice por qué. *Pendiente*: hasta que el motor avise al mapa conocido, responde que la partida todavía no lo tiene |
+| `mapa` | Ver las salas exploradas, sus salidas, el estado recordado de cada puerta y las salas avistadas (niebla de guerra, §3.3). No consume tiempo |
+| `ir a <sala>` | Viajar a una sala explorada por la ruta conocida más barata, un movimiento por paso (§3.4); al detenerse dice por qué. **Todavía no respeta las salidas de un solo sentido**: ver la nota más abajo |
+| `historia <t>`, `historia #k` | Ver el estado de la partida en el instante `t` o antes de la acción `k`, incluido el mapa conocido de ese momento. **Ver la nota sobre la línea de tiempo más abajo** |
 | `salir` | Terminar la sesión |
 
 Al terminar una partida el programa muestra el resultado, la registra en la tabla de puntajes si se ganó o se perdió, y muestra el reporte de red: solicitudes realizadas, presupuesto de la cripta, aciertos y fallos de caché (§5.1).
@@ -116,6 +121,13 @@ Al terminar una partida el programa muestra el resultado, la registra en la tabl
 Una partida reproducida con `--replay` solo se ejecuta si la fuente tiene las mismas versiones de cripta y catálogo que indica el log. Si no las tiene, el programa lo informa y no reproduce. Para un log viejo se usa `--offline` con una copia de los datos de esas versiones.
 
 El log de una sesión que empezó cargando un guardado, con `--cargar` o con `cargar`, indica en su cabecera de qué archivo salió (`partida_cargada`) y su huella (`huella_partida`). Para reproducirlo, ese archivo tiene que seguir en la misma ruta y sin cambios; si no, el programa lo informa y no reproduce.
+
+## Lo que todavía no funciona
+
+- **«ir a» con salidas de un solo sentido.** La búsqueda todavía recorre cada salida en los dos sentidos, así que con una salida sin vuelta puede declarar «no hay ruta» teniendo una salida directa, o no ver una ruta válida. La corrección está escrita (`MapaConocido.entrantes_conocidas`) y probada por equivalencia, pero conectarla necesita que la búsqueda compartida (`structures/rutas_mas_baratas.py`) acepte la parada anticipada junto con el proveedor de salidas. Las dos pruebas de los escenarios 7 y 8 de la Historia 4 (`tests/test_ir_a_sentido.py`) están marcadas como fallo esperado hasta entonces (tarea T052 de `specs/003-niebla-ir-a/tasks.md`).
+- **`historia` y `--replay --hasta` con copias espaciadas.** Para un instante posterior a un movimiento hacia una sala cuyo contenido no estaba cargado cuando se tomó la copia, la reconstrucción repite el movimiento, el motor lo rechaza porque esa sala no tiene contenido, y el resumen entero sale en la sala anterior, sin ningún error. Con `--checkpoint-cada 1` no pasa. Es un defecto de la reconstrucción de la línea de tiempo, reportado a su responsable.
+- **La cripta de referencia de §6.1** (cripta-06, de 300 salas) no está en el paquete sin conexión, así que el límite de 5 ms por paso de «ir a» no está comprobado sobre ella. En las cuadrículas sintéticas, el primer paso de un viaje entre los extremos pasa de 5 ms desde 400 salas (`docs/DECISIONES.md`, §5.3).
+- `--verificar` y `--forzar` (resolubilidad) no están implementadas.
 
 ## Herramientas del bloque 2
 

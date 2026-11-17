@@ -382,6 +382,10 @@ Con el código final, 100 salas dan entre 1.70 y 1.91 ms en el primer paso y ent
 
 **Conclusión: FR-036 se cumple con 100 salas y no se cumple con 400 ni con 1600** en el primer paso de un viaje entre los extremos de la cripta. En los pasos siguientes de un mismo viaje sí se cumple en los tres tamaños. Si se cumple en la condición de §6.1 depende del tamaño de la cripta de referencia, que el paquete sin conexión todavía no trae. El límite queda documentado en el Documento de Decisiones (§5.3).
 
+### Resultado de la medición 6 (salidas de un solo sentido)
+
+Tomada el 2026-11-17 con Python 3.12.3 en WSL, tres corridas; **no es comparable** con las cifras de arriba, que son de Windows con Python 3.11.3. Armar el índice de salidas entrantes cuesta de 0.31 a 0.39 ms con 100 salas, de 1.47 a 1.64 ms con 400 y de 7.03 a 8.05 ms con 1600, y ocupa 34.1, 131.2 y de 731.8 a 782.1 KiB. En promedio entran entre 3.15 y 3.90 salidas por sala, con un máximo de 4. Expandir la búsqueda completa por las salidas que entran no cuesta más que por las que salen: las diferencias quedan dentro de la variación entre corridas. No se midió el paso del viaje con parada y salidas entrantes, porque la búsqueda compartida todavía no lo acepta (T052). La tabla completa está en `cripta/docs/DECISIONES.md`, §5.3.
+
 ## Riesgos
 
 - **Pasos de un solo sentido.** ~~Riesgo~~ **Confirmado el 2026-11-17**: el servicio puede publicarlos. La corrección está decidida en la alternativa 9: expandir por las salidas conocidas que **llegan** a cada sala y elegir el primer paso por las que **salen**. Carlos ya la aplicó al cazador. Para «ir a» falta que levante el bloqueo entre `parar_en` y `salidas_de` en `RutasMasBaratas`; mientras tanto, el viaje sigue calculando mal con salidas de un solo sentido.
@@ -400,11 +404,11 @@ Con el código final, 100 salas dan entre 1.70 y 1.91 ms en el primer paso y ent
 | FR-012, FR-013 | `structures/mapa_conocido.py` (proveedor de vecinas conocidas), `controller/application.py` | `tests/test_niebla.py`, `tests/test_ir_a.py`, `tests/test_console_view.py` |
 | FR-014 | `structures/mapa_conocido.py` (exportar e importar), `adapters/almacen_partida.py` | `tests/test_niebla.py`, `tests/test_almacen_partida.py` |
 | FR-015, FR-035 | anotaciones en `structures/mapa_conocido.py` | `tests/test_niebla.py` |
-| FR-016 | exportar o anotaciones, según el plan de Erick | **la prueba vive en la especificación de la línea de tiempo**, de Erick. Esta especificación no tiene escenario propio para FR-016, porque la consulta por instante está fuera de su alcance; aquí solo se exige que el conocimiento sea recuperable |
+| FR-016 | exportar e importar, a través de `reconstruir_desde_copia` de la línea de tiempo (`reconstruir_con_mapa_conocido` en `controller/application.py`) | `tests/test_historia_mapa_conocido.py`, con una copia por acción. Con copias espaciadas hay un defecto de la reconstrucción, ajeno al mapa conocido (tasks.md, T041) |
 | FR-017 | consecuencia del principio II | `tests/test_niebla.py` (dos corridas idénticas) |
 | FR-018, FR-019 | `controller/commands.py`, `controller/application.py`, `view/console_view.py` | `tests/test_commands.py`, `tests/test_console_view.py` |
 | FR-020, FR-021 | `controller/application.py`, `view/console_view.py` | `tests/test_console_view.py` |
-| FR-022 a FR-030 | `model/viaje.py`, `controller/game_controller.py` | `tests/test_ir_a.py`, que incluye la comprobación de SC-008 a lo largo de un viaje completo |
+| FR-022 a FR-030 | `model/viaje.py`, `controller/game_controller.py` | `tests/test_ir_a.py`, que incluye la comprobación de SC-008 a lo largo de un viaje completo; `tests/test_niebla.py` con el motor real; `tests/test_ir_a_sentido.py` y `tests/test_equivalencia_sentido.py` para el sentido de las salidas (FR-023, FR-024) |
 | FR-038 | `model/viaje.py` (validación de la orden) | `tests/test_viaje.py` |
 | FR-031 | `controller/game_controller.py`, `replay/replay_log.py` | `tests/test_ir_a.py`, `tests/test_replay_log.py` |
 | FR-032 | ninguno propio: cada paso es una acción del historial | `tests/test_ir_a.py` |
