@@ -84,6 +84,17 @@ class ReplayLogWriter:
     def append(self, command):
         self._write_line(command.to_text())
 
+    def comment(self, text):
+        """Escribe una linea de comentario, '# texto', que la lectura ignora.
+
+        La usa el viaje automatico: cada paso queda como un 'mover' y la orden
+        'ir a' solo como comentario de depuracion (§3.4).
+        """
+        if "\n" in text:
+            raise ValueError("Un comentario no puede tener saltos de linea.")
+
+        self._write_line(f"# {text}")
+
     def close(self):
         self._file.close()
 

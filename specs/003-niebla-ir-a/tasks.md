@@ -67,8 +67,8 @@ Formato: `- [ ] Tnnn [P] [Hn] [AB] [BLOQUEADA: …] Descripción, en archivo —
   - (2) **Después del paso**: recibe la partida, el destino, la vida del jugador antes del paso, la respuesta de (1) y si el paso fue rechazado, y devuelve la lista **en el orden de FR-028**: `llegada`, `enemigos`, `daño`, `sin_ruta`, `partida_terminada`, `contenido_no_disponible`.
 
   Los enemigos se toman **solo** de la respuesta de (1), nunca del estado después del ciclo: un enemigo que llega a la sala del jugador sin atacarlo no es motivo, y uno que estaba al entrar sí lo es aunque se haya ido. Partir de una sala con enemigos no es un motivo.
-- [ ] T023 [P] [AB] Agregar un método para escribir un comentario en la bitácora, en `cripta/replay/replay_log.py` `ReplayLogWriter`. Escribe `# <texto>` y vacía a disco igual que `_write_line`. La lectura ya ignora esas líneas, así que no se toca — FR-031
-- [ ] T024 [P] [AB] Interpretar `ir a <sala>` en `cripta/controller/commands.py`: un comando nuevo con argumento entero, que **no** es acción del modelo (`is_game_action` sigue en falso para él) y aparece en la ayuda. Sin argumento o con un argumento no entero, error de sintaxis como los demás comandos — FR-022
+- [X] T023 [P] [AB] Agregar un método para escribir un comentario en la bitácora, en `cripta/replay/replay_log.py` `ReplayLogWriter`. Escribe `# <texto>` y vacía a disco igual que `_write_line`. La lectura ya ignora esas líneas, así que no se toca — FR-031
+- [X] T024 [P] [AB] Interpretar `ir a <sala>` en `cripta/controller/commands.py`: un comando nuevo con argumento entero, que **no** es acción del modelo (`is_game_action` sigue en falso para él) y aparece en la ayuda. Sin argumento o con un argumento no entero, error de sintaxis como los demás comandos — FR-022
 - [ ] T025 [AB] Bucle del viaje en `cripta/controller/game_controller.py` (depende de T021, T022, T023, T024) — FR-022, FR-025, FR-026, FR-028, FR-029, FR-031, FR-032
   - `GameController` recibe el mapa conocido como **parámetro opcional del constructor**. Si no se pasa, usa el de la partida, que existe desde T011. Las pruebas T027 y T028 lo pasan explícitamente.
   - Validar con `viaje`; si se acepta, escribir el comentario `ir a <sala>` en la bitácora.
@@ -93,7 +93,7 @@ Formato: `- [ ] Tnnn [P] [Hn] [AB] [BLOQUEADA: …] Descripción, en archivo —
 
 **Objetivo**: comando `mapa`, salidas según el conocimiento y cazadores distinguidos.
 
-- [ ] T030 [P] [H7] Interpretar `mapa` en `cripta/controller/commands.py`: sin argumentos, no es acción del modelo y aparece en la ayuda — FR-018, FR-019
+- [X] T030 [P] [H7] Interpretar `mapa` en `cripta/controller/commands.py`: sin argumentos, no es acción del modelo y aparece en la ayuda — FR-018, FR-019
 - [ ] T031 [H7] Armar la vista del mapa conocido en `cripta/controller/application.py` (depende de T001): las salas exploradas ordenadas por id con `sort` de `cripta/structures/sorting.py`; por cada salida, dirección, costo, estado recordado y destino (id si el destino está explorado; ninguno si está avistado) — FR-005, FR-018
 - [ ] T032 [H7] Cambiar `room_view` (`cripta/controller/application.py:172`) para que las salidas salgan del conocimiento: estado recordado en lugar de `door.is_open`, y destino sin id cuando está avistado — FR-012, FR-020
 - [ ] T033 [H7] Atender `mapa` en `_command_loop` de `cripta/controller/application.py` sin pasar por el controlador del modelo ni por la bitácora (depende de T030, T031) — FR-019

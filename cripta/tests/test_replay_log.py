@@ -184,5 +184,26 @@ class TestInvalidLogs(LogFileTestCase):
         self.assert_invalid(self.VALID_HEADER + "---\nguardar a.bin\n", "Linea 8")
 
 
+class TestComentarioDelViaje(LogFileTestCase):
+    """La orden «ir a» queda como comentario (specs/003-niebla-ir-a)."""
+
+    def test_el_comentario_se_escribe_y_la_lectura_lo_ignora(self):
+        """FR-031: cada paso es un movimiento y la orden, un comentario."""
+        with ReplayLogWriter(self.path, HEADER) as log:
+            log.comment("ir a 7")
+            log.append(parse_command("mover e"))
+            log.append(parse_command("mover n"))
+
+        self.assertIn("\n# ir a 7\n", self.read_text())
+        comandos = [logged.command.to_text() for logged in read_replay_log(self.path).commands]
+        self.assertEqual(comandos, ["mover E", "mover N"])
+
+    def test_un_comentario_no_puede_tener_saltos_de_linea(self):
+        """FR-031: un salto de línea metería una línea que no es comentario."""
+        with ReplayLogWriter(self.path, HEADER) as log:
+            with self.assertRaises(ValueError):
+                log.comment("ir a 7\nmover N")
+
+
 if __name__ == "__main__":
     unittest.main()

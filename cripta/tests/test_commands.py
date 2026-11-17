@@ -100,5 +100,53 @@ class TestGameActions(unittest.TestCase):
             self.assertFalse(is_game_action(parse_command(text)), text)
 
 
+class TestComandosDeLaNiebla(unittest.TestCase):
+    """Comandos «mapa» e «ir a <sala>» (specs/003-niebla-ir-a)."""
+
+    def test_mapa_sin_argumentos(self):
+        """FR-018: el comando para ver el mapa conocido."""
+        self.assertEqual(parse_command("mapa"), Command("mapa"))
+        self.assertEqual(parse_command("  MAPA "), Command("mapa"))
+
+    def test_mapa_no_lleva_argumentos(self):
+        """FR-018."""
+        with self.assertRaises(CommandError):
+            parse_command("mapa 3")
+
+    def test_mapa_no_es_accion_del_modelo(self):
+        """FR-019: ver el mapa no se registra como acción."""
+        self.assertFalse(is_game_action(parse_command("mapa")))
+
+    def test_ir_a_convierte_la_sala_a_entero(self):
+        """FR-022: <sala> es el identificador numérico."""
+        self.assertEqual(parse_command("ir a 7"), Command("ir a", 7))
+        self.assertEqual(parse_command("IR A 12"), Command("ir a", 12))
+
+    def test_ir_a_vuelve_a_su_forma_escrita(self):
+        """FR-022: parse_command(comando.to_text()) devuelve el mismo comando."""
+        comando = parse_command("ir a 7")
+
+        self.assertEqual(comando.to_text(), "ir a 7")
+        self.assertEqual(parse_command(comando.to_text()), comando)
+
+    def test_ir_a_mal_escrito_se_rechaza(self):
+        """FR-022: sin sala, con una sala que no es número o sin la «a»."""
+        for texto in ("ir", "ir a", "ir 7", "ir a siete", "ir a -3", "ir a 7 8", "ir b 7"):
+            with self.assertRaises(CommandError, msg=texto):
+                parse_command(texto)
+
+    def test_ir_a_no_es_accion_del_modelo(self):
+        """FR-031: en la bitácora quedan sus pasos, no la orden."""
+        self.assertFalse(is_game_action(parse_command("ir a 7")))
+
+    def test_la_ayuda_los_menciona(self):
+        """FR-018, FR-022."""
+        from controller.commands import HELP_LINES
+
+        texto = "\n".join(HELP_LINES)
+        self.assertIn("mapa", texto)
+        self.assertIn("ir a <sala>", texto)
+
+
 if __name__ == "__main__":
     unittest.main()
