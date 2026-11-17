@@ -130,7 +130,7 @@ Formato: `- [ ] Tnnn [P] [Hn] [AB] [BLOQUEADA: …] Descripción, en archivo —
   - copiar el conocimiento antes de cada acción, frente a las anotaciones;
   - reutilizar la ruta del viaje, y selección lineal del mínimo sin montículo, frente a recalcular con `RutasMasBaratas`.
 - [X] T043 [P] Agregar la suite a `SUITES` en `cripta/benchmark/benchmark.py` — FR-036
-- [ ] T044 (depende de T042) Correr `--bench` y anotar los resultados reales en una sección «Resultado de las mediciones» de `specs/003-niebla-ir-a/plan.md`: los tres tamaños sintéticos y, en cuanto el paquete sin conexión contenga la cripta de referencia, la fila de esa cripta, que es la que comprueba FR-036 y SC-006. Si un paso de «ir a» pasa de 5 ms, cambiar a la alternativa medida y corregir el plan — FR-036
+- [ ] T044 (depende de T042) Correr `--bench` y anotar los resultados reales en una sección «Resultado de las mediciones» de `specs/003-niebla-ir-a/plan.md`: los tres tamaños sintéticos y, en cuanto el paquete sin conexión contenga la cripta de referencia, la fila de esa cripta, que es la que comprueba FR-036 y SC-006. Si un paso de «ir a» pasa de 5 ms, cambiar a la alternativa medida y corregir el plan — FR-036. **Avance**: los resultados sintéticos están anotados. Pasa de 5 ms desde 400 salas, y la alternativa (a) no resuelve el primer paso de cada viaje. Falta la decisión del grupo y la fila de la cripta de referencia, que todavía no está en el paquete sin conexión
 
 ---
 

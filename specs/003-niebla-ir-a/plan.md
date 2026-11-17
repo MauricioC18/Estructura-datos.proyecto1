@@ -251,6 +251,67 @@ Todas entran en `--bench` por una suite nueva.
 
 Si la medición 5 da más de 5 ms, se cambia a la alternativa (a), se documenta el antes y el después y se corrige este plan.
 
+### Resultado de las mediciones
+
+Hechas el 2026-11-16 con `python main.py --bench` (suite «Mapa conocido y viaje ir a»), en Python 3.11.3 sobre Windows AMD64. Criptas sintéticas en cuadrícula de 100, 400 y 1600 salas, con costos deterministas por semilla, y la única cripta del paquete sin conexión disponible, de 6 salas. **El paquete todavía no contiene la cripta de referencia**, así que FR-036 no está comprobado sobre ella.
+
+**1. Estado de una sala (FR-033).** Por consulta, con la mitad de la cripta explorada:
+
+| Salas | Tabla (elegida) | Lista recorrida (descartada) |
+| ---: | ---: | ---: |
+| 100 | 0.51 µs | 26.42 µs |
+| 400 | 0.55 µs | 109.38 µs |
+| 1600 | 0.53 µs | 508.11 µs |
+
+La tabla queda plana al crecer el mapa conocido; la lista crece con él. Confirma la decisión 2.
+
+**2. Puerta recordada (FR-033).** Por consulta:
+
+| Salas | Clave entera (elegida) | Clave de texto (descartada) |
+| ---: | ---: | ---: |
+| 100 | 2.33 µs | 1.06 µs |
+| 400 | 2.35 µs | 1.09 µs |
+| 1600 | 2.52 µs | 1.12 µs |
+
+**Contradice lo que esperaba el plan.** La clave entera es plana (cumple FR-033), pero cuesta más del doble que la de texto, porque calcularla obliga a buscar por qué dirección sale la puerta de `room_a`. La clave de texto sigue siendo incorrecta cuando dos salidas unen las mismas dos salas, así que no es una alternativa válida. Lo que la medición sugiere es otra cosa: calcular la clave desde la salida que ya se tiene en la mano, sin buscarla. Queda como decisión pendiente (ver más abajo).
+
+**3. Explorar una sala más (FR-034).** Con la mitad de la cripta ya explorada:
+
+| Salas | Contadores (elegida) | Recalcular avistadas (descartada) |
+| ---: | ---: | ---: |
+| 100 | 21.62 µs | 222.13 µs |
+| 400 | 20.17 µs | 882.34 µs |
+| 1600 | 20.77 µs | 3708.92 µs |
+
+Plano con los contadores; lineal en el mapa conocido al recalcular. Confirma la decisión 3.
+
+**4. Entrar con antorcha y revertir (FR-035).**
+
+| Salas | Anotaciones (elegida) | Copiar el conocimiento (descartada) |
+| ---: | ---: | ---: |
+| 100 | 74.08 µs | 835.54 µs |
+| 400 | 69.39 µs | 3051.14 µs |
+| 1600 | 75.09 µs | 13882.56 µs |
+
+Revertir no depende del tamaño del mapa conocido. Confirma la decisión 5.
+
+**5. Un paso de «ir a» con el mapa conocido completo (FR-036).**
+
+| Cripta | Un paso, recalculando (elegida) | Por paso, reutilizando en el viaje (a) | Sin montículo (b) |
+| --- | ---: | ---: | ---: |
+| sintética, 100 salas | 2.60 ms | 0.15 ms (viaje de 18 pasos) | 4.20 ms |
+| sintética, 400 salas | **11.55 ms** | 0.37 ms (viaje de 38 pasos) | 32.01 ms |
+| sintética, 1600 salas | **61.44 ms** | 0.65 ms (viaje de 84 pasos) | 174.91 ms |
+| cripta-01, 6 salas | 0.0136 ms | — (sin ruta entre los extremos) | 0.0178 ms |
+
+**La elegida no cumple los 5 ms a partir de 400 salas.** El montículo sí aporta: la búsqueda sin él es de 1.6 a 2.8 veces más lenta. Un experimento aparte, no incluido en la suite, midió la misma búsqueda del cazador con las vecinas **reales** en lugar de las conocidas: 1.40 ms con 100 salas, 6.64 ms con 400 y 30.72 ms con 1600. O sea, la búsqueda misma ya supera los 5 ms en mapas medianos, y el proveedor de vecinas conocidas le agrega cerca de un 70 %, casi todo por el cálculo de la clave de puerta de la medición 2.
+
+**La regla de este plan no alcanza.** Reutilizar la búsqueda durante el viaje, la alternativa (a), baja el costo **promedio** por paso a menos de 1 ms, pero el **primer** paso de cada viaje sigue pagando una búsqueda completa, que con 400 salas es de 11.55 ms. No se cambió nada: decidir qué hacer es del grupo, y antes hay que saber el tamaño de la cripta de referencia. Opciones medibles:
+- calcular la clave de puerta sin buscarla (medición 2);
+- reutilizar la búsqueda durante el viaje, alternativa (a);
+- aligerar la búsqueda compartida con el cazador, que es de Carlos;
+- y medir sobre la cripta de referencia en cuanto el paquete la tenga.
+
 ## Riesgos
 
 - **Pasos de un solo sentido.** El traductor los admite: si una salida no tiene vuelta, la puerta solo aparece en la sala que la declara (`model/room.py:25-26`, `repository/traductor.py:183-206`). La búsqueda va desde el destino y expande por las salidas de cada sala, así que con un paso de un solo sentido calcularía una distancia por un camino que en realidad no se puede recorrer en ese sentido. **El cazador ya depende del mismo supuesto** (plan 002, «El supuesto del grafo sin dirección»). En `cripta-01` las 10 salidas tienen vuelta; no se sabe si alguna cripta publicada tiene un paso de un solo sentido. Si existen, la corrección es la misma para las dos capacidades: expandir por las salidas que **llegan** a cada sala y elegir el primer paso por las que **salen**. Se coordina con Carlos antes de implementar.
