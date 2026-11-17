@@ -54,6 +54,12 @@ def connect(rooms, id_a, id_b, direction, cost=DEFAULT_EXIT_COST, closed=False,
 
 
 def make_rooms(ids):
+    """Salas de prueba, buscables por id para armar la topologia.
+
+    El dict es un andamio de estas pruebas, no la estructura que resuelve
+    ningun problema evaluado: el mapa real de la partida es el RoomMap, que
+    usa la TablaHash del grupo (seccion 7).
+    """
     rooms = {}
 
     for room_id in ids:
