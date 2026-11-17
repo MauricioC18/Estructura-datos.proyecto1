@@ -147,53 +147,9 @@ class ConsoleView:
             )
 
     def show_history(self, resumen):
-        """Imprime el resumen de un instante pasado (seccion 3.6).
-
-        El resumen llega como dato desde el modelo: la vista decide como se
-        ve, y no decide que va adentro.
-        """
-        self._print(
-            f"Instante {resumen.instante} "
-            f"(antes de la accion {resumen.acciones_del_jugador + 1}):"
-        )
-
-        nombre = resumen.nombre_de_la_sala or "desconocida"
-        self._print(f"  Sala: {resumen.sala}, {nombre}")
-        self._print(
-            f"  Vida: {resumen.vida}/{resumen.vida_maxima}  "
-            f"ataque {resumen.ataque}, defensa {resumen.defensa}, "
-            f"velocidad {resumen.velocidad}"
-        )
-
-        if resumen.inventario:
-            objetos = ", ".join(
-                f"{nombre} ({clase})" for nombre, clase in resumen.inventario
-            )
-            self._print(f"  Inventario: {objetos}")
-        else:
-            self._print("  Inventario: vacio")
-
-        if resumen.efectos:
-            efectos = ", ".join(
-                nombre if termina is None else f"{nombre} hasta {termina}"
-                for nombre, termina in resumen.efectos
-            )
-            self._print(f"  Efectos: {efectos}")
-        else:
-            self._print("  Efectos: ninguno")
-
-        if resumen.enemigos:
-            for actor_id, nombre_enemigo, vida in resumen.enemigos:
-                self._print(f"  Enemigo {actor_id}: {nombre_enemigo}, vida {vida}")
-        else:
-            self._print("  Enemigos en la sala: ninguno")
-
-        if isinstance(resumen.mapa_conocido, str):
-            self._print(f"  Mapa conocido: {resumen.mapa_conocido}")
-        else:
-            cuantas = len(resumen.mapa_conocido)
-            salas = ", ".join(str(sala) for sala in resumen.mapa_conocido)
-            self._print(f"  Mapa conocido: {cuantas} salas exploradas ({salas})")
+        """Imprime el resumen de un instante pasado (seccion 3.6)."""
+        for linea in lineas_de_historia(resumen):
+            self._print(linea)
 
     def show_scores(self, entries, crypt_id=None):
         title = "Puntajes" if crypt_id is None else f"Puntajes de {crypt_id}"
@@ -269,3 +225,60 @@ class ConsoleView:
 
     def _print(self, text):
         self.output.write(text + "\n")
+
+
+def lineas_de_historia(resumen):
+    """Las lineas del resumen de un instante pasado (seccion 3.6).
+
+    Es una funcion y no un metodo para que --replay --hasta imprima el mismo
+    resumen sin instanciar la vista.
+
+    El resumen llega como dato desde el modelo: la vista decide como se
+    ve, y no decide que va adentro.
+    """
+    lineas = []
+
+    lineas.append(
+        f"Instante {resumen.instante} "
+        f"(antes de la accion {resumen.acciones_del_jugador + 1}):"
+    )
+
+    nombre = resumen.nombre_de_la_sala or "desconocida"
+    lineas.append(f"  Sala: {resumen.sala}, {nombre}")
+    lineas.append(
+        f"  Vida: {resumen.vida}/{resumen.vida_maxima}  "
+        f"ataque {resumen.ataque}, defensa {resumen.defensa}, "
+        f"velocidad {resumen.velocidad}"
+    )
+
+    if resumen.inventario:
+        objetos = ", ".join(
+            f"{nombre} ({clase})" for nombre, clase in resumen.inventario
+        )
+        lineas.append(f"  Inventario: {objetos}")
+    else:
+        lineas.append("  Inventario: vacio")
+
+    if resumen.efectos:
+        efectos = ", ".join(
+            nombre if termina is None else f"{nombre} hasta {termina}"
+            for nombre, termina in resumen.efectos
+        )
+        lineas.append(f"  Efectos: {efectos}")
+    else:
+        lineas.append("  Efectos: ninguno")
+
+    if resumen.enemigos:
+        for actor_id, nombre_enemigo, vida in resumen.enemigos:
+            lineas.append(f"  Enemigo {actor_id}: {nombre_enemigo}, vida {vida}")
+    else:
+        lineas.append("  Enemigos en la sala: ninguno")
+
+    if isinstance(resumen.mapa_conocido, str):
+        lineas.append(f"  Mapa conocido: {resumen.mapa_conocido}")
+    else:
+        cuantas = len(resumen.mapa_conocido)
+        salas = ", ".join(str(sala) for sala in resumen.mapa_conocido)
+        lineas.append(f"  Mapa conocido: {cuantas} salas exploradas ({salas})")
+
+    return lineas

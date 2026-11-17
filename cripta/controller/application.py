@@ -61,6 +61,7 @@ from structures.history import History, ReversibleEventQueue
 from structures.inventory import Inventory
 from structures.sorting import sort
 from structures.tabla_hash import TablaHash
+from view.console_view import lineas_de_historia
 from structures.trail import PlayerTrail
 
 
@@ -396,7 +397,8 @@ def load_saved_game(repository, view, load_path, in_use=None):
 
 
 def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
-         log_directory=LOG_DIRECTORY, scoreboard=None, load_path=None):
+         log_directory=LOG_DIRECTORY, scoreboard=None, load_path=None,
+         copias_cada=COPIAS_CADA):
     """Juega una partida completa con la vista de consola.
 
     Devuelve el Game al terminar, o None si no se llego a empezar. Si la
@@ -433,7 +435,7 @@ def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
                 return None
 
             repository.iniciar_partida(crypt_id)
-            game = build_game(repository, seed, player_name, in_use)
+            game = build_game(repository, seed, player_name, in_use, copias_cada)
 
         crypt, crypt_version, catalog_version = repository.versiones_de_la_partida()
         header = ReplayHeader(
@@ -678,8 +680,14 @@ def _ending_text(game):
 # ----------------------------------------------------------------------
 
 
-def replay(repository, log_path, output=print, in_use=None, verbose=True):
+def replay(repository, log_path, output=print, in_use=None, verbose=True,
+           copias_cada=COPIAS_CADA, hasta=None):
     """Reproduce un log sin interaccion (§4.11). Devuelve el Game o None.
+
+    Con hasta, al terminar imprime el resumen del instante hasta, el mismo
+    que da el comando historia, sin instanciar la vista (FR-014 de la linea
+    de tiempo). copias_cada son las acciones entre dos copias completas del
+    estado de la partida nueva (FR-015); una partida cargada trae su linea.
 
     Si la fuente no tiene las versiones del log lo informa y no reproduce:
     nunca reproduce en silencio contra datos distintos.
@@ -707,7 +715,7 @@ def replay(repository, log_path, output=print, in_use=None, verbose=True):
         if in_use is not None:
             in_use.game = game
     else:
-        game = build_game(repository, header.seed, in_use=in_use)
+        game = build_game(repository, header.seed, in_use=in_use, copias_cada=copias_cada)
 
     controller = GameController(game, repository=repository)
 
@@ -732,7 +740,25 @@ def replay(repository, log_path, output=print, in_use=None, verbose=True):
 
     output(_ending_text(game))
 
+    if hasta is not None:
+        show_instant(game, hasta, output)
+
     return game
+
+
+def show_instant(game, instant, output=print):
+    """Imprime con output el resumen de un instante pasado, o por que no se
+    puede. No usa la vista interactiva: solo su formato de lineas."""
+    try:
+        resumen = consultar_instante(game, instant, reconstruir_con_mapa_conocido)
+    except ConsultaRechazada as error:
+        output(str(error))
+        return None
+
+    for line in lineas_de_historia(resumen):
+        output(line)
+
+    return resumen
 
 
 def _game_from_logged_save(header, output):

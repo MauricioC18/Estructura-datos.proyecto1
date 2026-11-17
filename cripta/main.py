@@ -5,6 +5,9 @@ Uso, desde la carpeta cripta/:
     python main.py --offline                jugar con los datos de datos_offline/
     python main.py --offline CARPETA        jugar con otro paquete sin conexion
     python main.py --replay partida.log     reproducir una partida sin interaccion
+    python main.py --replay partida.log --hasta T
+                                            reproducir e imprimir el estado del instante T
+    python main.py --checkpoint-cada K      acciones entre dos copias de la linea de tiempo
     python main.py --bench                  medir los subsistemas
 
     python main.py --puntajes [CRIPTA]      mostrar la tabla de puntajes
@@ -18,6 +21,7 @@ import random
 import sys
 
 from structures.cache_catalogo import CAPACIDAD_POR_DEFECTO
+from structures.linea_de_tiempo import COPIAS_CADA
 
 
 DEFAULT_OFFLINE_DIRECTORY = "datos_offline"
@@ -54,6 +58,20 @@ def parse_arguments(argv=None):
         metavar="ARCHIVO",
         help="continuar una partida guardada con el comando guardar",
     )
+    parser.add_argument(
+        "--hasta",
+        type=int,
+        metavar="T",
+        help="con --replay, imprimir al final el estado de la partida en el instante T",
+    )
+    parser.add_argument(
+        "--checkpoint-cada",
+        type=int,
+        default=COPIAS_CADA,
+        metavar="K",
+        help=f"acciones del jugador entre dos copias de la linea de tiempo "
+             f"(por defecto {COPIAS_CADA})",
+    )
     parser.add_argument("--bench", action="store_true", help="medir los subsistemas")
     parser.add_argument("--cripta", metavar="ID", help="id de la cripta, sin preguntar")
     parser.add_argument("--semilla", type=int, help="semilla de la partida")
@@ -73,6 +91,12 @@ def parse_arguments(argv=None):
 
     if arguments.replay and arguments.bench:
         parser.error("--replay y --bench no se pueden usar juntos.")
+
+    if arguments.hasta is not None and not arguments.replay:
+        parser.error("--hasta solo se usa con --replay.")
+
+    if arguments.checkpoint_cada < 1:
+        parser.error("--checkpoint-cada debe ser al menos 1.")
 
     return arguments
 
@@ -132,7 +156,10 @@ def run_replay(arguments):
 
     try:
         repository = make_repository(arguments, in_use)
-        game = replay(repository, arguments.replay, in_use=in_use)
+        game = replay(
+            repository, arguments.replay, in_use=in_use,
+            copias_cada=arguments.checkpoint_cada, hasta=arguments.hasta,
+        )
     except FileNotFoundError:
         print(f"No existe el log '{arguments.replay}'.")
         return 1
@@ -177,6 +204,7 @@ def run_game(arguments):
             repository, view, seed, arguments.cripta, name, in_use,
             scoreboard=Scoreboard(DEFAULT_SCORES_PATH),
             load_path=arguments.cargar,
+            copias_cada=arguments.checkpoint_cada,
         )
     except DATA_ERRORS as error:
         print(f"Error: {error}")
