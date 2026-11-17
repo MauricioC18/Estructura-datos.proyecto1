@@ -188,8 +188,12 @@ class ConsoleView:
         self._print("Enemigos:")
 
         for enemy in enemies:
+            # El cazador se marca porque la decision que le conviene al jugador
+            # es la opuesta: de un guardian puede alejarse y olvidarlo, de un
+            # cazador no (FR-019 de la capacidad 002, §7.3 del enunciado).
+            marca = "[cazador] " if enemy.is_hunter else ""
             self._print(
-                f"  {enemy.name} [{enemy.actor_id}] "
+                f"  {marca}{enemy.name} [{enemy.actor_id}] "
                 f"vida {enemy.health}/{enemy.max_health}"
             )
 

@@ -120,7 +120,11 @@ El viaje automático «ir a» (§3.4), que es de Steven, también busca rutas de
 
 - **`cripta/benchmark/`** — un módulo nuevo para la persecución, con los cuatro escenarios de abajo y los tres modos de cálculo. Las criptas sintéticas son deterministas por semilla, como exige la constitución.
 
-**Lo que no se toca**: el rastro, la lógica de guardián, errante y rastreador, el cálculo del intervalo, el combate y la vista. El cazador usa la espera y el ataque que ya existen con sus costos de siempre.
+### Vista
+
+- **`cripta/view/console_view.py`** — la lista de enemigos de la sala marca al cazador. Es lo mínimo que hace visible la regla que esta capacidad agrega: el jugador tiene que poder decir cuál de los enemigos que ve lo va a perseguir por la cripta (FR-019, §7.3 del enunciado). El dato lo expone el motor en la vista de enemigo; la vista decide cómo se ve.
+
+**Lo que no se toca**: el rastro, la lógica de guardián, errante y rastreador, el cálculo del intervalo y el combate. El cazador usa la espera y el ataque que ya existen con sus costos de siempre.
 
 ## Complejidad esperada
 
@@ -267,6 +271,7 @@ Se cumple con margen de dos órdenes de magnitud. Que la cripta grande salga má
 | FR-016 | consecuencia de II; ningún código propio | `tests/test_cazador.py` |
 | FR-017 | `structures/rutas_mas_baratas.py` (corte por rango) | medición 1 |
 | FR-018 | el diseño completo | medición 4 |
+| FR-019 | `model/game.py` (el dato) y `view/console_view.py` (cómo se ve) | `tests/test_console_view.py`, `tests/test_linea_de_tiempo.py` |
 
 ## Fases
 

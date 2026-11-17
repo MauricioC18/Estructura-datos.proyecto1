@@ -2062,6 +2062,13 @@ El código está en [`structures/rutas_mas_baratas.py`](../structures/rutas_mas_
 y la decisión del cazador en `Enemy._hunt`, en [`model/enemy.py`](../model/enemy.py). La
 estructura **no conoce el modelo**: recibe desde afuera quién provee las vecinas.
 
+**Y la vista marca al cazador.** Es lo mínimo que hace visible la regla: para el jugador,
+un cazador y un guardián se ven igual —un nombre y una vida— pero la decisión que le
+conviene tomar es opuesta, porque de un guardián puede alejarse y olvidarlo y de un
+cazador no. Lo exige §7.3 del enunciado, y el requisito se agregó a la especificación
+antes de tocar la vista, en su propia confirmación. El motor expone el dato; la vista
+decide cómo se ve.
+
 **¿Coincide con el `plan.md` original?** Sí en lo central: buscar desde el jugador,
 reutilizar el montículo y compartir el cálculo son las tres decisiones del plan y las tres
 se mantienen. Cambió un supuesto, no una decisión: el plan daba por hecho que el grafo era
