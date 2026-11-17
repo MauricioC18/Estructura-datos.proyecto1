@@ -78,6 +78,7 @@ Limite conocido
 """
 import os
 import struct
+from io import BytesIO
 from pathlib import Path
 
 from model.enemy import Enemy
@@ -91,7 +92,7 @@ from structures.sorting import sort
 from structures.tabla_hash import TablaHash
 
 FIRMA_DEL_ARCHIVO = b"CRIPTAPA"
-VERSION_DEL_FORMATO = 2
+VERSION_DEL_FORMATO = 3
 
 # "<" = little-endian, sin relleno. B = 1 byte, H = 2, I = 4, i = 4 con signo,
 # q = 8 con signo, Q = 8 sin signo, d = flotante de 8.
@@ -622,6 +623,7 @@ def _empacar_puerta(door):
         _empacar_bandera(door.closed),
         _empacar_texto_o_entero(door.key_id),
         _empacar_entero_opcional(door.auto_close),
+        _empacar_entero(door.cost),
     ])
 
 
@@ -631,8 +633,9 @@ def _leer_puerta(lector):
     closed = lector.bandera()
     key_id = lector.texto_o_entero()
     auto_close = lector.entero_opcional()
+    cost = lector.entero()
     return Door(room_a, room_b, closed=closed, key_id=key_id,
-                auto_close=auto_close)
+                auto_close=auto_close, cost=cost)
 
 
 def _empacar_bloque_de_sala(room, enemies):
@@ -720,25 +723,55 @@ def _puerta_unica(puertas_compartidas, door):
 class AlmacenPartida:
     """Una partida guardada en un archivo binario de formato propio (§4.10)."""
 
-    def __init__(self, ruta):
-        self._ruta = Path(ruta)
+    def __init__(self, ruta=None, contenido=None):
+        """ruta para un archivo; contenido para un bloque ya en memoria.
+
+        El modo en memoria es lo que permite que un punto de control de la
+        linea de tiempo (seccion 3.6) sea este mismo formato sin pasar por
+        disco: se arma con armar_contenido y se vuelve a leer desde los bytes.
+        """
+        if (ruta is None) == (contenido is None):
+            raise ValueError("Hay que dar una ruta o un contenido, no las dos.")
+
+        self._ruta = None if ruta is None else Path(ruta)
+        self._contenido = contenido
 
     @property
     def ruta(self):
         return self._ruta
 
     def existe(self):
+        if self._contenido is not None:
+            return True
+
         return self._ruta.is_file()
+
+    def _abrir_para_leer(self):
+        """Archivo o bloque en memoria, los dos con seek y read."""
+        if self._contenido is not None:
+            return BytesIO(self._contenido)
+
+        return open(self._ruta, "rb")
 
     # ------------------------------------------------------------------
     # Escritura
     # ------------------------------------------------------------------
 
     def guardar(self, juego, versiones=("", "", "")):
-        """Escribe el estado completo de la partida.
+        """Escribe el estado completo de la partida en el archivo."""
+        contenido = self.armar_contenido(juego, versiones)
+        self._escribir_de_una_vez(contenido)
+
+        return len(contenido)
+
+    def armar_contenido(self, juego, versiones=("", "", "")):
+        """Estado completo de la partida en bytes, sin escribir nada.
 
         versiones es (id_cripta, version_cripta, version_catalogo), que se
         guardan para poder avisar al cargar si la cripta cambio.
+
+        Esta separado de guardar porque un punto de control de la linea de
+        tiempo es este mismo bloque, guardado en memoria.
         """
         bloque_global = _empacar_bloque_global(juego, versiones)
         bloques, ids_de_sala = self._armar_bloques_de_sala(juego)
@@ -777,8 +810,7 @@ class AlmacenPartida:
             + indice
         )
 
-        self._escribir_de_una_vez(contenido)
-        return len(contenido)
+        return contenido
 
     def _armar_bloques_de_sala(self, juego):
         bloques = []
@@ -811,7 +843,7 @@ class AlmacenPartida:
 
     def leer_encabezado(self):
         """(version del formato, posicion del indice, cantidad de salas)."""
-        with open(self._ruta, "rb") as archivo:
+        with self._abrir_para_leer() as archivo:
             crudo = archivo.read(_TAMANO_DEL_ENCABEZADO)
 
         if len(crudo) < _TAMANO_DEL_ENCABEZADO:
@@ -857,7 +889,7 @@ class AlmacenPartida:
 
         _, posicion, longitud = entradas[donde]
 
-        with open(self._ruta, "rb") as archivo:
+        with self._abrir_para_leer() as archivo:
             archivo.seek(posicion)
             contenido = archivo.read(longitud)
 
@@ -878,7 +910,7 @@ class AlmacenPartida:
             self.leer_encabezado()
         )
 
-        with open(self._ruta, "rb") as archivo:
+        with self._abrir_para_leer() as archivo:
             archivo.seek(_TAMANO_DEL_ENCABEZADO)
             crudo = archivo.read(_LARGO_DE_BLOQUE.size)
 
@@ -956,7 +988,7 @@ class AlmacenPartida:
         tamano = _ENTRADA_DEL_INDICE.size
 
         if archivo is None:
-            with open(self._ruta, "rb") as abierto:
+            with self._abrir_para_leer() as abierto:
                 abierto.seek(posicion_del_indice)
                 crudo = abierto.read(tamano * cuantas_salas)
         else:
@@ -1114,6 +1146,26 @@ def cargar_partida(ruta):
     poder comprobar las versiones.
     """
     return AlmacenPartida(ruta).cargar()
+
+
+def tomar_copia_del_estado(juego):
+    """Bloque de bytes con el estado completo, para la linea de tiempo.
+
+    Es el mismo formato del archivo de partida, armado en memoria. Se le pasa
+    al motor desde afuera, porque serializar es trabajo del adaptador y no del
+    modelo (principio III de la constitucion).
+    """
+    return AlmacenPartida(ruta="en-memoria").armar_contenido(juego)
+
+
+def reconstruir_desde_copia(bloque):
+    """Arma un Game nuevo a partir del bloque de una copia.
+
+    Va sin bitacora y sin repositorio a proposito: repetir acciones sobre el
+    motor reconstruido no debe escribir en la bitacora de reproduccion ni
+    provocar ninguna solicitud al servicio.
+    """
+    return construir_juego(AlmacenPartida(contenido=bloque).cargar())
 
 
 def comprobar_versiones_vigentes(partida, repositorio):

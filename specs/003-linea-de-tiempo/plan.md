@@ -64,11 +64,16 @@ Tres salidas, y la elegida es la pequeña:
 
 | Salida | Costo | Decisión |
 | --- | --- | --- |
-| **Anotar el estado del generador cada vez que se usa un pergamino** | Un registro por pergamino usado, no por acción. Los pergaminos son objetos de la cripta, así que la cantidad está acotada por los datos. La re-simulación lo aplica al cruzar ese punto y queda alineada con la partida viva | **Elegida** |
+| Anotar el estado del generador cada vez que se usa un pergamino | Un registro por pergamino usado, de unos 5 KB, mucho menos que una copia completa | **No alcanza.** Ver abajo | Descartada al implementar |
+| **Forzar una copia completa cada vez que se usa un pergamino** | Captura todo lo que un pergamino deja fuera del alcance de la lista de acciones, no solo el generador | Una copia completa en vez de 5 KB, y una copia extra fuera de la cadencia de *K* | **Elegida** |
 | Anotar el estado del generador en cada acción | Alinearía siempre, sin pensar. Pero el estado de un generador de Mersenne son 625 enteros: unos 5 KB por acción, 2.5 MB en 500 acciones, para un dato que casi nunca cambia de forma imprevisible | Descartada |
 | Hacer que el pergamino revierta el generador | Sería lo más limpio conceptualmente, pero cambia el comportamiento de una capacidad ya entregada y evaluada de la primera parte, y rompería su determinismo documentado | Descartada |
 
-**Esto es lo que hay que poder contar en la defensa**: el diseño elegido obligó a buscar dónde el programa no era determinista, y apareció un punto que la primera parte había dejado así a propósito. No es un defecto de la primera parte: es que la línea de tiempo le pide algo que el pergamino no necesitaba.
+**Corrección hecha al implementar.** La idea del anclaje de 5 KB se implementó y la prueba de equivalencia la tumbó: un pergamino, además de no revertir el generador, **consume un pergamino del inventario**, y ese consumo no es una acción del jugador, así que no está en la lista que la re-simulación repite. El anclaje alineaba el azar y dejaba el inventario mal.
+
+La respuesta correcta es más simple de explicar: **un pergamino es un punto donde el estado vivo no se puede derivar de la lista de acciones, así que la línea se re-ancla con una copia completa.** Es corrección, no optimización, y por eso se paga la copia. El mecanismo del anclaje se retiró del código en vez de dejarlo sin uso.
+
+**Esto es lo que hay que poder contar en la defensa**: el diseño elegido obligó a buscar dónde el programa no era determinista, y apareció un punto que la primera parte había dejado así a propósito. No es un defecto de la primera parte: es que la línea de tiempo le pide algo que el pergamino no necesitaba. Y la primera respuesta que se nos ocurrió era insuficiente; lo descubrió una prueba, no un razonamiento.
 
 ### Qué se registra por cada acción del jugador
 
@@ -98,7 +103,9 @@ El pergamino quita **una** acción. Recortar es quitar el último registro de ac
 
 ### Desviación declarada
 
-El enunciado permite «no más de una copia completa cada *K* acciones del jugador». Este plan cumple eso entre puntos de anclaje, pero el registro del estado del generador que fuerza cada pergamino es información extra fuera de las copias. **No es una copia del estado**: son unos 5 KB frente al tamaño completo de la cripta, y su cantidad está acotada por los pergaminos que la cripta contenga. Se declara aquí en vez de esconderlo, y la medición de memoria lo reporta por separado para que se vea cuánto pesa de verdad.
+El enunciado permite «no más de una copia completa cada *K* acciones del jugador». Este plan cumple eso durante el juego normal, pero **fuerza una copia extra cada vez que se usa un pergamino**, que puede caer dentro de las *K* acciones de la anterior.
+
+Se declara en vez de esconderlo, con su justificación: sin esa copia el programa informaría una historia **falsa**, y §3.6 exige que el estado consultado sea el real. Entre correcto y dentro del presupuesto de memoria, manda correcto. La cantidad de copias extra está acotada por los pergaminos que la cripta contenga, porque cada uso consume uno, y la medición de memoria las reporta aparte para que se vea cuánto pesan.
 
 ## Qué se cambia, archivo por archivo
 
@@ -164,6 +171,7 @@ Para la memoria se mide el tamaño real en bytes de lo que la línea guarda, no 
 - **Repetir una acción podría tener efectos que no deberían repetirse**, por ejemplo escribir en la bitácora de reproducción o contar solicitudes al servicio. La reconstrucción trabaja sobre un motor armado sin bitácora y sin repositorio, de modo que repetir no puede escribir nada ni pedir nada.
 - **Una copia completa guarda la cripta entera**, incluido el esqueleto, que no cambia nunca. Es desperdicio: lo que de verdad hace falta es el estado mutable. Se mide cuánto pesa y se deja anotado como la optimización evidente; no se hace ahora porque reutilizar el serializador completo, que ya está probado, vale más que ahorrar bytes en una cripta de este tamaño.
 - **El cambio de versión del formato a 3** invalida los guardados de la capacidad anterior, no solo los de la primera parte. Hay que decirlo al grupo.
+- **Defecto encontrado al implementar, ajeno a esta capacidad.** La prueba de equivalencia destapó que el archivo de partida **nunca guardó el costo de las salidas**: la capacidad 001 lo agregó al modelo y no al guardado, así que guardar y cargar devolvía todas las salidas a costo 100 en silencio. No había prueba que lo cubriera porque el costo se agregó después del guardado. Se corrigió aquí, y es el argumento más fuerte a favor de esta capacidad: reconstruir el pasado obliga a que el estado se serialice **completo**, y eso delata cualquier campo que falte.
 
 ## Trazabilidad
 
