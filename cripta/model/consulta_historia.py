@@ -271,17 +271,23 @@ def _enemigos_en_la_sala_de(reconstruido, room_id):
 
 
 def _mapa_conocido_de(reconstruido):
-    """El mapa conocido es de la niebla de guerra, que todavia no existe.
+    """Las salas que el jugador tenia exploradas en ese instante.
 
-    Se lee de quien lo tenga, por duck typing, para que conectarlo cuando
-    exista sea agregar una lectura y no rediseniar nada.
+    Se lee por duck typing del colaborador de niebla de guerra. Una partida
+    sin niebla lleva el objeto nulo del motor, que se declara no disponible, y
+    el resumen lo informa asi en vez de fallar.
     """
     conocido = getattr(reconstruido, "known_map", None)
 
-    if conocido is None:
+    if conocido is None or not getattr(conocido, "disponible", True):
         return MAPA_CONOCIDO_NO_DISPONIBLE
 
-    return conocido
+    exploradas = getattr(conocido, "salas_exploradas", None)
+
+    if exploradas is None:
+        return MAPA_CONOCIDO_NO_DISPONIBLE
+
+    return tuple(exploradas())
 
 
 def _exigir_linea(juego):

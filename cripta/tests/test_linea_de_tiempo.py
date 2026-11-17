@@ -298,6 +298,31 @@ def construir_partida_con_linea(copias_cada=10, semilla=2026, salas=4,
     return juego, linea
 
 
+class MapaConocidoDoble:
+    """Doble del mapa conocido, con el contrato acordado con Steven.
+
+    Recibe los avisos del motor (jugador_entro, puerta_cambio) y responde
+    salas_exploradas(). Sirve para probar que el motor avisa y que el resumen
+    lee, sin depender del modulo real, que vive en otra rama.
+    """
+
+    disponible = True
+
+    def __init__(self):
+        self._exploradas = []
+        self.puertas_observadas = 0
+
+    def jugador_entro(self, room_id, torch_lit):
+        if room_id not in self._exploradas:
+            self._exploradas.append(room_id)
+
+    def puerta_cambio(self, door, player_room_id):
+        self.puertas_observadas += 1
+
+    def salas_exploradas(self):
+        return list(self._exploradas)
+
+
 def estado_observable(juego):
     """Lo que un resumen debe poder reproducir."""
     sala = juego.player.room_id
@@ -443,21 +468,32 @@ class ReconstruirUnInstanteTest(unittest.TestCase):
         self.assertEqual(resumen.mapa_conocido, MAPA_CONOCIDO_NO_DISPONIBLE)
 
     def test_el_mapa_conocido_se_lee_de_quien_lo_tenga(self):
-        """El dato es de la niebla de guerra, que todavia no existe.
+        """El dato es de la niebla de guerra, que la implementa otro.
 
-        Se lee por duck typing para que conectarlo sea agregar una lectura.
+        Se usa un doble que cumple el contrato acordado: recibe los avisos del
+        motor y responde salas_exploradas(). Asi la prueba vale aunque el
+        modulo real todavia no este en esta rama.
         """
-        juego, _ = construir_partida_con_linea()
+        juego, _ = construir_partida_con_linea(objetos_extra=())
         jugar_guardando_el_estado(juego, 12)
 
         def reconstruir_con_mapa(bloque):
             reconstruido = reconstruir_desde_copia(bloque)
-            reconstruido.known_map = "mapa de prueba"
+            reconstruido.known_map = MapaConocidoDoble()
             return reconstruido
 
-        resumen = consultar_accion(juego, 3, reconstruir_con_mapa)
+        resumen = consultar_accion(juego, 6, reconstruir_con_mapa)
 
-        self.assertEqual(resumen.mapa_conocido, "mapa de prueba")
+        self.assertIsInstance(resumen.mapa_conocido, tuple)
+        self.assertIn(1, resumen.mapa_conocido)
+
+    def test_sin_niebla_de_guerra_el_resumen_lo_dice_en_vez_de_fallar(self):
+        juego, _ = construir_partida_con_linea()
+        jugar_guardando_el_estado(juego, 8)
+
+        resumen = consultar_accion(juego, 3, reconstruir_desde_copia)
+
+        self.assertEqual(resumen.mapa_conocido, MAPA_CONOCIDO_NO_DISPONIBLE)
 
 
 class ConsultarNoAlteraNadaTest(unittest.TestCase):
@@ -959,6 +995,56 @@ class ComandoYVistaTest(unittest.TestCase):
         self.assertIn("Inventario", texto)
         self.assertIn("Efectos", texto)
         self.assertIn("Mapa conocido", texto)
+
+
+class AvisosDelMotorAlMapaConocidoTest(unittest.TestCase):
+    """Los avisos que la niebla de guerra necesita del motor.
+
+    El modulo real es de Steven y vive en otra rama; aca se comprueba que el
+    motor avisa en los momentos acordados, con un doble.
+    """
+
+    def _partida_con_mapa(self):
+        doble = MapaConocidoDoble()
+        juego, linea = construir_partida_con_linea()
+        juego.known_map = doble
+        doble.jugador_entro(juego.player.room_id, juego.torch_lit)
+
+        return juego, doble
+
+    def test_el_motor_avisa_cuando_el_jugador_entra_a_una_sala(self):
+        juego, doble = self._partida_con_mapa()
+
+        self.assertEqual(doble.salas_exploradas(), [1])
+
+        self.assertTrue(juego.move("N").accepted)
+
+        self.assertEqual(doble.salas_exploradas(), [1, 2])
+
+    def test_una_partida_sin_niebla_no_falla_con_los_avisos(self):
+        """El objeto nulo ignora los avisos, igual que _NoHistory."""
+        juego, _ = construir_partida_con_linea()
+
+        self.assertFalse(juego.known_map.disponible)
+        self.assertTrue(juego.move("N").accepted)
+
+    def test_la_vista_de_enemigos_dice_si_es_cazador(self):
+        """Lo que Steven pidio para pintar el cazador distinto."""
+        from model.enemy import Enemy
+
+        juego, _ = construir_partida_con_linea()
+        juego.enemies[0].behavior = Enemy.HUNTER
+        juego.enemies[0].pursuit_range = 600
+        juego.enemies[0].room_id = juego.player.room_id
+        juego.enemies[1].room_id = juego.player.room_id
+
+        vistos = {
+            enemigo.actor_id: enemigo.is_hunter
+            for enemigo in juego.visible_state().enemies
+        }
+
+        self.assertTrue(vistos["e-1"])
+        self.assertFalse(vistos["e-2"])
 
 
 if __name__ == "__main__":

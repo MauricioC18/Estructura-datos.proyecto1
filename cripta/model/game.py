@@ -86,11 +86,31 @@ class ActionResult:
 
 
 @dataclass
+class _NoKnownMap:
+    """Objeto nulo del mapa conocido, para una partida sin niebla de guerra.
+
+    El motor avisa de lo que pasa sin preguntar si alguien escucha, igual que
+    hace con el historial reversible y su _NoHistory. El atributo disponible
+    permite a quien consulte el mapa distinguir «no hay niebla de guerra» de
+    «el jugador no ha explorado nada».
+    """
+
+    disponible = False
+
+    def jugador_entro(self, room_id, torch_lit):
+        pass
+
+    def puerta_cambio(self, door, player_room_id):
+        pass
+
+
+@dataclass
 class EnemyView:
     actor_id: str
     name: str
     health: int
     max_health: int
+    is_hunter: bool = False
 
 
 @dataclass
@@ -146,6 +166,7 @@ class Game:
         always_recompute_routes=False,
         timeline=None,
         snapshot=None,
+        known_map=None,
     ):
         self.state = state
         self.player = player
@@ -167,6 +188,7 @@ class Game:
         self._routes = None
         self.timeline = timeline
         self._snapshot = snapshot
+        self.known_map = _NoKnownMap() if known_map is None else known_map
 
         if start:
             self._begin_new_game()
@@ -182,6 +204,7 @@ class Game:
         archivo, sus enemigos ya tienen su estado y el reloj no esta en cero.
         """
         self._mark_trail()
+        self.known_map.jugador_entro(self.player.room_id, self.torch_lit)
         self._schedule(self.player, self.state.clock)
         self._activate_enemies_in(self.player.room_id)
         self._advance_to_player_turn()
@@ -207,6 +230,7 @@ class Game:
         enemies_defeated=0,
         timeline=None,
         snapshot=None,
+        known_map=None,
     ):
         """Arma una partida guardada en disco, para el guardado de §4.10.
 
@@ -242,6 +266,7 @@ class Game:
             start=False,
             timeline=timeline,
             snapshot=snapshot,
+            known_map=known_map,
         )
 
         for event in events:
@@ -325,6 +350,7 @@ class Game:
         self.history.begin_action()
         self.history.assign(self.player, "room_id", destination.room_id)
         self._invalidate_routes()
+        self.known_map.jugador_entro(destination.room_id, self.torch_lit)
         self._activate_enemies_in(destination.room_id)
         message = f"Entras a {destination.name}."
         self._log(message)
@@ -374,6 +400,7 @@ class Game:
         self.history.begin_action()
         self.history.assign(door, "closed", False)
         self._invalidate_routes()
+        self.known_map.puerta_cambio(door, self.player.room_id)
         message = f"Abres la puerta hacia {direction}."
 
         if door.auto_close is not None:
@@ -614,6 +641,7 @@ class Game:
                 enemy.name,
                 enemy.health,
                 enemy.max_health,
+                enemy.behavior == Enemy.HUNTER,
             )
             for enemy in self.enemies
             if enemy.is_alive and enemy.room_id == self.player.room_id
@@ -1129,6 +1157,7 @@ class Game:
 
         self.history.assign(exit_.door, "closed", True)
         self._invalidate_routes()
+        self.known_map.puerta_cambio(exit_.door, self.player.room_id)
         self._log(f"La puerta hacia {direction} se cierra sola.")
 
     def _rearm_trap(self, room_id, instance_id):

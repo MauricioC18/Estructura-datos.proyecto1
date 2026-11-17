@@ -172,6 +172,7 @@ class PartidaGuardada:
         self.player_actions = 0
         self.enemies_defeated = 0
         self.timeline = None
+        self.known_map = None
 
 
 # ----------------------------------------------------------------------
@@ -612,9 +613,54 @@ def _empacar_bloque_global(juego, versiones, con_linea=True):
         partes.append(_empacar_entero(room_id))
         partes.append(_empacar_entero(time))
 
+    partes.append(_empacar_mapa_conocido(juego))
     partes.append(_empacar_linea_de_tiempo(juego, con_linea))
 
     return b"".join(partes)
+
+
+def _empacar_mapa_conocido(juego):
+    """El mapa conocido del jugador, si la partida lleva niebla de guerra.
+
+    Se lee por duck typing: el adaptador no conoce la clase. El contrato es
+    exportar() -> (salas exploradas en orden, pares (clave, abierta)), que es
+    lo acordado con quien implementa la niebla de guerra (seccion 3.3).
+
+    Un punto de control de la linea de tiempo es este mismo formato, asi que
+    el conocimiento del jugador entra en las copias sin ningun trabajo extra.
+    """
+    mapa = getattr(juego, "known_map", None)
+    exportar = getattr(mapa, "exportar", None)
+
+    if exportar is None:
+        return _empacar_bandera(False)
+
+    exploradas, puertas = exportar()
+    partes = [_empacar_bandera(True), _empacar_cantidad(len(exploradas))]
+
+    for room_id in exploradas:
+        partes.append(_empacar_entero(room_id))
+
+    partes.append(_empacar_cantidad(len(puertas)))
+
+    for clave, abierta in puertas:
+        partes.append(_empacar_entero(clave))
+        partes.append(_empacar_bandera(abierta))
+
+    return b"".join(partes)
+
+
+def _leer_mapa_conocido(lector):
+    """Devuelve (exploradas, puertas), o None si la partida no lleva niebla."""
+    if not lector.bandera():
+        return None
+
+    cuantas = lector.cantidad()
+    exploradas = [lector.entero() for _ in range(cuantas)]
+    cuantas = lector.cantidad()
+    puertas = [(lector.entero(), lector.bandera()) for _ in range(cuantas)]
+
+    return exploradas, puertas
 
 
 def _empacar_linea_de_tiempo(juego, con_linea):
@@ -1048,6 +1094,7 @@ class AlmacenPartida:
         partida.trail_marks = [
             (lector.entero(), lector.entero()) for _ in range(cuantas_marcas)
         ]
+        partida.known_map = _leer_mapa_conocido(lector)
         partida.timeline = _leer_linea_de_tiempo(lector)
 
         puertas_compartidas = TablaHash()
@@ -1167,7 +1214,7 @@ def _comprobar_versiones(partida, versiones_vigentes):
 
 
 def construir_juego(partida, trail=None, history=None, event_queue=None,
-                    message_log=None):
+                    message_log=None, known_map=None):
     """Arma el Game de una partida leida del archivo.
 
     Se usa Game.load() y no el constructor normal: el constructor hace el
@@ -1204,6 +1251,7 @@ def construir_juego(partida, trail=None, history=None, event_queue=None,
         player_actions=partida.player_actions,
         timeline=partida.timeline,
         snapshot=tomar_copia_del_estado,
+        known_map=_mapa_conocido_importado(known_map, partida),
         enemies_defeated=partida.enemies_defeated,
     )
 
@@ -1232,6 +1280,21 @@ def cargar_partida(ruta):
     return AlmacenPartida(ruta).cargar()
 
 
+def _mapa_conocido_importado(known_map, partida):
+    """Deja el mapa conocido como estaba al guardar, si hay los dos.
+
+    Se llama a importar() por duck typing: el adaptador guarda y recupera los
+    datos, y la clase es de quien implementa la niebla de guerra.
+    """
+    if known_map is None or partida.known_map is None:
+        return known_map
+
+    exploradas, puertas = partida.known_map
+    known_map.importar(exploradas, puertas)
+
+    return known_map
+
+
 def tomar_copia_del_estado(juego):
     """Bloque de bytes con el estado completo, para la linea de tiempo.
 
@@ -1242,14 +1305,22 @@ def tomar_copia_del_estado(juego):
     return AlmacenPartida(ruta="en-memoria").armar_contenido(juego, con_linea=False)
 
 
-def reconstruir_desde_copia(bloque):
+def reconstruir_desde_copia(bloque, crear_mapa_conocido=None):
     """Arma un Game nuevo a partir del bloque de una copia.
 
     Va sin bitacora y sin repositorio a proposito: repetir acciones sobre el
     motor reconstruido no debe escribir en la bitacora de reproduccion ni
     provocar ninguna solicitud al servicio.
+
+    crear_mapa_conocido recibe el mapa de salas reconstruido y devuelve un
+    mapa conocido vacio. Si se da, el conocimiento del jugador que venia en la
+    copia se importa en el: asi el resumen de un instante puede informar lo
+    que el jugador sabia en ese momento.
     """
-    return construir_juego(AlmacenPartida(contenido=bloque).cargar())
+    partida = AlmacenPartida(contenido=bloque).cargar()
+    mapa = None if crear_mapa_conocido is None else crear_mapa_conocido(partida.room_map)
+
+    return construir_juego(partida, known_map=mapa)
 
 
 def comprobar_versiones_vigentes(partida, repositorio):
@@ -1259,7 +1330,7 @@ def comprobar_versiones_vigentes(partida, repositorio):
     _comprobar_versiones(partida, (version_cripta, version_catalogo))
 
 
-def construir_juego_reversible(partida, message_log=None):
+def construir_juego_reversible(partida, message_log=None, known_map=None):
     """Arma el Game de una partida cargada, con historial para el retroceso.
 
     Es la version que usa el programa, no las pruebas: le pone el historial, el
@@ -1304,6 +1375,7 @@ def construir_juego_reversible(partida, message_log=None):
         player_actions=partida.player_actions,
         timeline=partida.timeline,
         snapshot=tomar_copia_del_estado,
+        known_map=_mapa_conocido_importado(known_map, partida),
         enemies_defeated=partida.enemies_defeated,
     )
 

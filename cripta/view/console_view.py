@@ -127,7 +127,12 @@ class ConsoleView:
         else:
             self._print("  Enemigos en la sala: ninguno")
 
-        self._print(f"  Mapa conocido: {resumen.mapa_conocido}")
+        if isinstance(resumen.mapa_conocido, str):
+            self._print(f"  Mapa conocido: {resumen.mapa_conocido}")
+        else:
+            cuantas = len(resumen.mapa_conocido)
+            salas = ", ".join(str(sala) for sala in resumen.mapa_conocido)
+            self._print(f"  Mapa conocido: {cuantas} salas exploradas ({salas})")
 
     def show_scores(self, entries, crypt_id=None):
         title = "Puntajes" if crypt_id is None else f"Puntajes de {crypt_id}"
