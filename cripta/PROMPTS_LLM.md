@@ -1823,3 +1823,39 @@ Estoy en medio de un merge de origin/main en la rama Parte_2-niebla-ir-a, con co
 Uso en el proyecto: `cripta/PROMPTS_LLM.md`, `cripta/benchmark/benchmark.py` y `cripta/controller/commands.py`.
 
 Cambios realizados por el estudiante: Los tres conflictos eran de dos lados que agregaban cosas distintas en el mismo lugar, no de cambios incompatibles. En este archivo quedaron la entrada de la línea de tiempo que trajo main y, a continuación, las entradas 2.30 a 2.39 de esta rama, sin tocar su texto; las dos ramas numeraron su primera entrada como 2.30, y esa repetición se dejó así porque renumerar habría reescrito entradas ajenas. En `benchmark.py` quedaron las dos suites nuevas (mapa conocido y viaje «ir a», y línea de tiempo), y en `commands.py` las líneas de ayuda de `mapa`, `ir a` e `historia`; el resto de ambos archivos ya lo había combinado git sin conflicto. No hizo falta cambiar ningún otro archivo. Las 1143 pruebas pasaron con Python 3.12.3 (el de WSL, porque en Windows solo estaba el atajo de la Microsoft Store), y se comprobó que el código fusionado no importa heapq, bisect ni collections.
+
+### 2.41 Análisis de «ir a» frente a salidas de un solo sentido
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Saber, sin modificar nada, si el cálculo de ruta de «ir a» sigue siendo correcto ahora que Carlos confirmó que el servicio puede publicar salidas de un solo sentido, y qué habría que cambiar.
+
+Prompts utilizados:
+
+```text
+Carlos confirma que el servicio puede publicar salidas de un solo sentido. Analiza SIN modificar nada: 1. Cómo calcula hoy mi «ir a» la ruta [...] ¿es incorrecto con salidas dirigidas? Dímelo con un ejemplo concreto de mapa asimétrico. 2. Revisa cómo quedó structures/rutas_mas_baratas.py en main y los avisos de Carlos sobre un proveedor de aristas entrantes. Dime si puedo reutilizar eso para el mapa conocido. 3. Propón la solución más simple que mantenga el desempate de FR-024 y la parada anticipada [...] Compara y recomienda, con las mediciones que habría que hacer. 4. Dime si esto exige cambiar la spec 003-niebla-ir-a (futura 005) o solo el plan [...] 5. Dime qué parte depende de que Carlos termine su proveedor de aristas entrantes y qué puedo hacer ya. No toques código, tests ni documentos. Registra la entrada en PROMPTS_LLM.md.
+```
+
+Uso en el proyecto: ninguno todavía; es el análisis previo a actualizar el plan de `specs/003-niebla-ir-a`. Se leyeron `cripta/model/viaje.py`, `cripta/structures/mapa_conocido.py`, `cripta/structures/rutas_mas_baratas.py` en esta rama y en `origin/mauricio-logica-juego`, y `cripta/model/game.py` y `cripta/docs/DECISIONES.md` de esa rama.
+
+Cambios realizados por el estudiante: Pendiente de la decisión. El análisis confirmó lo que el plan ya listaba como riesgo: la búsqueda va desde el destino por las salidas que salen de cada sala, así que con un paso de un solo sentido calcula la distancia del destino a cada sala y no la de cada sala al destino. Con las salidas 1→3, 3→2 y 2→1, todas de costo 1 y sin vuelta, el jugador en 1 queda sin ruta hacia 3 aunque tiene una salida directa. También se encontró que el proveedor de salidas entrantes de Carlos no está en main sino en su rama, que su versión de la búsqueda rechaza a propósito combinar la parada anticipada con el proveedor de salidas, y que la especificación ya pide lo correcto (recorrer salidas y minimizar su costo), de modo que el defecto es de implementación y de plan, no de requisito.
+
+### 2.42 La especificación de «ir a» no decía nada de las salidas de un solo sentido
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Dejar escrito en la especificación, antes de tocar plan o código (§2.6), que «ir a» debe respetar el sentido de las salidas, ahora que se confirmó que el servicio puede publicar salidas de un solo sentido.
+
+Prompts utilizados:
+
+```text
+Agrega a specs/003-niebla-ir-a/spec.md (y su checklist), SIN reenumerar FR existentes: un caso límite y, si hace falta, un escenario de aceptación que diga que «ir a» debe encontrar la ruta de menor costo respetando el sentido de las salidas. Una salida puede existir en un solo sentido (la sala destino no declara la vuelta); la ruta del jugador solo puede usar salidas en el sentido en que existen, y no debe declararse "sin ruta" cuando existe una salida directa. No nombres estructuras, clases ni algoritmos. Registra la decisión en aclaraciones. Muestra el cambio y NO hagas commit.
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` (aclaración de la sesión 2026-11-17, caso borde y escenarios 7 y 8 de la Historia 4) y `specs/003-niebla-ir-a/checklists/requirements.md` (nota de la corrección).
+
+Cambios realizados por el estudiante: No se agregó ningún requisito ni se reenumeró ninguno, porque FR-023 ya pide recorrer salidas y minimizar su costo: el defecto estaba en el código y en el plan, no en el requisito. Lo que faltaba era que la especificación lo hiciera verificable. El escenario 7 es el mapa de tres salas del análisis anterior (2.41), con el que la implementación actual se declara sin ruta teniendo una salida directa de costo 1; así la prueba que lo cubra falla hoy y deja de fallar con la corrección. El escenario 8 cubre el caso contrario, que la ruta no use una salida al revés. La especificación sigue sin nombrar estructuras, clases ni algoritmos. El cambio queda sin commit hasta revisarlo.

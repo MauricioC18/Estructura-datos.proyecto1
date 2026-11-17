@@ -27,6 +27,10 @@
 - Q: ¿La especificación debe fijar con qué criptas se mide FR-036? → A: No. El límite es el de §6.1, sobre el mapa conocido completo de la cripta de referencia. Con qué criptas se mide es una decisión del plan.
 - Q: ¿Se acepta la orden `ir a` cuando la partida ya terminó? → A: No. Se rechaza sin consumir tiempo, igual que toda otra acción con la partida terminada (FR-038).
 
+### Session 2026-11-17
+
+- Q: Una salida puede existir en un solo sentido: la sala a la que lleva no declara la salida de vuelta. ¿Cómo la trata «ir a»? → A: La ruta solo puede atravesar cada salida en el sentido en que existe; una salida de un solo sentido no se puede recorrer al revés. Con esa restricción, la ruta sigue siendo la de menor costo (FR-023) y desempata igual (FR-024). Si existe una salida directa que el mapa recuerda abierta desde la sala del jugador hacia el destino, el viaje no puede declarar que no hay ruta conocida. *(Confirmado por el grupo: el servicio puede publicar salidas de un solo sentido.)*
+
 ## Escenarios de uso y pruebas
 
 ### Historia 1 — El jugador solo conoce lo que ha visto (Prioridad: P1)
@@ -102,6 +106,8 @@ Cada paso es una acción completa del jugador: cuesta lo que cuesta atravesar es
 4. **Dado** una ruta que mejoraría pasando por una puerta cerrada de la que el jugador tiene la llave, **cuando** viaja, **entonces** no abre la puerta y sigue por las salidas que recuerda abiertas.
 5. **Dado** un viaje de varios pasos, **cuando** termina, **entonces** cada paso consumió el tiempo de un movimiento por esa salida y entre paso y paso se ejecutaron los eventos del reloj que correspondían.
 6. **Dado** un viaje de varios pasos, **cuando** se revisa la bitácora de reproducción, **entonces** cada paso aparece como un movimiento individual y la orden `ir a` aparece además como comentario.
+7. **Dado** tres salas exploradas unidas solo por salidas de un solo sentido, de la sala 1 a la 3, de la 3 a la 2 y de la 2 a la 1, todas de costo 1 y recordadas abiertas, con el jugador en la sala 1, **cuando** escribe `ir a 3`, **entonces** el viaje atraviesa la salida directa de la 1 a la 3 en un solo paso de costo 1, y no informa que no hay ruta conocida.
+8. **Dado** un destino al que el jugador solo podría llegar recorriendo al revés una salida de un solo sentido, **cuando** escribe `ir a` hacia él, **entonces** esa salida no forma parte de la ruta: el viaje sigue otra ruta conocida que respete el sentido de las salidas, o, si no la hay, se detiene antes del primer paso informando que no hay ruta conocida, sin consumir tiempo.
 
 ---
 
@@ -165,6 +171,7 @@ El jugador tiene un comando para ver su mapa conocido: las salas exploradas, sus
 - **`ir a` hacia la sala en la que ya está el jugador**: se rechaza sin consumir tiempo.
 - **`ir a` con un identificador que no corresponde a ninguna sala de la cripta**: se rechaza igual que una sala no explorada, sin revelar si esa sala existe.
 - **`ir a` hacia una sala explorada a la que no lleva ninguna ruta conocida**: el viaje se detiene antes del primer paso, informa que no hay ruta conocida y no consume tiempo.
+- **Salidas de un solo sentido**: una salida puede existir solo desde una sala hacia otra, sin que la segunda declare la vuelta. La ruta solo la atraviesa en el sentido en que existe, y el costo de la ruta se cuenta con las salidas en ese sentido. Que la vuelta no exista no impide usar la ida: si hay una salida directa recordada abierta hacia el destino, el viaje no se declara sin ruta.
 - **Iniciar un viaje desde una sala con enemigos**: se permite. Solo detiene el viaje **entrar** a una sala con enemigos, no partir de una.
 - **Un enemigo entra a la sala del jugador a mitad del viaje sin hacerle daño**: no es un motivo de parada por sí solo; si lo ataca, el daño sí lo es.
 - **El primer paso de cada cálculo atraviesa siempre una puerta de la sala actual**: como el jugador observa las puertas de la sala en la que está, el mapa nunca le hace intentar cruzar una puerta que en ese instante está cerrada sin haberla visto cerrada antes.
