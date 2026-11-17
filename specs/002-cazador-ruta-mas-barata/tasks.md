@@ -44,7 +44,7 @@ Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porqu
 - [x] T014 El banco de mediciones de la persecución, en `cripta/benchmark/`
 - [x] T015 Correr las cuatro mediciones y anotarlas en `specs/002-cazador-ruta-mas-barata/plan.md`
 - [x] T016 No romper nada: la suite completa
-- [ ] T017 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
+- [x] T017 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
 
 ---
 

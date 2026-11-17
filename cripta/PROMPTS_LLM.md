@@ -1477,3 +1477,75 @@ sí, dale, hacé el plan y las tareas e implementalo
 Uso en el proyecto: `specs/001-terreno-costo-salidas/plan.md` y `tasks.md`; `model/room.py`, `model/game.py`, `repository/traductor.py`, `controller/application.py`, `view/console_view.py`, `benchmark/scheduler_bench.py` y las pruebas de `tests/test_room.py`, `tests/test_traductor.py`, `tests/test_movement.py` y `tests/test_actor.py`.
 
 Cambios realizados por el estudiante: La decisión de diseño fue guardar el costo en la puerta y no en la salida. La puerta ya era un único objeto compartido por las dos salas que conecta, así que el requisito de que el costo sea igual en ambos sentidos se cumple por construcción en vez de depender de una validación. Se descartaron guardar el costo en la salida, que obligaría a validar a mano que las dos direcciones coincidan, y guardarlo en una estructura aparte indexada por par de salas, que sería un índice y la sección 7 lo prohíbe. Se reutilizó el mecanismo que el traductor ya tenía para cuando los dos lados de una puerta declaran valores distintos, el mismo que usa para la llave y el cierre automático, en vez de inventar una regla nueva. Al revisar lo implementado se encontró un error propio: se estaba comparando el costo efectivo de la puerta, que siempre trae el valor por omisión, en vez del costo declarado, de modo que si un solo lado declaraba costo el traductor avisaba de una discrepancia inexistente; se corrigió guardando el valor declarado junto a la puerta pendiente de emparejar. También se eliminó la constante del costo de movimiento del motor, que quedaba repitiendo el mismo 100 que ya define el modelo, porque era el riesgo anotado en el propio plan. Dos requisitos resultaron ya satisfechos por el diseño de la primera parte, el intervalo mínimo de una unidad y el reescalado al cambiar de velocidad, así que sus tareas fueron demostrarlo con pruebas y no implementarlo. La medición cerró el ciclo: 0.1912 ms por ciclo con costos uniformes contra 0.1897 ms con costos variables, o sea que el cambio no cuesta nada medible.
+
+### 2.27 Especificación del cazador con /speckit.specify
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Escribir la segunda especificación de la segunda parte, la del cazador y su ruta de costo mínimo (§3.2, §5.1 y §5.2), siguiendo el flujo obligatorio de spec-kit.
+
+Prompts utilizados:
+
+```text
+sí, subilo a las dos y seguí con el cazador
+```
+
+```text
+/speckit.specify El cazador: un enemigo que persigue al jugador por la ruta más barata.
+
+Se agrega un cuarto comportamiento de enemigo, "cazador", junto a guardián, errante y rastreador. Su ficha de catálogo incluye un campo "rango", entero en unidades de costo. En su turno: si comparte sala con el jugador ataca; si no, considera el costo mínimo d de llegar hasta la sala del jugador sumando el costo de cada salida y usando solo salidas abiertas en ese instante; si no existe ruta o d es mayor que su rango, espera con costo 100; si existe, se mueve un paso por una ruta de costo d.
+
+Desempate obligatorio: entre las vecinas v tales que costo(u,v) + distancia(v, jugador) = d, se mueve a la de menor id. Conoce el esqueleto completo y el estado actual de las puertas; no le afecta la niebla de guerra y no abre puertas cerradas. Equivalencia observable: su decisión en cada turno debe ser idéntica a la de un cálculo desde cero en ese instante.
+
+[El prompt completo incluye los cinco casos del Apéndice B que faltaban, los requisitos de rendimiento de §5.1 y §5.2, lo que queda fuera por pertenecer a otros integrantes, y las estructuras propias que ya existen en el repositorio.]
+```
+
+Uso en el proyecto: `specs/002-cazador-ruta-mas-barata/spec.md` y su lista de verificación.
+
+Cambios realizados por el estudiante: Antes de escribir la especificación se leyó el enunciado de la segunda parte y el código de los tres comportamientos existentes, para no inventar reglas y para saber qué colaboradores recibe un enemigo en su turno. Se resolvieron como supuestos documentados, en vez de dejar marcadores de aclaración, tres puntos que el enunciado no dice de forma literal: que un rango igual al costo de la ruta sí permite perseguir, porque el enunciado dice que el cazador espera cuando el costo es «mayor» que el rango; que un rango ausente o inválido es un error de datos de cripta, con el mismo criterio que la capacidad anterior aplicó al costo de las salidas; y que un rango de 0 es una ficha válida que simplemente nunca persigue. Se dejó explícitamente fuera del alcance la niebla de guerra y el viaje automático, que son de otros integrantes, con la nota de que el viaje automático calcula rutas sobre el mapa conocido y no sobre el real, de modo que compartir implementación es decisión de su propio plan.
+
+### 2.28 Revisión de consistencia con /speckit.analyze y corrección de la especificación
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Revisar la consistencia entre la especificación, el plan y las tareas del cazador antes de implementar, como pide §2.2 del enunciado, y corregir lo que apareciera.
+
+Prompts utilizados:
+
+```text
+/speckit.analyze Revisar la consistencia entre spec.md, plan.md y tasks.md de specs/002-cazador-ruta-mas-barata, y contra .specify/memory/constitution.md, antes de implementar.
+```
+
+Uso en el proyecto: la corrección de `specs/002-cazador-ruta-mas-barata/spec.md` en una confirmación propia, antes del código, y el ajuste del plan y de las tareas.
+
+Cambios realizados por el estudiante: La revisión encontró seis problemas reales y se corrigieron todos antes de escribir código, en el orden que exige el principio VII de la constitución: primero la especificación y en su propia confirmación. Dos de ellos eran contradicciones entre documentos escritos por uno mismo. Primero, un criterio de éxito decía que ninguna prueba anterior se modificaría, mientras una tarea decía que las del guardado binario sí cambiarían al subir la versión del formato; se acotó la excepción en el criterio. Segundo, un requisito exigía que el costo de la decisión dependiera del rango de cada cazador, sin admitir que un cálculo compartido entre varios abarca el rango mayor; se agregó esa salvedad y la obligación de medir el sobrecosto, que después resultó ser de diecisiete veces. Tercero, el desempate estaba escrito sobre salas vecinas, pero dos salidas distintas pueden llevar a la misma vecina con costos distintos, así que el costo entre dos salas no estaba definido; se fijó que cuenta la más barata. Cuarto, «decenas de cazadores» no era verificable y se fijó en 50. Además se detectó que la revisión misma incumplía la constitución: faltaba registrar en este archivo las invocaciones de spec-kit de esta capacidad, y se agregó una tarea para ello. Y se anotó como riesgo que la firma de la decisión del enemigo tiene diez llamadas directas en las pruebas, varias posicionales, de modo que el colaborador nuevo tenía que entrar al final y con valor por omisión.
+
+### 2.29 Plan, tareas e implementación del cazador
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Completar el flujo de spec-kit para la segunda capacidad: planificar la ruta de costo mínimo del cazador, descomponerla en tareas, implementarla y medirla.
+
+Prompts utilizados:
+
+```text
+/speckit.plan Planificar specs/002-cazador-ruta-mas-barata. Decidir con qué estructuras propias se calcula la ruta de costo mínimo del cazador, respetando la prohibición de dict como índice, set, heapq, bisect, collections y bibliotecas de grafos. Evaluar y documentar como alternativas: Dijkstra por cazador con corte por rango reutilizando el montículo binario de la agenda de eventos; un único cálculo compartido desde la sala del jugador para todos los cazadores activos; y recalcular siempre desde cero. Planificar las mediciones que exigen §5.1 y §5.2.
+```
+
+```text
+/speckit.tasks Generar tasks.md para specs/002-cazador-ruta-mas-barata a partir de su plan.md. Tareas pequeñas y verificables, cada una con los requisitos que atiende y sus dependencias. Incluir las tareas de medición de §5.1 y §5.2 y la prueba de equivalencia contra el modo de recalcular siempre.
+```
+
+Uso en el proyecto: `specs/002-cazador-ruta-mas-barata/plan.md` y `tasks.md`; `structures/rutas_mas_baratas.py`, `model/enemy.py`, `model/game.py`, `repository/traductor.py`, `adapters/almacen_partida.py`, `benchmark/bench_cazador.py`, `benchmark/scheduler_bench.py`, `benchmark/benchmark.py` y las pruebas de `tests/test_rutas_mas_baratas.py`, `tests/test_cazador.py`, `tests/test_traductor.py` y `tests/test_almacen_partida.py`.
+
+Cambios realizados por el estudiante: La decisión de diseño fue buscar desde la sala del jugador y no desde la del cazador. El desempate del enunciado está escrito como costo(u, v) más distancia(v, jugador), así que buscar desde el jugador entrega ese número para todas las vecinas de golpe; además el grafo no tiene dirección, porque el costo de una salida es el mismo en ambos sentidos y una puerta abierta lo está para los dos lados, de modo que una sola búsqueda sirve a todos los cazadores activos. Buscando desde cada cazador habría que reconstruir rutas para recuperar la distancia de cada vecina y compartir trabajo sería imposible. No se escribió ninguna estructura nueva: la cola de prioridad es el montículo binario de la agenda de eventos, que ordena por el par (instante, secuencia) y al que se le entregan pares (distancia, id de sala), de modo que ordena por distancia y desempata por id sin tocarlo; las distancias y las salas asentadas van en la tabla hash del grupo. El desempate se aplica aparte, sobre las vecinas de la sala consultada, y no se deja al orden de expansión del montículo; hay una prueba con una topología donde el orden de expansión y el id dan respuestas distintas, para que una implementación que confíe en el montículo falle.
+
+Se encontraron cuatro errores propios al implementar y medir, todos corregidos. Primero, un ayudante de prueba activaba a los cazadores poniéndoles el campo a mano, y resulta que es el camino de activación del motor el que también los programa en la agenda: varias pruebas de ciclo completo pasaban en vano porque el cazador nunca tomaba un turno. Se cambió para activarlos por el camino del motor y se comprobó que ahora sí se mueven. Segundo, la prueba de equivalencia decía ejercitar cierres automáticos frecuentes y no ejercitaba ninguno, porque un cierre automático solo se programa cuando alguien abre la puerta; se reescribió para que el jugador abra puertas y se verificó que la invalidación se dispara, con una comprobación dentro de la prueba de que hubo más de una búsqueda. Tercero, la medición del corte por rango salía plana también sin corte, y el motivo era que la cripta sintética nace con una puerta cerrada de cada tres, así que la región alcanzable era de dos salas por grande que fuera la cripta: no se medía el corte sino el bloqueo. Se parametrizó el generador y, bien medida, quitar el corte multiplica el costo de la decisión por 320. Cuarto, se identificó un punto de invalidación que el plan no había previsto: el pergamino de retroceso revierte el historial, así que puede cambiar la sala del jugador y el estado de las puertas de golpe.
+
+El hallazgo principal de las mediciones contradice lo que el plan esperaba, y así quedó escrito. El plan suponía que el ahorro vendría de reutilizar el cálculo entre turnos cuando las puertas están quietas. No es así: el jugador se mueve casi en cada decisión, y moverse invalida, de modo que el cálculo se rehace 297 veces en 300 decisiones. El ahorro real viene de compartir una sola búsqueda entre todos los cazadores del mismo instante, de 3902 búsquedas a 297. Eso cambia cuál es la justificación de la decisión: lo que vale no es la caché, es haber buscado desde el jugador en vez de desde cada cazador, porque si se buscara desde cada cazador compartir sería imposible. Con cincuenta cazadores activos el ciclo completo de eventos queda en 0.1854 ms, contra 0.1897 ms sin cazadores: la persecución de cincuenta enemigos no mueve la aguja. Por último, el bloque de enemigo del archivo de partida tuvo que guardar el rango, lo que subió la versión del formato de 1 a 2; sus pruebas usaban la constante y no el número, así que ninguna hubo que reescribir.
