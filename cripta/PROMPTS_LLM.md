@@ -1681,3 +1681,21 @@ Ejecuta /speckit-implement para specs/003-niebla-ir-a, SOLO el tramo que no depe
 Uso en el proyecto: `cripta/structures/mapa_conocido.py`, `cripta/model/viaje.py`, `cripta/controller/commands.py`, `cripta/replay/replay_log.py`, `cripta/controller/application.py`, `cripta/view/console_view.py` y las pruebas `tests/test_mapa_conocido.py`, `tests/test_viaje.py`, `tests/test_vista_mapa_conocido.py`, `tests/test_commands.py` y `tests/test_replay_log.py`.
 
 Cambios realizados por el estudiante: Se hizo solo lo que no necesitaba los avisos del motor: las pruebas llaman a mano a los avisos que algún día dará el motor, y las reglas del viaje se probaron moviendo al jugador con el motor real y actualizando el mapa conocido a mano. Quedaron sin hacer, y así marcadas, las tareas que necesitan que la partida tenga el mapa conocido, aunque algunas tocaran solo archivos propios, porque conectarlas antes haría fallar el inicio de toda partida. Tres pruebas fallaron al primer intento, y en los tres casos el error era de la prueba y no del código: dos topologías asignaban dos salidas a la misma dirección de una sala, y una prueba suponía un orden de salidas distinto del real, que es N, S, E, O. Las reglas del viaje se escribieron en un módulo aparte del motor en vez de dentro de él, para no tocar el archivo de otro integrante y porque así se prueban sin armar un viaje entero.
+
+### 2.36 La especificación no decía que «ir a» se rechaza con la partida terminada
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Cerrar un hueco que apareció al implementar: el código rechazaba la orden «ir a» con la partida terminada y ningún requisito lo decía.
+
+Prompts utilizados:
+
+```text
+Corrige primero la spec (specs/003-niebla-ir-a/spec.md y su checklist, nada más): agrega como requisito o supuesto, con su FR o con la numeración que corresponda sin reenumerar los existentes, que la orden «ir a» se rechaza sin consumir tiempo cuando la partida ya terminó, igual que toda otra acción. Regístralo en aclaraciones si hace falta. Muestra el cambio y no hagas commit.
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` y su lista de verificación.
+
+Cambios realizados por el estudiante: Al revisar la implementación se notó que el viaje rechazaba la orden con la partida terminada por decisión de la herramienta, siguiendo la regla de la primera parte de que una partida terminada rechaza toda acción, pero sin que la especificación lo dijera. Según §1 del enunciado, un programa que hace algo que ninguna especificación describe es un defecto, así que se corrige primero la especificación, en una confirmación aparte, antes de que el código quede como lo único que lo describe. Se agregó como FR-038 y no como supuesto, porque es una regla del juego que se puede probar, y se numeró después del último requisito para no cambiar los identificadores que ya citan las pruebas y las tareas.

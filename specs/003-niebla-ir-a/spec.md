@@ -25,6 +25,7 @@
 - Q: Si `ir a` recibe un identificador que no corresponde a ninguna sala, ¿se rechaza igual que una sala no explorada, sin revelar que no existe? → A: Sí. Mismo rechazo y mismo mensaje que una sala no explorada.
 - Q: ¿«Una sala que contiene enemigos» incluye a los enemigos muertos? → A: No. Solo cuentan los enemigos vivos, estén activos o dormidos. Un enemigo muerto deja de actuar (P1 §2.6) y no detiene el viaje.
 - Q: ¿La especificación debe fijar con qué criptas se mide FR-036? → A: No. El límite es el de §6.1, sobre el mapa conocido completo de la cripta de referencia. Con qué criptas se mide es una decisión del plan.
+- Q: ¿Se acepta la orden `ir a` cuando la partida ya terminó? → A: No. Se rechaza sin consumir tiempo, igual que toda otra acción con la partida terminada (FR-038).
 
 ## Escenarios de uso y pruebas
 
@@ -169,6 +170,7 @@ El jugador tiene un comando para ver su mapa conocido: las salas exploradas, sus
 - **El primer paso de cada cálculo atraviesa siempre una puerta de la sala actual**: como el jugador observa las puertas de la sala en la que está, el mapa nunca le hace intentar cruzar una puerta que en ese instante está cerrada sin haberla visto cerrada antes.
 - **La sala siguiente no puede cargarse porque se agotó el presupuesto de solicitudes**: el viaje se detiene con su propio motivo y ese paso no consume tiempo.
 - **La partida termina a mitad del viaje**, por la muerte del jugador o porque entra a la sala de salida: el viaje se detiene.
+- **`ir a` con la partida ya terminada**: se rechaza sin consumir tiempo, como cualquier otra acción (FR-038).
 - **El jugador usa un pergamino después de un viaje**: se revierte solo el último paso; el viaje no se reanuda.
 - **La antorcha se apaga a mitad de un viaje**: las entradas posteriores ya no exploran vecinas; lo explorado hasta ese momento queda explorado.
 - **Una vecina ya explorada vuelve a quedar al alcance de la antorcha**: sigue explorada; la antorcha no le quita ni le cambia nada.
@@ -219,6 +221,7 @@ El jugador tiene un comando para ver su mapa conocido: las salas exploradas, sus
 **Viaje automático «ir a»**
 
 - **FR-022**: El jugador DEBE poder ordenar `ir a <sala>`, donde `<sala>` es el identificador numérico de una sala. La orden DEBE aceptarse solo si la sala está explorada y no es la sala actual del jugador; en cualquier otro caso DEBE rechazarse sin consumir tiempo y sin registrarse como acción. Un identificador que no corresponde a ninguna sala DEBE rechazarse con el mismo mensaje que una sala no explorada, sin revelar que no existe.
+- **FR-038**: Con la partida terminada, la orden `ir a` DEBE rechazarse sin consumir tiempo, sin registrarse como acción y sin mover al jugador, igual que toda otra acción del jugador.
 - **FR-023**: La ruta DEBE atravesar únicamente salas exploradas y únicamente salidas cuya puerta el mapa del jugador recuerda abierta, y DEBE minimizar la suma de los costos de las salidas recorridas.
 - **FR-024**: Entre las salas vecinas que empiezan una ruta conocida de costo mínimo, el primer paso DEBE ir a la de menor identificador. Cuando dos salidas distintas que el mapa recuerda abiertas llevan a esa misma vecina con costos distintos, DEBE atravesar la más barata de las dos. Es el mismo criterio que FR-008 de `specs/002-cazador-ruta-mas-barata`.
 - **FR-025**: Cada paso DEBE ser un movimiento ordinario y una acción completa del jugador, sujeto a todas las reglas de un movimiento escrito a mano: su costo, la disponibilidad del contenido de la sala destino, la activación de enemigos, las trampas, el rastro y la victoria. Entre un paso y el siguiente DEBEN ejecutarse normalmente los eventos del reloj.
