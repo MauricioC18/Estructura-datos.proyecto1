@@ -25,6 +25,7 @@ SUITES = (
     ("Bitacora de partida y reproduccion", "benchmark.replay_bench"),
     ("Guardado binario de la partida", "benchmark.bench_almacen_partida"),
     ("Persecucion del cazador", "benchmark.bench_cazador"),
+    ("Mapa conocido y viaje ir a", "benchmark.bench_mapa_conocido"),
 )
 
 

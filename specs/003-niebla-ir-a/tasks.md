@@ -119,7 +119,7 @@ Formato: `- [ ] Tnnn [P] [Hn] [AB] [BLOQUEADA: …] Descripción, en archivo —
 
 **Objetivo**: respaldar FR-033 a FR-036 con `--bench`, midiendo la alternativa descartada.
 
-- [ ] T042 Crear `cripta/benchmark/bench_mapa_conocido.py` con `run()` que devuelve `Measurement` como los demás (depende de T005 y T021) — FR-033, FR-034, FR-035, FR-036. Dos fuentes, sin ningún tamaño ni id de cripta en el código:
+- [X] T042 Crear `cripta/benchmark/bench_mapa_conocido.py` con `run()` que devuelve `Measurement` como los demás (depende de T005 y T021) — FR-033, FR-034, FR-035, FR-036. Dos fuentes, sin ningún tamaño ni id de cripta en el código:
   - (1) criptas sintéticas deterministas por semilla en tres tamaños crecientes de mapa conocido, generadas por el propio módulo;
   - (2) para la medición 5, el mapa conocido completo de **cada** cripta del paquete sin conexión, cargada con `FuenteOffline` (`cripta/adapters/fuente_offline.py`) y reportada con el id que traen sus datos. Si el paquete no contiene la cripta de referencia, la suite lo informa y sigue solo con las sintéticas, sin fallar.
 
@@ -129,7 +129,7 @@ Formato: `- [ ] Tnnn [P] [Hn] [AB] [BLOQUEADA: …] Descripción, en archivo —
   - recalcular todas las avistadas al explorar, frente a los contadores;
   - copiar el conocimiento antes de cada acción, frente a las anotaciones;
   - reutilizar la ruta del viaje, y selección lineal del mínimo sin montículo, frente a recalcular con `RutasMasBaratas`.
-- [ ] T043 [P] Agregar la suite a `SUITES` en `cripta/benchmark/benchmark.py` — FR-036
+- [X] T043 [P] Agregar la suite a `SUITES` en `cripta/benchmark/benchmark.py` — FR-036
 - [ ] T044 (depende de T042) Correr `--bench` y anotar los resultados reales en una sección «Resultado de las mediciones» de `specs/003-niebla-ir-a/plan.md`: los tres tamaños sintéticos y, en cuanto el paquete sin conexión contenga la cripta de referencia, la fila de esa cripta, que es la que comprueba FR-036 y SC-006. Si un paso de «ir a» pasa de 5 ms, cambiar a la alternativa medida y corregir el plan — FR-036
 
 ---
