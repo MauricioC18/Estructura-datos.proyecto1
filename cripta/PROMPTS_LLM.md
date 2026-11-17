@@ -1435,3 +1435,27 @@ Sí, dale, instalá spec-kit y hacé la constitución
 Uso en el proyecto: `docs/REPARTO_PROYECTO2.md`, `docs/PROMPT_SDD_PARA_EL_GRUPO.md`, `.specify/memory/constitution.md` y la sección nueva del `README.md`.
 
 Cambios realizados por el estudiante: Se revisó el estado real del repositorio antes de planificar y se encontró que no había ningún avance de la segunda parte: sin commits desde el 28 de octubre, sin spec-kit inicializado y con el enunciado sin subir, a dos días de la entrega. Se decidió, pese a la advertencia sobre el riesgo, intentar las cuatro capacidades completas en vez de reducir el alcance. El reparto se hizo siguiendo lo que cada integrante ya dominaba de la primera parte, para no gastar tiempo en volver a aprender módulos ajenos, y se compensó el desbalance de pesos de la rúbrica asignando a la Persona 4 las banderas nuevas de todo el equipo, la integración de `--bench` y el README. Se identificó además el orden que desbloquea al resto: la constitución la sube una sola persona porque `specify init` escribe en la raíz, y los campos nuevos del traductor son prerrequisito de las otras tres capacidades. Se fijó spec-kit en la versión v1.4.1, la más reciente publicada, y se descubrió que el enunciado menciona la bandera `--ai`, que corresponde a la versión 1.1 y que en la 1.4.1 se llama `--integration`. La constitución se redactó con los siete principios que pide §2.3, en palabras del grupo y apoyados en lo que la primera parte ya hacía, y se agregó la lista concreta de dependencias prohibidas para que el agente la tenga presente en la fase de plan y no al implementar. También se detectó que el enunciado remite a una sección 2.7 que no existe en el documento, lo que quedó como pregunta para el profesor.
+
+### 2.25 Especificación de terreno con /speckit.specify
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Escribir la primera especificación de la segunda parte, la del costo de tránsito de las salidas (§3.1), siguiendo el flujo obligatorio de spec-kit.
+
+Prompts utilizados:
+
+```text
+/speckit.specify Terreno: costo de tránsito de las salidas.
+
+Contexto: segunda parte del proyecto CRIPTA, juego de mazmorra dirigido por eventos con reloj virtual. El enunciado completo está en cripta/docs/SegundoProyecto-EDII-2026.md; esta capacidad corresponde a su sección 3.1 y al caso 6 y 7 del Apéndice B bajo "Terreno y cazador".
+
+Cada salida de una sala puede declarar un campo "costo", entero mayor o igual que 1. Si la salida no lo declara, su costo es 100. El costo es el mismo en ambos sentidos. Moverse a través de una salida pasa a ser una acción cuyo costo base es el costo de esa salida, en lugar del valor fijo 100. El intervalo se sigue calculando con la fórmula de la primera parte. La regla aplica a todos los actores. El costo de las demás acciones no cambia y los comportamientos de enemigo existentes conservan su lógica. La vista debe mostrar el costo de las salidas de la sala actual.
+
+[El prompt completo incluye los escenarios de aceptación obligatorios del Apéndice B, la justificación de separar terreno del cazador, las dependencias prohibidas y los requisitos de rendimiento heredados.]
+```
+
+Uso en el proyecto: `specs/001-terreno-costo-salidas/spec.md` y su lista de verificación.
+
+Cambios realizados por el estudiante: Se decidió separar el terreno del cazador en dos especificaciones distintas, aunque el enunciado las presente como una sola capacidad. La razón es de orden de trabajo y queda escrita en la especificación: el costo de las salidas es infraestructura de la que dependen el cazador, el viaje automático y las mediciones, así que entregarlo por separado desbloquea a los otros integrantes en vez de que esperen al cazador completo; el enunciado permite dividir una capacidad si se justifica. Al revisar la especificación contra su propia lista de verificación se detectó que la fórmula del intervalo estaba escrita con sintaxis de Python, y se reformuló como división entera para que no dependiera de ningún lenguaje. Se dejaron explícitamente fuera del alcance dos cosas que pertenecen a otras capacidades: qué conoce el jugador del costo de una salida que no ha explorado, que es de la niebla de guerra, y cómo se calculan rutas de costo mínimo, que es del cazador y del viaje automático.
