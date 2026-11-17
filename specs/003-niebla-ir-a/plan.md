@@ -342,6 +342,27 @@ Para que la comparación mida lo que el programa hace, la medición 5 pasa a med
 
 **Qué no cambia.** FR-036 y la especificación. Si después de las tres mejoras un paso sigue pasando de 5 ms en el tamaño de la cripta de referencia, se documenta el resultado y el límite en el Documento de Decisiones, sin esconderlo.
 
+### Resultado de las mejoras
+
+Medición 5 tal como la calcula el viaje del programa, en las mismas cuadrículas y con las mismas semillas, en Python 3.11.3 sobre Windows. La línea base y las mejoras (a) y (b) se midieron una vez; la (c), tres veces, y entre corridas el primer paso varió alrededor de un 20 %. Por eso las diferencias pequeñas del primer paso están dentro del ruido.
+
+| Medida | Línea base | Tras (a) | Tras (b) | Tras (c), 3 corridas |
+| --- | ---: | ---: | ---: | ---: |
+| 400 salas, primer paso | 12.24 ms | 9.62 ms | 8.91 ms | 9.21 a 11.29 ms |
+| 400 salas, promedio por paso del viaje | 13.59 ms | 11.35 ms | 3.62 ms | 0.26 a 0.33 ms |
+| 1600 salas, primer paso | 58.96 ms | 51.41 ms | 41.03 ms | 42.70 a 57.70 ms |
+| 1600 salas, promedio por paso del viaje | 59.18 ms | 53.68 ms | 18.32 ms | 0.58 a 0.64 ms |
+| cripta-01 (6 salas), primer paso | 0.0134 ms | 0.0118 ms | 0.0128 ms | 0.0129 ms |
+
+Con el código final, 100 salas dan entre 1.70 y 1.91 ms en el primer paso y entre 0.105 y 0.118 ms en promedio por paso.
+
+**Lo que muestran:**
+- **(a)** bajó un poco todo, porque abarata cada consulta del proveedor de vecinas.
+- **(b)** bajó mucho el promedio por paso, porque a medida que el jugador se acerca al destino la búsqueda asienta cada vez menos salas. El primer paso casi no baja: en la medición el jugador está en el extremo opuesto al destino, el peor caso para la parada.
+- **(c)** deja el promedio por paso por debajo de 1 ms en los tres tamaños. No toca el primer paso, como estaba previsto.
+
+**Conclusión: FR-036 se cumple con 100 salas y no se cumple con 400 ni con 1600** en el primer paso de un viaje entre los extremos de la cripta. En los pasos siguientes de un mismo viaje sí se cumple en los tres tamaños. Si se cumple en la condición de §6.1 depende del tamaño de la cripta de referencia, que el paquete sin conexión todavía no trae. El límite queda documentado en el Documento de Decisiones (§5.3).
+
 ## Riesgos
 
 - **Pasos de un solo sentido.** El traductor los admite: si una salida no tiene vuelta, la puerta solo aparece en la sala que la declara (`model/room.py:25-26`, `repository/traductor.py:183-206`). La búsqueda va desde el destino y expande por las salidas de cada sala, así que con un paso de un solo sentido calcularía una distancia por un camino que en realidad no se puede recorrer en ese sentido. **El cazador ya depende del mismo supuesto** (plan 002, «El supuesto del grafo sin dirección»). En `cripta-01` las 10 salidas tienen vuelta; no se sabe si alguna cripta publicada tiene un paso de un solo sentido. Si existen, la corrección es la misma para las dos capacidades: expandir por las salidas que **llegan** a cada sala y elegir el primer paso por las que **salen**. Se coordina con Carlos antes de implementar.

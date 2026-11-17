@@ -2008,15 +2008,18 @@ La frecuencia real de cada una en una partida **todavía no está medida**: hace
 
 ### Decisión
 
-El mapa conocido (`structures/mapa_conocido.py`) guarda solo lo que no se deduce del esqueleto: las salas exploradas y el recuerdo de cada puerta, en `TablaHash` con claves enteras. Mantiene además un contador de avistamiento por sala y el orden de exploración como pila (una `list`). El nombre, las salidas y los costos de una sala explorada se leen del mapa de salas, porque no cambian durante la partida.
+El mapa conocido (`structures/mapa_conocido.py`) guarda solo lo que no se deduce del esqueleto: las salas exploradas y el recuerdo de cada puerta, en `TablaHash` con claves enteras. Mantiene además un contador de avistamiento por sala, el orden de exploración como pila (una `list`) y un número de versión que sube con cada cambio. El recuerdo de una puerta se guarda bajo la clave de cada uno de sus lados, para consultarlo desde una salida sin buscar su dirección. El nombre, las salidas y los costos de una sala explorada se leen del mapa de salas, porque no cambian durante la partida.
 
 Cada cambio anota su inversa en el historial reversible que ya existía, como el rastro del jugador. Si nada cambia, no anota nada.
 
-«ir a» tiene sus reglas en el modelo (`model/viaje.py`) y su bucle de pasos en el controlador. Cada paso pasa por el mismo camino que un `mover` escrito a mano.
+«ir a» tiene sus reglas en el modelo (`model/viaje.py`) y su bucle de pasos en el controlador. Cada paso pasa por el mismo camino que un `mover` escrito a mano. La búsqueda de la ruta se detiene al asentar la sala del jugador y se reutiliza durante el viaje mientras el conocimiento no cambie.
 
-**¿Coincide con el `plan.md` original?** En las estructuras, sí. En dos puntos la evidencia contradice lo que el plan esperaba y **la decisión está pendiente del grupo**:
-1. la clave de puerta (ver Evidencia, medición 2);
-2. el límite de FR-036 (ver Evidencia, medición 5).
+**¿Coincide con el `plan.md` original?** En las estructuras, sí. **En la ruta, no.** El plan elegía recalcular la búsqueda completa en cada paso y, si pasaba de 5 ms, reutilizarla durante el viaje. Las mediciones mostraron que eso no alcanza, porque el primer paso de cada viaje paga la búsqueda completa. El plan se revisó («Decisión revisada para FR-036») antes de cambiar el código, y se aplicaron tres mejoras en orden, cada una medida antes y después:
+- **(a)** el recuerdo de las puertas se guarda por lado. Responde a la medición 2: buscar la dirección de la puerta era lo caro.
+- **(b)** la búsqueda se detiene en la sala del jugador, con un parámetro opcional en la búsqueda del cazador que no cambia su comportamiento.
+- **(c)** la búsqueda se reutiliza mientras no cambie la versión del conocimiento.
+
+**FR-036 sigue sin cumplirse en mapas de 400 salas o más** (ver Evidencia y Límites).
 
 ### Análisis de complejidad
 
@@ -2025,10 +2028,11 @@ Cada cambio anota su inversa en el historial reversible que ya existía, como el
 | Operación | Costo |
 | --- | --- |
 | Estado de una sala | O(1) promedio |
-| Puerta recordada | O(1) promedio, más la búsqueda de la dirección, a lo sumo 4 salidas |
+| Puerta recordada | O(1) promedio. Desde una salida, sin buscar nada; desde la puerta sola, buscando su dirección, a lo sumo 4 salidas |
 | Entrar a una sala | O(1); con antorcha, a lo sumo 5 salas y 20 contadores |
 | Revertir una acción | O(cambios de la acción) |
-| Paso de «ir a» | O((k + e) log k), con *e* ≤ 4*k* salidas |
+| Primer paso de «ir a» | O((k' + e') log k'), con *k'* las salas a menor distancia del destino que la del jugador y *e'* sus salidas; en el peor caso, todo el mapa conocido |
+| Pasos siguientes del mismo viaje | O(grado de la sala), si el conocimiento no cambió |
 | Memoria | O(k + puertas recordadas) |
 
 ### Evidencia empírica
@@ -2044,17 +2048,29 @@ Medida con `python main.py --bench` (suite «Mapa conocido y viaje ir a») el 20
 | 5. Un paso de «ir a», elegida / sin montículo | 2.60 / 4.20 ms | 11.55 / 32.01 ms | 61.44 / 174.91 ms |
 | 5. Por paso, reutilizando la búsqueda del viaje | 0.15 ms | 0.37 ms | 0.65 ms |
 
+Las cifras de arriba son de la primera versión, antes de las mejoras. La medición 5 se cambió después para que mida el paso que calcula el viaje del programa. Así quedó el antes y el después, en las mismas cuadrículas y con las mismas semillas:
+
+| Medida | Línea base | Tras (a) | Tras (b) | Tras (c), 3 corridas |
+| --- | ---: | ---: | ---: | ---: |
+| 400 salas, primer paso | 12.24 ms | 9.62 ms | 8.91 ms | 9.21 a 11.29 ms |
+| 400 salas, promedio por paso | 13.59 ms | 11.35 ms | 3.62 ms | 0.26 a 0.33 ms |
+| 1600 salas, primer paso | 58.96 ms | 51.41 ms | 41.03 ms | 42.70 a 57.70 ms |
+| 1600 salas, promedio por paso | 59.18 ms | 53.68 ms | 18.32 ms | 0.58 a 0.64 ms |
+| cripta-01 (6 salas), primer paso | 0.0134 ms | 0.0118 ms | 0.0128 ms | 0.0129 ms |
+
+Con el código final, 100 salas dan entre 1.70 y 1.91 ms en el primer paso. La línea base y las mejoras (a) y (b) se midieron una vez; entre corridas el primer paso varió alrededor de un 20 %, así que sus diferencias pequeñas están dentro del ruido.
+
 Lo que muestran:
 - Las mediciones 1, 3 y 4 respaldan FR-033, FR-034 y FR-035: la elegida queda plana y la descartada crece con el mapa conocido.
 - **Medición 2, contra lo esperado**: la clave entera es plana, pero cuesta el doble que la de texto, porque hay que buscar por qué dirección sale la puerta. La de texto sigue siendo incorrecta, así que no es reemplazo. Se reporta tal cual.
-- **Medición 5, contra lo esperado**: la elegida **no cumple los 5 ms de FR-036 desde 400 salas**.
-  - Reutilizar la búsqueda durante el viaje baja el promedio por paso, pero no el primer paso de cada viaje.
+- **Medición 5, contra lo esperado**: la decisión del plan **no cumplía los 5 ms de FR-036 desde 400 salas**.
   - Un experimento aparte midió la misma búsqueda con las vecinas reales: 1.40, 6.64 y 30.72 ms. La búsqueda misma supera el límite en mapas medianos.
+  - Con las tres mejoras, el promedio por paso queda por debajo de 1 ms en los tres tamaños, pero el **primer** paso de un viaje entre los extremos de la cripta sigue entre 9 y 11 ms con 400 salas y entre 43 y 58 ms con 1600.
 - **Falta**: la fila de la cripta de referencia. Sin su tamaño no se puede decir si FR-036 se cumple en la condición de §6.1.
 
 ### Límites conocidos
 
-- Un paso de «ir a» con el mapa conocido completo pasa de 5 ms en mapas de varios cientos de salas (medición 5). Si la cripta de referencia es de ese tamaño, la decisión tiene que cambiar.
+- **FR-036 no se cumple en el primer paso de un viaje largo en mapas de 400 salas o más.** Con el mapa conocido completo, el primer paso de un viaje entre los extremos de la cripta pasa de 5 ms; los pasos siguientes del mismo viaje no. Si la cripta de referencia tiene ese tamaño, FR-036 no se cumple en la condición de §6.1. Lo que queda por probar es aligerar la búsqueda misma, que es compartida con el cazador. Tampoco se sabe todavía el tamaño de la cripta de referencia: el paquete sin conexión no la trae.
 - Explorar, consultar y revertir dependen de que el motor avise de cada entrada y de cada cambio de puerta. Un camino del motor que cambie una puerta sin avisar dejaría el recuerdo desactualizado sin ningún error. **Los avisos todavía no existen** (T011–T013, de Carlos).
 - La búsqueda supone que cada paso entre salas se puede recorrer en los dos sentidos, igual que el cazador. El formato de datos admite pasos de un solo sentido. En `cripta-01` no hay ninguno; falta comprobarlo en las demás criptas.
 
@@ -2062,11 +2078,13 @@ Lo que muestran:
 
 | Archivo | Qué cubre | Pruebas |
 | --- | --- | ---: |
-| `tests/test_mapa_conocido.py` | Tres estados, memoria de puertas, antorcha, reversión, vecinas conocidas, exportar e importar | 48 |
+| `tests/test_mapa_conocido.py` | Tres estados, memoria de puertas y recuerdo por lado, antorcha, reversión, vecinas conocidas, exportar e importar | 54 |
 | `tests/test_viaje.py` | Reglas del viaje en el modelo: aceptar la orden, siguiente paso, motivos de parada | 26 |
 | `tests/test_ir_a.py` | Viaje completo por el controlador, bitácora y reproducción, paradas, pergamino | 23 |
 | `tests/test_vista_mapa_conocido.py` | Vista y presentación del mapa conocido | 10 |
 | `tests/test_commands.py`, `tests/test_replay_log.py` | Comandos `mapa` e `ir a`, comentario en la bitácora | 10 |
+| `tests/test_parada_anticipada.py` | En 300 mapas sintéticos, la búsqueda con parada da el mismo paso que la completa, y la del cazador coincide con un cálculo de referencia | 4 |
+| `tests/test_reutilizar_ruta.py` | Reutilizar la búsqueda da el mismo viaje que recalcular; un cambio de conocimiento obliga a buscar de nuevo | 6 |
 
 **Falta** la prueba del caso del Apéndice B de la puerta recordada abierta que estaba cerrada, con el motor real (T029). Necesita los avisos del motor.
 
