@@ -66,11 +66,20 @@ class GameController:
 
     @property
     def known_map(self):
-        """El mapa conocido que se le paso, o el de la partida si lo tiene."""
-        if self._known_map is not None:
-            return self._known_map
+        """El mapa conocido que se le paso, o el de la partida si lo tiene.
 
-        return getattr(self.game, "known_map", None)
+        None si no hay mapa. El objeto nulo de Game (disponible = False)
+        cuenta como ausencia de mapa, igual que None.
+        """
+        known_map = self._known_map
+
+        if known_map is None:
+            known_map = getattr(self.game, "known_map", None)
+
+        if known_map is None or not getattr(known_map, "disponible", True):
+            return None
+
+        return known_map
 
     def travel(self, destination):
         """Viaje automatico «ir a» (§3.4): una secuencia de movimientos ordinarios.

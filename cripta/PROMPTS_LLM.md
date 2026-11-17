@@ -1907,3 +1907,21 @@ Estoy en medio de un merge de origin/mauricio-logica-juego en mi rama Parte_2-ni
 Uso en el proyecto: `cripta/PROMPTS_LLM.md`. Se revisaron `cripta/structures/rutas_mas_baratas.py`, `cripta/model/game.py`, `cripta/controller/game_controller.py` y `cripta/tests/test_ir_a.py`.
 
 Cambios realizados por el estudiante: Quitar solo las líneas de marca habría dejado entradas mezcladas, porque git había alineado el encabezado de la entrada 2.31 de Carlos con fragmentos de las entradas 2.40 y 2.42 de esta rama. Se rearmó el archivo con la parte común, la entrada 2.31 de Carlos y, a continuación, las entradas 2.30 a 2.42 de esta rama, y se comprobó que tiene exactamente las mismas líneas que el archivo con las marcas quitadas, más las líneas comunes («Prompts utilizados:», la apertura del bloque de texto y líneas vacías) que cada entrada necesita para quedar completa. No quedó ninguna marca en el repositorio. La búsqueda de Carlos conserva `parar_en`, `salidas_de` y las protecciones de `distancia_a`, `alcanza` y `primer_paso_desde`. De 1158 pruebas falló una, `test_ir_a.TestOrden.test_sin_mapa_conocido_no_hay_viaje`: la partida de Carlos ya no deja el mapa conocido en `None`, sino que pone un objeto nulo con `disponible = False`, y el controlador del viaje solo comprobaba `None`, así que le pedía a ese objeto un método que no tiene. Por eso el merge no se commiteó.
+
+### 2.44 El controlador del viaje trata el objeto nulo del mapa conocido como ausencia de mapa
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Cerrar el merge de la rama de Carlos en su propio commit y arreglar, en otro commit aparte, la prueba que dejó fallando.
+
+Prompts utilizados:
+
+```text
+Sí, aplica el arreglo en MI archivo cripta/controller/game_controller.py: que known_map devuelva None cuando el mapa tenga disponible = False, para que travel y el comando mapa rechacen la orden como cuando no hay mapa. Cambio mínimo, sin tocar nada más. [...] 1. Primero cierra el merge [...] SIN el arreglo dentro [...] 2. Aplica el arreglo y haz un SEGUNDO commit aparte [...] 3. Corre TODAS las pruebas [...] 4. Revisa la comprobación de None en cripta/adapters/almacen_partida.py:1289 y dime si tiene el mismo problema. NO modifiques ese archivo (es de Carlos). 5. Verifica que PROMPTS_LLM.md conserva todas las entradas de ambos lados [...]
+```
+
+Uso en el proyecto: `cripta/controller/game_controller.py` (propiedad `known_map`).
+
+Cambios realizados por el estudiante: El merge se cerró primero con la prueba fallando, para que el arreglo quedara en un commit propio y se viera qué lo motivó. El arreglo es solo la propiedad `known_map`: devuelve `None` si el mapa falta o si se declara no disponible, y el mapa real, que no tiene ese atributo, sigue contando como disponible. Con eso pasan las 1158 pruebas. Se revisó la comprobación de `None` de `adapters/almacen_partida.py` y no tiene el mismo problema: recibe el mapa que le pasa quien carga la partida, que es `None` o un mapa real, nunca el objeto nulo, porque ese lo crea la partida después; y la copia para la línea de tiempo pide `exportar` por duck typing, que el objeto nulo no tiene, así que se guarda como «sin mapa». Al buscar dónde se atiende el comando `mapa` se encontró que la aplicación no lo despacha: cae en «Comando sin atender». Es un defecto aparte, anterior a este merge, y no se tocó. También se comprobó que este archivo conserva todos los encabezados y todas las líneas de los dos padres del merge.
