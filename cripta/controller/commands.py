@@ -14,6 +14,7 @@ PREVIOUS = "ant"
 REWIND = "retroceder"
 
 VIEW = "ver"
+HISTORY = "historia"
 SAVE = "guardar"
 LOAD = "cargar"
 HELP = "ayuda"
@@ -38,6 +39,8 @@ HELP_LINES = (
     "retroceder         usar un pergamino de retroceso",
     "mapa               ver las salas exploradas y avistadas",
     "ir a <sala>        viajar a una sala explorada, por ejemplo ir a 7",
+    "historia <t>       ver como estaba la partida en el instante t",
+    "historia #k        ver como estaba antes de la accion numero k",
     "guardar <archivo>  guardar la partida",
     "cargar <archivo>   dejar esta partida y continuar la guardada",
     "ayuda              mostrar esta lista",
@@ -120,6 +123,9 @@ def parse_command(text):
     if name == VIEW:
         return Command(name, _optional_criterion(arguments))
 
+    if name == HISTORY:
+        return Command(name, _instante_o_accion(arguments))
+
     if name in (SAVE, LOAD):
         return Command(name, _single_word(name, arguments, "el nombre del archivo"))
 
@@ -131,6 +137,31 @@ def parse_command(text):
         return Command(TRAVEL, _travel_destination(arguments))
 
     raise CommandError(f"Comando desconocido: '{words[0]}'. Escriba ayuda.")
+
+
+def _instante_o_accion(arguments):
+    """Instante del reloj, o numero de accion escrito con # delante.
+
+    Se devuelve el numero de accion como texto con el # para que quien
+    despache distinga las dos formas sin tener que volver a interpretar.
+    """
+    if len(arguments) != 1:
+        raise CommandError(
+            "historia necesita un instante, por ejemplo 'historia 1500', o un "
+            "numero de accion, por ejemplo 'historia #10'."
+        )
+
+    crudo = arguments[0]
+    es_accion = crudo.startswith("#")
+    numero = crudo[1:] if es_accion else crudo
+
+    if not numero.isdigit():
+        raise CommandError(
+            f"'{crudo}' no es un instante ni un numero de accion. Use "
+            f"'historia 1500' o 'historia #10'."
+        )
+
+    return crudo if es_accion else int(numero)
 
 
 def _direction(name, arguments):

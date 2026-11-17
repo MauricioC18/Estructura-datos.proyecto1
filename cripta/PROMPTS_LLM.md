@@ -1550,6 +1550,56 @@ Se encontraron cuatro errores propios al implementar y medir, todos corregidos. 
 
 El hallazgo principal de las mediciones contradice lo que el plan esperaba, y así quedó escrito. El plan suponía que el ahorro vendría de reutilizar el cálculo entre turnos cuando las puertas están quietas. No es así: el jugador se mueve casi en cada decisión, y moverse invalida, de modo que el cálculo se rehace 297 veces en 300 decisiones. El ahorro real viene de compartir una sola búsqueda entre todos los cazadores del mismo instante, de 3902 búsquedas a 297. Eso cambia cuál es la justificación de la decisión: lo que vale no es la caché, es haber buscado desde el jugador en vez de desde cada cazador, porque si se buscara desde cada cazador compartir sería imposible. Con cincuenta cazadores activos el ciclo completo de eventos queda en 0.1854 ms, contra 0.1897 ms sin cazadores: la persecución de cincuenta enemigos no mueve la aguja. Por último, el bloque de enemigo del archivo de partida tuvo que guardar el rango, lo que subió la versión del formato de 1 a 2; sus pruebas usaban la constante y no el número, así que ninguna hubo que reescribir.
 
+### 2.30 Especificación, plan y tareas de la línea de tiempo
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Desarrollar la cuarta capacidad del proyecto, la línea de tiempo (§3.6 y §5.5), con el flujo completo de spec-kit.
+
+Prompts utilizados:
+
+```text
+Ok, Claude, ayúdame y si quieres, avanza más todavía, tipo, haz la línea del tiempo y avanza al siguiente paso que creas y luego me dices lo que tengo que dejarle al grupo en general, como para decirle, ok, voy por aquí, para que ellos sí vayan avanzando.
+```
+
+```text
+/speckit.specify La línea de tiempo: consultar el estado de la partida en cualquier instante pasado.
+
+El pergamino de retroceso sigue limitado a 5 acciones. La línea de tiempo es independiente: permite consultar, sin modificar la partida, el estado en cualquier instante desde el inicio. El estado en el instante t es el estado después de ejecutar todos los eventos con tiempo menor o igual que t; si a t le corresponde una decisión del jugador, es el estado justo antes de tomarla.
+
+El comando "historia <t>" o "historia #k" muestra reloj, sala, vida y estadísticas, inventario, efectos activos, enemigos de esa sala con su vida, y el mapa conocido. La consulta no consume tiempo virtual, no se registra como acción y no altera ningún estado del juego ni del historial de retroceso. Las acciones revertidas con un pergamino dejan de existir en la línea. Consultar un instante posterior al reloj actual se rechaza.
+
+Se permite guardar copias completas del estado, no más de una cada K acciones del jugador. Una consulta no puede requerir aplicar o deshacer cambios de más de K acciones. Guardar y cargar conserva la línea completa.
+
+[El prompt completo incluye los dos casos del Apéndice B, los cinco requisitos de rendimiento de §5.5, lo que queda fuera por ser de otros integrantes, y las estructuras propias que ya existen en el repositorio.]
+```
+
+```text
+/speckit.plan Planificar specs/003-linea-de-tiempo. La decisión central es cómo se reconstruye el estado de un instante pasado: el enunciado permite reconstruir hacia adelante desde un punto de control re-simulando, o hacia atrás desde el estado actual invirtiendo cambios. Evaluar y documentar las dos, más la alternativa ingenua de una copia completa por acción. Tener en cuenta que el historial reversible guarda cambios inversos pero solo de las últimas 5 acciones, y que sus objetos Change guardan referencias directas a los objetos vivos, de modo que no se pueden aplicar a una copia. Tener en cuenta que el guardado binario ya serializa el estado completo incluido el estado del generador aleatorio. Planificar la búsqueda del punto de control más cercano con búsqueda binaria propia, porque bisect está prohibido. Planificar las mediciones de memoria y tiempo de consulta para al menos tres valores de K y la justificación del valor por omisión.
+```
+
+```text
+/speckit.tasks
+```
+
+```text
+sigue
+```
+
+Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md`, `plan.md`, `tasks.md` y su lista de verificación; `structures/linea_de_tiempo.py`, `model/consulta_historia.py`, `model/game.py`, `adapters/almacen_partida.py`, `controller/commands.py`, `controller/application.py`, `view/console_view.py`, `benchmark/bench_linea_de_tiempo.py`, `docs/INTERFAZ_LINEA_DE_TIEMPO.md` y las pruebas de `tests/test_linea_de_tiempo.py`.
+
+Cambios realizados por el estudiante: La decisión de diseño fue reconstruir hacia adelante desde una copia completa, y el motivo no fue de preferencia sino de código. Antes de planificar se revisó el historial reversible de la primera parte y se encontró que sus objetos de cambio guardan referencias directas a los objetos vivos; como acotar una consulta a K acciones obliga a partir de una copia, y una copia reconstruida crea objetos nuevos, los cambios inversos no se les pueden aplicar. Reconstruir hacia atrás habría exigido restaurar el estado vivo campo por campo sin cambiar la identidad de ningún objeto, lo que es mucho más riesgoso que lo que resuelve. Hacia adelante, en cambio, todo lo necesario ya estaba escrito: el serializador completo guarda el estado del generador aleatorio y el cargador construye objetos nuevos sin rehacer el trabajo de inicio de partida, así que la consulta no puede alterar la partida viva por construcción y no por cuidado. Un punto de control es ese mismo bloque de bytes guardado en memoria, lo que obligó a separar en el adaptador el armado del contenido de su escritura en disco; ese refactor no cambió ningún comportamiento y las 54 pruebas del guardado siguieron pasando sin tocarlas. La búsqueda del punto de control del que partir y la traducción de un instante a un número de acción son búsquedas binarias escritas a mano, porque bisect está prohibido.
+
+Durante la planificación se encontró el que iba a ser el problema central: el pergamino de retroceso devuelve el reloj a su valor anterior pero no devuelve el estado del generador aleatorio, que es una decisión deliberada y documentada de la primera parte. Re-simular habría divergido después de cada pergamino y los resúmenes de los instantes posteriores habrían sido falsos sin que nada se viera raro. La primera respuesta fue anotar el estado del generador una vez por pergamino usado, que son unos 5 KB frente a una copia completa. La prueba de equivalencia tumbó esa idea: un pergamino además consume un pergamino del inventario, y ese consumo no es una acción del jugador, así que no está en la lista que la re-simulación repite. El anclaje alineaba el azar y dejaba el inventario mal. La respuesta correcta resultó más simple de explicar: un pergamino es un punto donde el estado vivo no se puede derivar de la lista de acciones, así que la línea se re-ancla con una copia completa. El mecanismo del anclaje se retiró del código en vez de dejarlo sin uso, y la desviación respecto del presupuesto de una copia cada K acciones quedó declarada en el plan con su justificación: entre correcto y dentro del presupuesto de memoria, manda correcto.
+
+La misma prueba de equivalencia destapó un defecto ajeno a esta capacidad: el archivo de partida nunca guardaba el costo de las salidas. La capacidad 001 lo agregó al modelo y no al guardado, así que guardar y cargar devolvía todas las salidas a costo 100 en silencio, y no había prueba que lo cubriera porque el costo se agregó después del guardado. Es el argumento más fuerte a favor de esta capacidad: reconstruir el pasado obliga a que el estado se serialice completo, y eso delata cualquier campo que falte. También se evitó un error de diseño que habría crecido en silencio: si una copia llevara la línea de tiempo dentro, cada copia contendría las anteriores y el tamaño crecería de forma exponencial; por eso el bloque global se arma con la línea cuando es un archivo de partida y sin ella cuando es una copia, y hay una prueba que lo comprueba.
+
+Se corrigieron además tres errores propios en las pruebas, todos detectados al comparar contra el estado real: el ayudante guardaba el estado posterior a una espera en vez del anterior cuando una acción se rechazaba; los objetos extra del inventario se agregaban después de que se tomaba la copia inicial, por fuera del flujo registrado, lo que era un defecto de la prueba y no del programa; y la medición del costo de una consulta frente al largo de la partida consultaba siempre la última acción, que cae justo después de una copia y casi no repite nada, de modo que salía plana por el caso más fácil sin probar nada. Es el mismo error que ya había aparecido en la capacidad del cazador. Se cambió a puntos repartidos y entonces sí midió lo que decía medir.
+
+El valor por omisión de K quedó en 50, elegido con las mediciones como exige el enunciado. La alternativa ingenua de una copia por acción cuesta 43 veces más memoria para ganar menos de 0.6 ms por consulta. Entre los valores razonables el argumento resultó ser de latencia y no de memoria: con 98 KiB la memoria ya es irrelevante en términos absolutos, así que lo que queda por optimizar es cuánto tarda una consulta, y K de 200 ahorra 71 KiB que nadie nota y duplica el tiempo. También quedó anotado que esas cifras son de una cripta de 40 salas y que la memoria de las copias crece con el tamaño de la cripta, más la optimización evidente que no se hizo a propósito: guardar en la copia solo el estado mutable y no el esqueleto, que no cambia nunca. Se prefirió reutilizar el serializador ya probado antes que escribir un segundo serializador, y el costo está medido.
+
 ### 2.30 Niebla de guerra e «ir a»: análisis del repositorio, /speckit.specify y /speckit.clarify
 
 Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
@@ -1755,3 +1805,21 @@ Voy a abordar el problema de rendimiento de FR-036 que mediste. Trabaja en orden
 Uso en el proyecto: `specs/003-niebla-ir-a/plan.md` y `research.md`, `cripta/structures/mapa_conocido.py`, `cripta/structures/rutas_mas_baratas.py` (cambio rotulado para revisión de su dueño), `cripta/model/viaje.py`, `cripta/controller/game_controller.py`, `cripta/benchmark/bench_mapa_conocido.py`, las pruebas `tests/test_parada_anticipada.py`, `tests/test_reutilizar_ruta.py` y `tests/test_mapa_conocido.py`, y `cripta/docs/DECISIONES.md`.
 
 Cambios realizados por el estudiante: Antes de la primera mejora se cambió la medición para que mida el paso que da el viaje del programa y no la búsqueda suelta; si no, las mejoras dentro del viaje no se habrían visto en el número. Al probar la parada anticipada apareció un caso que la justificación escrita no cubría: si la sala del jugador no tiene ruta al destino, la búsqueda nunca se detiene, y pedirle el paso no debe ser un error sino «no hay ruta». La prueba de equivalencia lo encontró en los mapas aleatorios y se corrigió antes del commit. Las mediciones se reportaron con su ruido: repetidas tres veces, el primer paso varió alrededor de un veinte por ciento, así que las diferencias pequeñas no se presentaron como mejoras. El resultado final no cumple el límite en el primer paso de un viaje largo con 400 salas o más, y así quedó escrito en el Documento de Decisiones, junto con lo que falta probar.
+
+### 2.40 Resolución del merge de main (línea de tiempo) sobre la rama de niebla de guerra e «ir a»
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Terminar el merge de `origin/main` en `Parte_2-niebla-ir-a` resolviendo los conflictos sin perder trabajo de ninguno de los dos lados.
+
+Prompts utilizados:
+
+```text
+Estoy en medio de un merge de origin/main en la rama Parte_2-niebla-ir-a, con conflictos en cripta/PROMPTS_LLM.md, cripta/benchmark/benchmark.py y cripta/controller/commands.py. NO abortes el merge. Resuélvelos conservando AMBOS lados [...] No cambies ningún otro archivo salvo lo estrictamente necesario para que compile. Luego corre TODAS las pruebas con un Python 3.11 o superior real. Si pasan todas, haz el commit del merge con el mensaje por defecto, SIN líneas de atribución de Claude, y no hagas push. Si alguna falla, NO commitees [...] Respeta la constitución y §6.2 [...] Registra la entrada en cripta/PROMPTS_LLM.md, al final de mi sección.
+```
+
+Uso en el proyecto: `cripta/PROMPTS_LLM.md`, `cripta/benchmark/benchmark.py` y `cripta/controller/commands.py`.
+
+Cambios realizados por el estudiante: Los tres conflictos eran de dos lados que agregaban cosas distintas en el mismo lugar, no de cambios incompatibles. En este archivo quedaron la entrada de la línea de tiempo que trajo main y, a continuación, las entradas 2.30 a 2.39 de esta rama, sin tocar su texto; las dos ramas numeraron su primera entrada como 2.30, y esa repetición se dejó así porque renumerar habría reescrito entradas ajenas. En `benchmark.py` quedaron las dos suites nuevas (mapa conocido y viaje «ir a», y línea de tiempo), y en `commands.py` las líneas de ayuda de `mapa`, `ir a` e `historia`; el resto de ambos archivos ya lo había combinado git sin conflicto. No hizo falta cambiar ningún otro archivo. Las 1143 pruebas pasaron con Python 3.12.3 (el de WSL, porque en Windows solo estaba el atajo de la Microsoft Store), y se comprobó que el código fusionado no importa heapq, bisect ni collections.

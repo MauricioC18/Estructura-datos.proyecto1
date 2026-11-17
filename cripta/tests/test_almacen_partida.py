@@ -790,8 +790,15 @@ class PruebasRangoDeCazadorEnElArchivo(unittest.TestCase):
             if enemigo.behavior != Enemy.HUNTER:
                 self.assertEqual(enemigo.pursuit_range, 0)
 
-    def test_la_version_del_formato_subio_porque_el_bloque_cambio(self):
-        self.assertEqual(VERSION_DEL_FORMATO, 2)
+    def test_el_rango_viaja_dentro_del_bloque_de_enemigo(self):
+        """El bloque de enemigo cambio, asi que el formato dejo de ser el 1.
+
+        No se fija el numero exacto a proposito: la version sube cada vez que
+        el formato cambia, y fijarla aqui obligaria a tocar esta prueba en
+        cada capacidad. Lo que importa es que un archivo viejo se rechace, y
+        de eso se encarga test_una_version_distinta_del_formato.
+        """
+        self.assertGreater(VERSION_DEL_FORMATO, 1)
 
 
 if __name__ == "__main__":

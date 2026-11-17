@@ -620,10 +620,11 @@ class PruebasRangoDeCazador(unittest.TestCase):
         self.assertEqual(cazador.behavior, Enemy.HUNTER)
         self.assertEqual(cazador.pursuit_range, 600)
 
-    def test_un_rango_de_cero_es_valido(self):
-        _, cazador = self.cazador_con(rango=0)
+    def test_el_rango_minimo_de_la_ficha_es_uno(self):
+        """El contrato del servicio 1.1.0 declara el campo con minimo 1."""
+        _, cazador = self.cazador_con(rango=1)
 
-        self.assertEqual(cazador.pursuit_range, 0)
+        self.assertEqual(cazador.pursuit_range, 1)
 
     def test_una_ficha_de_cazador_sin_rango_es_un_error_de_datos(self):
         """FR-014: no se sustituye por un valor por omisión."""
@@ -633,7 +634,7 @@ class PruebasRangoDeCazador(unittest.TestCase):
         self.assertIn("rango", str(error.exception))
 
     def test_un_rango_invalido_es_un_error_de_datos(self):
-        for invalido in (-1, "600", 1.5, True, [600]):
+        for invalido in (0, -1, "600", 1.5, True, [600]):
             with self.subTest(rango=invalido):
                 with self.assertRaises(ErrorDatosCripta):
                     self.cazador_con(rango=invalido)
