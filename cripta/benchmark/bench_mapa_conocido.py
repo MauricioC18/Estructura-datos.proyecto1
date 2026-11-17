@@ -13,10 +13,12 @@ Qué se mide y contra qué
        exploración. FR-034.
     4. Revertir una entrada con antorcha. Anotaciones inversas en el
        historial contra copiar el conocimiento antes de la acción. FR-035.
-    5. Un paso de «ir a» con el mapa conocido completo. Recalcular en cada
-       paso con la búsqueda del cazador (la decisión del plan) contra (a)
-       reutilizar la búsqueda durante todo el viaje y (b) una búsqueda que
-       escoge el mínimo recorriendo una lista, sin montículo. FR-036.
+    5. Un paso de «ir a» con el mapa conocido completo, tal como lo calcula
+       el viaje del programa (model/viaje.py): el primer paso de un viaje y
+       el promedio por paso de un viaje entero. Se comparan con la búsqueda
+       completa sin mejoras, que queda fija como referencia, y con una
+       búsqueda que escoge el mínimo recorriendo una lista, sin montículo.
+       FR-036.
 
 Criptas
     Sintéticas: cuadrículas de tres tamaños crecientes, con el costo de cada
@@ -38,6 +40,7 @@ import time
 from adapters.fuente_offline import FuenteOffline
 from benchmark.utilidades_medicion import Measurement, calentar_procesador
 from model.game_state import GameState
+from model import viaje
 from model.room import Door, Exit, Room, RoomMap
 from repository.gestor_contenido import descargar_salas_del_esqueleto
 from repository.traductor import Traductor
@@ -323,15 +326,43 @@ def recorrido_de_prueba(room_map):
     return ids[0], ids[-1]
 
 
+class _JugadorDePrueba:
+    def __init__(self, room_id):
+        self.room_id = room_id
+
+
+class _PartidaDePrueba:
+    """Lo único que mira model/viaje.py para calcular un paso: la sala del jugador."""
+
+    def __init__(self, room_id):
+        self.player = _JugadorDePrueba(room_id)
+
+
+def primer_paso_del_programa(mapa, destino, partida):
+    """El paso que calcula el viaje del programa al empezar, sin nada guardado."""
+    return viaje.siguiente_paso(_PartidaDePrueba(partida), mapa, destino)
+
+
+def viaje_del_programa(mapa, destino, camino):
+    """Todos los pasos de un viaje, calculados como los calcula el programa."""
+    partida = _PartidaDePrueba(camino[0] if camino else destino)
+
+    for sala in camino:
+        partida.player.room_id = sala
+        viaje.siguiente_paso(partida, mapa, destino)
+
+
 def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True):
-    """Un paso con el mapa conocido completo, y el viaje entero por pasos."""
+    """Un paso de «ir a» con el mapa conocido completo.
+
+    primero: el primer paso de un viaje, como lo calcula el programa.
+    por_paso: el promedio por paso de un viaje entero, como lo calcula el programa.
+    completa: la búsqueda completa desde el destino, sin ninguna mejora,
+        como referencia fija entre una mejora y otra.
+    lineal: la alternativa sin montículo.
+    """
     mapa = conocimiento_completo(room_map)
     partida, destino = recorrido_de_prueba(room_map)
-
-    def un_paso():
-        RutasMasBaratas(mapa.vecinas_conocidas, destino).primer_paso_desde(partida)
-
-    paso = mejor_tiempo(un_paso)
 
     camino = []
     sala = partida
@@ -343,18 +374,11 @@ def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True):
         camino.append(sala)
         sala = salida.destination
 
-    def viaje_recalculando():
-        for sala_actual in camino:
-            RutasMasBaratas(mapa.vecinas_conocidas, destino).primer_paso_desde(sala_actual)
-
-    def viaje_reutilizando():
-        una_sola = RutasMasBaratas(mapa.vecinas_conocidas, destino)
-        for sala_actual in camino:
-            una_sola.primer_paso_desde(sala_actual)
-
-    pasos = max(1, len(camino))
-    recalculando = mejor_tiempo(viaje_recalculando) / pasos
-    reutilizando = mejor_tiempo(viaje_reutilizando) / pasos
+    primero = mejor_tiempo(lambda: primer_paso_del_programa(mapa, destino, partida))
+    por_paso = mejor_tiempo(lambda: viaje_del_programa(mapa, destino, camino)) / max(1, len(camino))
+    completa = mejor_tiempo(
+        lambda: RutasMasBaratas(mapa.vecinas_conocidas, destino).primer_paso_desde(partida)
+    )
     lineal = None
 
     if con_alternativa_lineal:
@@ -362,7 +386,7 @@ def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True):
             lambda: primer_paso_sin_monticulo(mapa.vecinas_conocidas, destino, partida), 1
         )
 
-    return paso, recalculando, reutilizando, lineal, len(camino)
+    return primero, por_paso, completa, lineal, len(camino)
 
 
 def _us(segundos):
@@ -411,11 +435,11 @@ def run(carpeta_sin_conexion=CARPETA_SIN_CONEXION):
         ))
 
     for salas, room_map in cuadriculas:
-        paso, recalculando, reutilizando, lineal, largo = medir_paso_de_ir_a(room_map)
+        primero, por_paso, completa, lineal, largo = medir_paso_de_ir_a(room_map)
         mediciones.append(Measurement(
-            f"5. Paso de ir a, mapa completo de {salas} salas", paso,
-            f"un paso {_ms(paso)}; viaje de {largo} pasos: recalcular {_ms(recalculando)} "
-            f"y reutilizar {_ms(reutilizando)} por paso; sin monticulo {_ms(lineal)}",
+            f"5. Paso de ir a, mapa completo de {salas} salas", primero,
+            f"primer paso {_ms(primero)}; por paso en un viaje de {largo} pasos "
+            f"{_ms(por_paso)}; busqueda completa {_ms(completa)}; sin monticulo {_ms(lineal)}",
         ))
 
     reales = criptas_sin_conexion(carpeta_sin_conexion)
@@ -427,10 +451,11 @@ def run(carpeta_sin_conexion=CARPETA_SIN_CONEXION):
         ))
 
     for id_cripta, room_map in reales:
-        paso, recalculando, reutilizando, lineal, largo = medir_paso_de_ir_a(room_map)
+        primero, por_paso, completa, lineal, largo = medir_paso_de_ir_a(room_map)
         mediciones.append(Measurement(
-            f"5. Paso de ir a, mapa completo de {id_cripta} ({len(room_map)} salas)", paso,
-            f"un paso {_ms(paso)}; sin monticulo {_ms(lineal)}; viaje de {largo} pasos",
+            f"5. Paso de ir a, mapa completo de {id_cripta} ({len(room_map)} salas)", primero,
+            f"primer paso {_ms(primero)}; busqueda completa {_ms(completa)}; "
+            f"sin monticulo {_ms(lineal)}; viaje de {largo} pasos",
         ))
 
     return mediciones
