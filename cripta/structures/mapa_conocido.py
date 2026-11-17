@@ -29,12 +29,21 @@ Estructuras, todas propias o permitidas
     No se usa dict como índice ni set (P1 §7, §6.2).
 
 Clave de una puerta
-    TablaHash solo admite claves int o str, así que no sirve una tupla. Se
-    usa id de room_a * 4 + posición de la dirección por la que la puerta sale
-    de room_a. Es única (una salida por dirección y sala), es la misma desde
-    los dos lados y sobrevive a guardar y cargar porque no depende del objeto
-    en memoria. Un texto con los ids de las dos salas no serviría: dos
-    salidas distintas pueden unir las mismas dos salas.
+    TablaHash solo admite claves int o str, así que no sirve una tupla. La
+    clave de una salida es id de la sala * 4 + posición de su dirección. Es
+    única (una salida por dirección y sala) y sobrevive a guardar y cargar
+    porque no depende del objeto en memoria. Un texto con los ids de las dos
+    salas no serviría: dos salidas distintas pueden unir las mismas dos
+    salas.
+
+    El recuerdo de una puerta se guarda bajo la clave de cada uno de sus
+    lados, con el mismo valor. Así el proveedor de vecinas, que recorre las
+    salidas de una sala, consulta con la clave de la salida que tiene en la
+    mano, sin buscar por qué dirección sale la puerta de la otra sala: esa
+    búsqueda era la mitad del costo de un paso de «ir a» (plan, mejora a).
+    Observar escribe los dos lados, pero observar es raro y consultar es
+    frecuente. La exportación entrega un par por puerta, con la clave del
+    lado room_a.
 
 Reversión
     Cada cambio anota en el historial reversible su operación inversa, con el
@@ -46,12 +55,13 @@ Reversión
 Complejidad (k = salas exploradas)
     estado_de_sala, puerta_recordada: O(1) promedio, no dependen de k.
     jugador_entro: O(1); con la antorcha, como mucho 5 salas y 20 contadores.
-    puerta_cambio: O(1).
+    puerta_cambio: O(1), escribe los dos lados de la puerta.
     deshacer los cambios de una acción: O(cambios de esa acción).
-    vecinas_conocidas: O(grado de la sala), a lo sumo 4.
+    vecinas_conocidas: O(grado de la sala), a lo sumo 4, sin buscar la
+        dirección de ninguna puerta.
     exportar, importar: O(k + puertas recordadas).
 """
-from model.room import DIRECTIONS
+from model.room import DIRECTIONS, direction_index
 from structures.history import CallbackChange
 from structures.sorting import sort
 from structures.tabla_hash import TablaHash
@@ -144,7 +154,9 @@ class MapaConocido:
             if not self._exploradas.contiene(salida.destination):
                 continue
 
-            if self._puertas.obtener(self.clave_de_puerta(salida.door)) is True:
+            clave = id_sala * len(DIRECTIONS) + direction_index(salida.direction)
+
+            if self._puertas.obtener(clave) is True:
                 vecinas.append((salida.destination, salida.cost, salida))
 
         return vecinas
@@ -192,7 +204,8 @@ class MapaConocido:
         pares = []
 
         for clave in self._puertas.claves():
-            pares.append((clave, self._puertas.obtener(clave)))
+            if self._salida_de_la_clave(clave).door.room_a == clave // len(DIRECTIONS):
+                pares.append((clave, self._puertas.obtener(clave)))
 
         return list(self._orden), sort(pares, key=_primer_valor)
 
@@ -210,7 +223,8 @@ class MapaConocido:
             self._marcar_explorada(id_sala)
 
         for clave, abierta in puertas:
-            self._puertas.insertar(clave, bool(abierta))
+            for lado in self._claves_de_los_lados(self._salida_de_la_clave(clave).door):
+                self._puertas.insertar(lado, bool(abierta))
 
     # ------------------------------------------------------------------
     # Cambios con su inversa
@@ -253,21 +267,48 @@ class MapaConocido:
                 self._contadores.eliminar(destino)
 
     def _observar(self, puerta):
-        clave = self.clave_de_puerta(puerta)
-        anterior = self._puertas.obtener(clave)
+        claves = self._claves_de_los_lados(puerta)
+        anterior = self._puertas.obtener(claves[0])
         actual = puerta.is_open
 
         if anterior is not None and anterior == actual:
             return
 
-        self._puertas.insertar(clave, actual)
-        self._anotar(CallbackChange(self._restaurar_puerta, clave, anterior))
+        for clave in claves:
+            self._puertas.insertar(clave, actual)
 
-    def _restaurar_puerta(self, clave, anterior):
-        if anterior is None:
-            self._puertas.eliminar(clave)
-        else:
-            self._puertas.insertar(clave, anterior)
+        self._anotar(CallbackChange(self._restaurar_puerta, claves, anterior))
+
+    def _restaurar_puerta(self, claves, anterior):
+        for clave in claves:
+            if anterior is None:
+                self._puertas.eliminar(clave)
+            else:
+                self._puertas.insertar(clave, anterior)
+
+    def _claves_de_los_lados(self, puerta):
+        """La clave del lado room_a y, si la puerta tiene salida de vuelta, la
+        del lado room_b. Un paso de un solo sentido tiene una sola."""
+        claves = [self.clave_de_puerta(puerta)]
+        sala_b = self._room_map.room(puerta.room_b)
+
+        for indice in range(len(DIRECTIONS)):
+            salida = sala_b.exit_towards(DIRECTIONS[indice])
+
+            if salida is not None and salida.door is puerta:
+                claves.append(puerta.room_b * len(DIRECTIONS) + indice)
+                break
+
+        return claves
+
+    def _salida_de_la_clave(self, clave):
+        id_sala = clave // len(DIRECTIONS)
+        salida = self._room_map.room(id_sala).exit_towards(DIRECTIONS[clave % len(DIRECTIONS)])
+
+        if salida is None:
+            raise ValueError(f"La clave de puerta {clave} no corresponde a ninguna salida.")
+
+        return salida
 
     def _anotar(self, cambio):
         if self._history is not None:

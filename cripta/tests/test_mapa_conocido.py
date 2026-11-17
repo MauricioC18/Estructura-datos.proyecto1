@@ -596,5 +596,84 @@ class TestExportarImportar(unittest.TestCase):
         self.assertEqual(mapa.salas_exploradas(), [1])
 
 
+
+class TestRecuerdoPorLado(unittest.TestCase):
+    """Mejora (a) del plan: el recuerdo se guarda bajo la clave de cada lado."""
+
+    def test_observada_desde_room_b_sirve_desde_room_a(self):
+        """FR-007, FR-023: una sola puerta, el mismo recuerdo desde los dos lados."""
+        room_map = mapa_de_salas(1, 2)
+        puerta = conectar(room_map, 1, 2, "E")
+        mapa = MapaConocido(room_map)
+        mapa.importar([1, 2], [])
+
+        mapa.puerta_cambio(puerta, 2)
+
+        self.assertEqual([v for v, _, _ in mapa.vecinas_conocidas(1)], [2])
+        self.assertEqual([v for v, _, _ in mapa.vecinas_conocidas(2)], [1])
+        self.assertEqual(mapa.puerta_recordada(puerta), ABIERTA)
+
+    def test_un_cambio_actualiza_los_dos_lados(self):
+        """FR-006, FR-007: al cerrarse con el jugador presente, ninguno de los
+        dos lados la ofrece como vecina."""
+        room_map = mapa_de_salas(1, 2)
+        puerta = conectar(room_map, 1, 2, "E")
+        mapa = MapaConocido(room_map)
+        mapa.jugador_entro(1)
+        mapa.jugador_entro(2)
+
+        puerta.closed = True
+        mapa.puerta_cambio(puerta, 2)
+
+        self.assertEqual(mapa.vecinas_conocidas(1), [])
+        self.assertEqual(mapa.vecinas_conocidas(2), [])
+
+    def test_deshacer_restaura_los_dos_lados(self):
+        """FR-015: la inversa devuelve las dos entradas."""
+        room_map = mapa_de_salas(1, 2)
+        puerta = conectar(room_map, 1, 2, "E")
+        history = historial()
+        mapa = MapaConocido(room_map, history)
+        mapa.jugador_entro(1)
+        mapa.jugador_entro(2)
+
+        history.begin_action()
+        puerta.closed = True
+        mapa.puerta_cambio(puerta, 1)
+        history.undo()
+
+        self.assertEqual([v for v, _, _ in mapa.vecinas_conocidas(1)], [2])
+        self.assertEqual([v for v, _, _ in mapa.vecinas_conocidas(2)], [1])
+
+    def test_un_paso_de_un_solo_sentido_tiene_una_sola_entrada(self):
+        """FR-007, FR-014: sin salida de vuelta, un solo lado que recordar."""
+        room_map = mapa_de_salas(1, 6)
+        puerta = Door(6, 1)
+        room_map.room(6).add_exit(Exit("S", 1, puerta))
+        mapa = MapaConocido(room_map)
+
+        mapa.jugador_entro(6)
+
+        self.assertEqual(mapa.puerta_recordada(puerta), ABIERTA)
+        self.assertEqual(len(mapa.exportar()[1]), 1)
+
+    def test_exportar_da_un_par_por_puerta(self):
+        """FR-014: aunque se guarden dos lados, se exporta una vez cada puerta."""
+        room_map = cruz()
+        mapa = MapaConocido(room_map)
+        mapa.jugador_entro(1)
+
+        exploradas, puertas = mapa.exportar()
+
+        self.assertEqual(len(puertas), 4)
+        for clave, _ in puertas:
+            self.assertEqual(clave // 4, 1)
+
+    def test_importar_una_clave_que_no_es_de_ninguna_salida(self):
+        """FR-014: datos dañados se rechazan."""
+        with self.assertRaises(ValueError):
+            MapaConocido(cruz()).importar([1], [(1 * 4 + 3 + 400, True)])
+
+
 if __name__ == "__main__":
     unittest.main()
