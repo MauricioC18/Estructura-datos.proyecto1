@@ -113,6 +113,7 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 - **Una ficha de cazador sin el campo de rango, o con un rango que no es entero mayor o igual que 0**: es un dato inválido de la cripta y se reporta como tal, sin inventar un valor por omisión que oculte el error.
 - **El cazador llega a la sala del jugador en su movimiento**: ese turno fue un movimiento; atacar es decisión del turno siguiente, cuando ya comparte sala.
 - **El jugador muere o la partida termina** mientras un cazador tiene turno programado: se aplica lo mismo que a cualquier enemigo con turno programado, sin regla nueva.
+- **Dos salidas abiertas distintas que llevan a la misma sala vecina con costos distintos**: cuenta la más barata, tanto para el costo mínimo como para el paso que el cazador atraviesa. La vecina es la misma, así que el desempate por identificador no decide nada aquí.
 - **Una salida de costo muy alto como único camino**: la ruta existe y cuesta mucho; si ese costo supera el rango, el cazador espera aunque el jugador esté en la sala de al lado.
 
 ## Requisitos
@@ -126,7 +127,7 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 - **FR-005**: Cuando no existe ninguna ruta así, el cazador DEBE esperar, y la espera DEBE costar 100.
 - **FR-006**: Cuando ese costo mínimo es mayor que el rango del cazador, el cazador DEBE esperar, y la espera DEBE costar 100.
 - **FR-007**: Cuando ese costo mínimo existe y no supera el rango, el cazador DEBE moverse una sala por una salida que empiece una ruta de ese costo mínimo, y el costo de esa acción DEBE ser el costo de la salida que atraviesa.
-- **FR-008**: Entre las salas vecinas que empiezan una ruta de costo mínimo, el cazador DEBE moverse a la de menor identificador. Este criterio DEBE cumplirse siempre, incluso cuando hay muchas rutas de igual costo, y DEBE valer sea cual sea la forma en que se calcule la ruta.
+- **FR-008**: Entre las salas vecinas que empiezan una ruta de costo mínimo, el cazador DEBE moverse a la de menor identificador. Cuando dos salidas abiertas distintas llevan a esa misma vecina con costos distintos, DEBE atravesar la más barata de las dos. Este criterio DEBE cumplirse siempre, incluso cuando hay muchas rutas de igual costo, y DEBE valer sea cual sea la forma en que se calcule la ruta.
 - **FR-009**: El cazador DEBE decidir con el esqueleto completo de la cripta y el estado actual de todas las puertas. Lo que el jugador conoce o desconoce del mapa NO DEBE afectar su decisión.
 - **FR-010**: Un cazador NO DEBE abrir puertas cerradas, igual que cualquier otro enemigo.
 - **FR-011**: La decisión de un cazador en cada turno DEBE ser idéntica a la que se obtendría calculando la ruta desde cero en ese instante, considerando que entre dos de sus turnos pueden haber ocurrido aperturas y cierres de puertas, movimientos del jugador, cambios de sala de otros actores y cambios de velocidad.
@@ -138,8 +139,8 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 
 ### Requisitos de rendimiento
 
-- **FR-017**: El costo de la decisión de un cazador DEBE crecer con el tamaño de la región que queda dentro de su rango, y no con el tamaño de la cripta completa.
-- **FR-018**: El programa DEBE seguir resolviendo el ciclo completo de eventos entre dos decisiones del jugador en menos de 20 ms, con decenas de cazadores activos a la vez.
+- **FR-017**: El costo de la decisión de un cazador DEBE crecer con el tamaño de la región que queda dentro de su rango, y no con el tamaño de la cripta completa. Cuando varios cazadores de rangos distintos deciden en el mismo instante, el trabajo compartido entre ellos PUEDE abarcar la región del rango mayor; ese sobrecosto DEBE quedar medido y reportado, no supuesto.
+- **FR-018**: El programa DEBE seguir resolviendo el ciclo completo de eventos entre dos decisiones del jugador en menos de 20 ms con al menos 50 cazadores activos a la vez, que es lo que este proyecto toma como «decenas de cazadores».
 
 ### Entidades
 
@@ -153,10 +154,10 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 - **SC-003**: Un cazador cuyo jugador está fuera de su rango, o incomunicado de él, no se mueve ni una sala durante toda la partida.
 - **SC-004**: Después de que una puerta se abre o se cierra, la decisión del cazador coincide con la de un cálculo hecho desde cero en ese instante, en todos los turnos comprobados.
 - **SC-005**: Al multiplicar por diez el tamaño de la cripta sin cambiar el rango del cazador, el tiempo de su decisión no se multiplica por diez.
-- **SC-006**: Con decenas de cazadores activos persiguiendo al mismo jugador, el ciclo completo de eventos entre dos decisiones del jugador sigue resolviéndose en menos de 20 ms.
+- **SC-006**: Con al menos 50 cazadores activos persiguiendo al mismo jugador, el ciclo completo de eventos entre dos decisiones del jugador sigue resolviéndose en menos de 20 ms.
 - **SC-007**: Está medido, con una cripta donde las puertas cambian con frecuencia y otra donde casi nunca cambian, cuánto trabajo ahorra reutilizar cálculos frente a calcular siempre desde cero, y en qué condiciones deja de convenir.
 - **SC-008**: Está medido si conviene un cálculo por cazador o un cálculo compartido entre todos los cazadores activos, y está documentada la condición que hace cambiar la respuesta.
-- **SC-009**: Las 882 pruebas anteriores a esta capacidad siguen pasando sin modificarlas.
+- **SC-009**: Las 882 pruebas anteriores a esta capacidad siguen pasando sin modificarlas, con una sola excepción prevista: las que fijan la versión del formato del archivo de partida, porque guardar el rango de un cazador cambia ese formato. Cualquier otra prueba que falle es un defecto, no una prueba desactualizada.
 
 ## Supuestos
 
