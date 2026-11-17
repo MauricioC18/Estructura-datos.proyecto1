@@ -19,12 +19,14 @@ from adapters.almacen_partida import (
     comprobar_versiones_vigentes,
     construir_juego_reversible,
     guardar_partida,
+    tomar_copia_del_estado,
 )
 from adapters.fuente_datos import ErrorFuenteDatos
 from adapters.scoreboard import ScoreboardError, ScoreEntry
 from controller.commands import (
     HELP,
     LOAD,
+    HISTORY,
     QUIT,
     SAVE,
     VIEW,
@@ -33,6 +35,12 @@ from controller.commands import (
     parse_command,
 )
 from controller.game_controller import GameController
+from structures.linea_de_tiempo import COPIAS_CADA, LineaDeTiempo
+from model.consulta_historia import (
+    ConsultaRechazada,
+    consultar_accion,
+    consultar_instante,
+)
 from model.game import DEFEAT, VICTORY, Game
 from model.game_state import GameState
 from replay.replay import ReplayDivergence, replay_commands
@@ -88,11 +96,16 @@ class InUseIds:
         return self.repository.ids_en_uso(game.enemies, items, room.traps)
 
 
-def build_game(repository, seed, player_name=None, in_use=None):
+def build_game(repository, seed, player_name=None, in_use=None,
+               copias_cada=COPIAS_CADA):
     """Arma una partida nueva sobre la cripta que el repositorio ya inicio.
 
     El historial reversible lo comparten el inventario, el rastro y la agenda,
     para que el pergamino pueda deshacer todo lo que paso en el intervalo.
+
+    copias_cada son las acciones del jugador entre dos copias completas del
+    estado, que es lo que la linea de tiempo usa para responder consultas sin
+    guardar una copia por accion (seccion 3.6).
     """
     data = repository.datos_de_partida()
     state = GameState(seed)
@@ -117,6 +130,8 @@ def build_game(repository, seed, player_name=None, in_use=None):
         trail=PlayerTrail(history),
         history=history,
         event_queue=ReversibleEventQueue(history),
+        timeline=LineaDeTiempo(copias_cada=copias_cada),
+        snapshot=tomar_copia_del_estado,
     )
 
     if in_use is not None:
@@ -397,6 +412,17 @@ def _command_loop(controller, view):
             show = False
             continue
 
+        if command.name == HISTORY:
+            try:
+                resumen = _consultar_historia(controller.game, command.argument)
+            except ConsultaRechazada as error:
+                view.show_message(str(error))
+            else:
+                view.show_history(resumen)
+
+            show = False
+            continue
+
         if command.name == SAVE:
             try:
                 escritos = guardar_partida(
@@ -444,6 +470,21 @@ def _command_loop(controller, view):
         view.show_state(controller.visible_state())
 
     return None
+
+
+def _consultar_historia(game, argumento):
+    """Atiende las dos formas del comando: instante y numero de accion.
+
+    El parser devuelve un entero para un instante del reloj y un texto que
+    empieza con # para un numero de accion, asi que no hay que volver a
+    interpretar el texto aca.
+    """
+    from adapters.almacen_partida import reconstruir_desde_copia
+
+    if isinstance(argumento, str) and argumento.startswith("#"):
+        return consultar_accion(game, int(argumento[1:]), reconstruir_desde_copia)
+
+    return consultar_instante(game, argumento, reconstruir_desde_copia)
 
 
 def _saved_game_problem(path, repository):

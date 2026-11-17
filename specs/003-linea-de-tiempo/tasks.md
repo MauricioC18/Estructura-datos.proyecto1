@@ -10,44 +10,44 @@ Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porqu
 
 ### Fase 1 — Base, bloquea todo lo demás
 
-- [ ] T001 La línea: acciones, copias, anclajes y búsqueda binaria, en `cripta/structures/linea_de_tiempo.py`
-- [ ] T002 [P] Pruebas de la línea, en `cripta/tests/test_linea_de_tiempo.py`
-- [ ] T003 Separar el armado del contenido de su escritura, en `cripta/adapters/almacen_partida.py`
-- [ ] T004 El motor registra cada acción del jugador y pide copias, en `cripta/model/game.py`
+- [x] T001 La línea: acciones, copias, anclajes y búsqueda binaria, en `cripta/structures/linea_de_tiempo.py`
+- [x] T002 [P] Pruebas de la línea, en `cripta/tests/test_linea_de_tiempo.py`
+- [x] T003 Separar el armado del contenido de su escritura, en `cripta/adapters/almacen_partida.py`
+- [x] T004 El motor registra cada acción del jugador y pide copias, en `cripta/model/game.py`
 
 ### Fase 2 — Historia 1: consultar un instante pasado (P1)
 
-- [ ] T005 [H1] La reconstrucción y el resumen, en `cripta/model/consulta_historia.py`
-- [ ] T006 [H1] Prueba de equivalencia contra el estado real de todos los instantes, en `cripta/tests/test_linea_de_tiempo.py`
-- [ ] T007 [P] [H1] Pruebas de que consultar no altera nada, en `cripta/tests/test_linea_de_tiempo.py`
-- [ ] T008 [P] [H1] Pruebas de las acciones que actúan sobre el objeto que se ve, en `cripta/tests/test_linea_de_tiempo.py`
+- [x] T005 [H1] La reconstrucción y el resumen, en `cripta/model/consulta_historia.py`
+- [x] T006 [H1] Prueba de equivalencia contra el estado real de todos los instantes, en `cripta/tests/test_linea_de_tiempo.py`
+- [x] T007 [P] [H1] Pruebas de que consultar no altera nada, en `cripta/tests/test_linea_de_tiempo.py`
+- [x] T008 [P] [H1] Pruebas de las acciones que actúan sobre el objeto que se ve, en `cripta/tests/test_linea_de_tiempo.py`
 
 ### Fase 3 — Historia 2: preguntar por algo que no pasó (P1)
 
-- [ ] T009 [P] [H2] Rechazo de consultas imposibles, en `cripta/model/consulta_historia.py` y sus pruebas
+- [x] T009 [P] [H2] Rechazo de consultas imposibles, en `cripta/model/consulta_historia.py` y sus pruebas
 
 ### Fase 4 — Historia 3: el pergamino recorta la línea (P2)
 
-- [ ] T010 [H3] El recorte y el anclaje del generador, en `cripta/model/game.py`
-- [ ] T011 [H3] Pruebas del recorte y de la re-simulación después de un pergamino, en `cripta/tests/test_linea_de_tiempo.py`
+- [x] T010 [H3] El recorte y el anclaje del generador, en `cripta/model/game.py`
+- [x] T011 [H3] Pruebas del recorte y de la re-simulación después de un pergamino, en `cripta/tests/test_linea_de_tiempo.py`
 
 ### Fase 5 — Historia 4: consultar sigue siendo barato (P2)
 
-- [ ] T012 [H4] Pruebas del límite de K acciones y de la búsqueda binaria, en `cripta/tests/test_linea_de_tiempo.py`
+- [x] T012 [H4] Pruebas del límite de K acciones y de la búsqueda binaria, en `cripta/tests/test_linea_de_tiempo.py`
 
 ### Fase 6 — Historia 5: la historia sobrevive a guardar y cargar (P3)
 
-- [ ] T013 [H5] La línea en el archivo de partida y la versión 3, en `cripta/adapters/almacen_partida.py`
-- [ ] T014 [P] [H5] Pruebas de ida y vuelta de la línea, en `cripta/tests/test_almacen_partida.py`
+- [x] T013 [H5] La línea en el archivo de partida y la versión 3, en `cripta/adapters/almacen_partida.py`
+- [x] T014 [P] [H5] Pruebas de ida y vuelta de la línea, en `cripta/tests/test_almacen_partida.py`
 
 ### Fase 7 — Cierre
 
-- [ ] T015 El comando de consulta y la impresión del resumen, en `cripta/controller/commands.py` y `cripta/view/console_view.py`
-- [ ] T016 El banco de mediciones de la línea, en `cripta/benchmark/bench_linea_de_tiempo.py`
-- [ ] T017 Correr las mediciones, escoger el valor por omisión de K y anotarlo en `specs/003-linea-de-tiempo/plan.md`
-- [ ] T018 No romper nada: la suite completa
-- [ ] T019 Dejarle la interfaz lista a la Persona 4 para las dos banderas nuevas
-- [ ] T020 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
+- [x] T015 El comando de consulta y la impresión del resumen, en `cripta/controller/commands.py` y `cripta/view/console_view.py`
+- [x] T016 El banco de mediciones de la línea, en `cripta/benchmark/bench_linea_de_tiempo.py`
+- [x] T017 Correr las mediciones, escoger el valor por omisión de K y anotarlo en `specs/003-linea-de-tiempo/plan.md`
+- [x] T018 No romper nada: la suite completa
+- [x] T019 Dejarle la interfaz lista a la Persona 4 para las dos banderas nuevas
+- [x] T020 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
 
 ---
 

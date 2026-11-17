@@ -164,6 +164,61 @@ Para la memoria se mide el tamaño real en bytes de lo que la línea guarda, no 
 
 **Qué se reporta si el resultado no es el esperado**: si *K* = 1 resulta aceptable en memoria para las criptas de esta escala, se reporta tal cual y se discute si la complejidad del diseño se justifica. La constitución pide el número incómodo antes que el favorable sin respaldo. Lo que **no** cambia con las mediciones es que §5.5 prohíbe la copia por acción, así que el diseño se mantiene aunque la medición fuera indulgente; lo que las mediciones deciden es el valor por omisión de *K*.
 
+### Resultado de las mediciones
+
+Hechas el 2026-11-16, en Python 3.14.6 sobre Windows 11, en una cripta sintética de 40 salas con 6 enemigos errantes y 300 decisiones del jugador. Cada copia completa pesa unos **14 KiB** en esta cripta.
+
+**1. Memoria y tiempo de consulta según *K*** (40 consultas en puntos repartidos):
+
+| *K* | Copias | Memoria en copias | Memoria en acciones | Por consulta |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 (la alternativa ingenua) | 301 | **4 259.9 KiB** | 7.32 KiB | 0.6970 ms |
+| 10 | 31 | 437.4 KiB | 7.32 KiB | 0.8101 ms |
+| **50 (el valor por omisión)** | 7 | **98.2 KiB** | 7.32 KiB | **1.2953 ms** |
+| 200 | 2 | 27.4 KiB | 7.32 KiB | 2.6585 ms |
+
+**Por qué el valor por omisión es 50.** Lo primero que dicen los números es que la alternativa ingenua, una copia por acción, cuesta **43 veces más memoria** que *K* = 50 para ganar menos de 0.6 ms por consulta. Eso cierra la discusión sobre el diseño: §5.5 lo prohíbe y la medición muestra por qué.
+
+Entre los tres valores razonables el argumento es de latencia, no de memoria, y conviene decirlo así: **con 98 KiB la memoria ya es irrelevante en términos absolutos**, así que lo que queda por optimizar es cuánto tarda una consulta. *K* = 200 ahorra 71 KiB —nada— y **duplica** el tiempo de consulta. *K* = 10 gana 0.5 ms y cuesta 4.5 veces más memoria. *K* = 50 deja la consulta cerca de 1 ms, que para un comando interactivo es imperceptible, con la memoria ya en dos órdenes de magnitud por debajo de la ingenua.
+
+La columna de la memoria en acciones es la que respalda FR-017: **7.32 KiB para 300 acciones, y no cambia con *K***. Lo que crece con *K* son las copias, no el registro de lo que pasó.
+
+**2. El costo de una consulta no depende del largo de la partida** (*K* = 50, consultas en puntos repartidos):
+
+| Partida | Por consulta |
+| ---: | ---: |
+| 50 acciones | 1.1901 ms |
+| 150 acciones | 1.2347 ms |
+| 300 acciones | 1.2819 ms |
+
+Plano: seis veces más partida mueve la cifra un 7 %, que está en el ruido. Es SC-002, y era lo esperado, porque en la complejidad de una consulta no aparece la cantidad total de acciones.
+
+**Esta medición hubo que corregirla.** La primera versión consultaba siempre la **última** acción, que cae justo después de una copia y casi no repite nada: salía plana por el caso más fácil y no probaba nada. Se cambió a puntos repartidos, de modo que el promedio pasa por reconstrucciones de 0 a *K* acciones. Queda anotado porque es el mismo error que ya había aparecido en la capacidad del cazador: una medición que confirma la hipótesis sin haberla puesto a prueba.
+
+**3. El recorte por pergamino no depende del largo de la partida**:
+
+| Partida | Por recorte |
+| ---: | ---: |
+| 50 acciones | 0.218 µs |
+| 300 acciones | 0.217 µs |
+
+Idéntico, que es SC-008 y FR-019: recortar quita una acción y a lo sumo una copia, sin recorrer nada.
+
+**4. El ciclo de eventos con la línea activa**:
+
+| Escenario | Por ciclo | Del límite de 20 ms |
+| --- | ---: | ---: |
+| Sin copias | 0.0358 ms | 0.18 % |
+| Con la línea activa, *K* = 50 | 0.0415 ms | 0.21 % |
+
+La línea le cuesta al ciclo un **16 % más**, que es lo que cuesta serializar el estado una vez cada 50 acciones. En términos absolutos son 0.0057 ms y el 0.21 % del límite, así que SC-009 se cumple con dos órdenes de magnitud de margen. El número se reporta tal cual: la línea **no** es gratis, simplemente es baratísima.
+
+### La advertencia que hay que decir en la defensa
+
+Estas cifras son de una cripta de 40 salas, donde una copia pesa 14 KiB. **La memoria de las copias crece con el tamaño de la cripta**, porque una copia guarda la cripta entera, incluido el esqueleto, que no cambia nunca. En la cripta de la revisión, más grande, las copias pesarán más y puede convenir subir *K*; por eso es configurable.
+
+La optimización evidente está identificada y **no** se hizo: guardar en la copia solo el estado mutable y no el esqueleto. Se prefirió reutilizar el serializador completo, que ya estaba escrito y probado, antes que escribir un segundo serializador para ahorrar bytes en una cripta de este tamaño. Es una decisión consciente con su costo medido, no un descuido.
+
 ## Riesgos
 
 - **La divergencia por el generador aleatorio es el riesgo grande.** Ya está identificada y resuelta con los anclajes, pero cualquier otra fuente de no determinismo produciría resúmenes falsos sin que nada se vea raro. Por eso la prueba central no compara contra valores escritos a mano: juega una partida larga guardando el estado real en cada acción, y después consulta **todos** los instantes y exige que cada resumen coincida con lo que de verdad hubo. Es la técnica que en la capacidad del cazador destapó dos errores propios.

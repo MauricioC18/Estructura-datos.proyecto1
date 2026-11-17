@@ -35,6 +35,10 @@ Complejidad (A = acciones, C = copias)
     espacio: O(A + ((A/K) + pergaminos) * tamano del estado).
 """
 
+# Acciones del jugador entre dos copias completas del estado. El valor sale de
+# las mediciones de la capacidad: con 50, la memoria de las copias queda 43
+# veces por debajo de la alternativa ingenua de una copia por accion, y una
+# consulta sigue cerca de 1 ms. Se configura por partida.
 COPIAS_CADA = 50
 
 
@@ -131,6 +135,17 @@ class LineaDeTiempo:
             return
 
         self._copias.append(CopiaDelEstado(acciones, reloj, bloque))
+
+    def restaurar_copias(self, copias):
+        """Vuelve a poner las copias leidas de un archivo de partida.
+
+        Se usa al cargar: las copias llegan ya hechas y no hay que volver a
+        aplicarles la regla de una cada K.
+        """
+        self._copias = [
+            CopiaDelEstado(acciones, reloj, bloque)
+            for acciones, reloj, bloque in copias
+        ]
 
     # ------------------------------------------------------------------
     # Recortar

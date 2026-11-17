@@ -205,6 +205,8 @@ class Game:
         result=IN_PROGRESS,
         player_actions=0,
         enemies_defeated=0,
+        timeline=None,
+        snapshot=None,
     ):
         """Arma una partida guardada en disco, para el guardado de §4.10.
 
@@ -224,7 +226,8 @@ class Game:
         archivo y la interfaz no mostraria nada, sin que diera ningun error.
 
         El historial del retroceso no se carga: al abrir una partida guardada
-        el de la sesion anterior ya no aplica.
+        el de la sesion anterior ya no aplica. La linea de tiempo si, porque
+        describe la historia de la partida y no la de la sesion (seccion 3.6).
         """
         game = cls(
             state,
@@ -237,6 +240,8 @@ class Game:
             message_log,
             event_queue,
             start=False,
+            timeline=timeline,
+            snapshot=snapshot,
         )
 
         for event in events:

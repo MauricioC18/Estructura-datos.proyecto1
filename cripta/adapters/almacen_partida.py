@@ -171,6 +171,7 @@ class PartidaGuardada:
         self.result = ""
         self.player_actions = 0
         self.enemies_defeated = 0
+        self.timeline = None
 
 
 # ----------------------------------------------------------------------
@@ -210,6 +211,11 @@ def _empacar_texto_o_entero(valor):
 
 def _empacar_cantidad(valor):
     return _CANTIDAD.pack(int(valor))
+
+
+def _empacar_bytes(crudo):
+    """Bloque de bytes opaco, para las copias de la linea de tiempo."""
+    return _LARGO_DE_BLOQUE.pack(len(crudo)) + crudo
 
 
 class _Lector:
@@ -253,6 +259,19 @@ class _Lector:
 
     def entero(self):
         return self._tomar(_ENTERO)[0]
+
+    def bytes_opacos(self):
+        largo = self._tomar(_LARGO_DE_BLOQUE)[0]
+        siguiente = self._posicion + largo
+
+        if siguiente > len(self._contenido):
+            raise ArchivoDePartidaDanado(
+                f"el {self._de_donde} se corto en medio de un bloque"
+            )
+
+        crudo = self._contenido[self._posicion:siguiente]
+        self._posicion = siguiente
+        return crudo
 
     def entero_opcional(self):
         etiqueta, valor = self._tomar(_ENTERO_OPCIONAL)
@@ -561,7 +580,7 @@ def _leer_evento(lector):
     return event, id_del_actor, id_del_objetivo
 
 
-def _empacar_bloque_global(juego, versiones):
+def _empacar_bloque_global(juego, versiones, con_linea=True):
     id_cripta, version_cripta, version_catalogo = versiones
     state = juego.state
     eventos = juego.events.active_events()
@@ -593,7 +612,69 @@ def _empacar_bloque_global(juego, versiones):
         partes.append(_empacar_entero(room_id))
         partes.append(_empacar_entero(time))
 
+    partes.append(_empacar_linea_de_tiempo(juego, con_linea))
+
     return b"".join(partes)
+
+
+def _empacar_linea_de_tiempo(juego, con_linea):
+    """La linea de tiempo del juego, para el archivo de partida (seccion 3.6).
+
+    con_linea=False cuando lo que se arma es una COPIA de la propia linea. Si
+    una copia llevara la linea dentro, cada copia contendria las anteriores y
+    el tamano creceria de forma exponencial.
+    """
+    linea = None if not con_linea else getattr(juego, "timeline", None)
+
+    if linea is None:
+        return _empacar_bandera(False)
+
+    partes = [
+        _empacar_bandera(True),
+        _empacar_cantidad(linea.copias_cada),
+        _empacar_cantidad(linea.cantidad_de_acciones()),
+    ]
+
+    for accion in linea.acciones():
+        partes.append(_empacar_texto(accion.nombre))
+        partes.append(_empacar_texto_o_entero(accion.argumento))
+        partes.append(_empacar_entero(accion.reloj))
+
+    partes.append(_empacar_cantidad(linea.cantidad_de_copias()))
+
+    for copia in linea.copias():
+        partes.append(_empacar_cantidad(copia.acciones))
+        partes.append(_empacar_entero(copia.reloj))
+        partes.append(_empacar_bytes(copia.bloque))
+
+    return b"".join(partes)
+
+
+def _leer_linea_de_tiempo(lector):
+    from structures.linea_de_tiempo import LineaDeTiempo
+
+    if not lector.bandera():
+        return None
+
+    linea = LineaDeTiempo(copias_cada=lector.cantidad())
+    cuantas_acciones = lector.cantidad()
+    acciones = []
+
+    for _ in range(cuantas_acciones):
+        acciones.append((lector.texto(), lector.texto_o_entero(), lector.entero()))
+
+    cuantas_copias = lector.cantidad()
+    copias = []
+
+    for _ in range(cuantas_copias):
+        copias.append((lector.cantidad(), lector.entero(), lector.bytes_opacos()))
+
+    for nombre, argumento, reloj in acciones:
+        linea.registrar_accion(nombre, argumento, reloj)
+
+    linea.restaurar_copias(copias)
+
+    return linea
 
 
 def _marcas_del_rastro(juego):
@@ -764,7 +845,7 @@ class AlmacenPartida:
 
         return len(contenido)
 
-    def armar_contenido(self, juego, versiones=("", "", "")):
+    def armar_contenido(self, juego, versiones=("", "", ""), con_linea=True):
         """Estado completo de la partida en bytes, sin escribir nada.
 
         versiones es (id_cripta, version_cripta, version_catalogo), que se
@@ -773,7 +854,7 @@ class AlmacenPartida:
         Esta separado de guardar porque un punto de control de la linea de
         tiempo es este mismo bloque, guardado en memoria.
         """
-        bloque_global = _empacar_bloque_global(juego, versiones)
+        bloque_global = _empacar_bloque_global(juego, versiones, con_linea)
         bloques, ids_de_sala = self._armar_bloques_de_sala(juego)
 
         posicion = _TAMANO_DEL_ENCABEZADO
@@ -967,6 +1048,7 @@ class AlmacenPartida:
         partida.trail_marks = [
             (lector.entero(), lector.entero()) for _ in range(cuantas_marcas)
         ]
+        partida.timeline = _leer_linea_de_tiempo(lector)
 
         puertas_compartidas = TablaHash()
         room_map = RoomMap()
@@ -1120,6 +1202,8 @@ def construir_juego(partida, trail=None, history=None, event_queue=None,
         torch_lit=partida.torch_lit,
         result=partida.result,
         player_actions=partida.player_actions,
+        timeline=partida.timeline,
+        snapshot=tomar_copia_del_estado,
         enemies_defeated=partida.enemies_defeated,
     )
 
@@ -1155,7 +1239,7 @@ def tomar_copia_del_estado(juego):
     al motor desde afuera, porque serializar es trabajo del adaptador y no del
     modelo (principio III de la constitucion).
     """
-    return AlmacenPartida(ruta="en-memoria").armar_contenido(juego)
+    return AlmacenPartida(ruta="en-memoria").armar_contenido(juego, con_linea=False)
 
 
 def reconstruir_desde_copia(bloque):
@@ -1218,6 +1302,8 @@ def construir_juego_reversible(partida, message_log=None):
         torch_lit=partida.torch_lit,
         result=partida.result,
         player_actions=partida.player_actions,
+        timeline=partida.timeline,
+        snapshot=tomar_copia_del_estado,
         enemies_defeated=partida.enemies_defeated,
     )
 

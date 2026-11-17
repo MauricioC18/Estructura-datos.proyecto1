@@ -3,9 +3,16 @@
 La estructura se prueba con bloques de bytes falsos, sin tocar el motor: no
 reconstruye nada, solo guarda y localiza.
 """
+import struct
+import tempfile
 import unittest
+from pathlib import Path
 
 from adapters.almacen_partida import (
+    VERSION_DEL_FORMATO,
+    AlmacenPartida,
+    PartidaIncompatible,
+    construir_juego_reversible,
     reconstruir_desde_copia,
     tomar_copia_del_estado,
 )
@@ -807,6 +814,151 @@ class CostoDeLaConsultaTest(unittest.TestCase):
             with self.subTest(accion=numero):
                 resumen = consultar_accion(juego, numero, reconstruir_desde_copia)
                 self.assertEqual(estado_del_resumen(resumen), real)
+
+
+class LaLineaSobreviveAlArchivoTest(unittest.TestCase):
+    """Historia 5: guardar y cargar conserva la linea completa."""
+
+    def setUp(self):
+        self._carpeta = tempfile.TemporaryDirectory()
+        self.ruta = Path(self._carpeta.name) / "guardados" / "partida.cripta"
+
+    def tearDown(self):
+        self._carpeta.cleanup()
+
+    def guardar_y_cargar(self, juego):
+        AlmacenPartida(self.ruta).guardar(juego, versiones=("c", "1", "1"))
+
+        return construir_juego_reversible(AlmacenPartida(self.ruta).cargar())
+
+    def test_la_linea_viaja_completa(self):
+        """FR-020."""
+        juego, linea = construir_partida_con_linea(copias_cada=5)
+        jugar_guardando_el_estado(juego, 18)
+
+        cargado = self.guardar_y_cargar(juego)
+
+        self.assertIsNotNone(cargado.timeline)
+        self.assertEqual(
+            cargado.timeline.cantidad_de_acciones(), linea.cantidad_de_acciones()
+        )
+        self.assertEqual(
+            cargado.timeline.cantidad_de_copias(), linea.cantidad_de_copias()
+        )
+        self.assertEqual(cargado.timeline.copias_cada, linea.copias_cada)
+
+    def test_consultar_despues_de_cargar_da_el_mismo_resumen(self):
+        """FR-020: la promesa de «desde el inicio» sigue siendo cierta."""
+        juego, _ = construir_partida_con_linea(copias_cada=5)
+        reales = jugar_guardando_el_estado(juego, 18)
+
+        cargado = self.guardar_y_cargar(juego)
+
+        for numero, real in enumerate(reales):
+            with self.subTest(accion=numero):
+                antes = consultar_accion(juego, numero, reconstruir_desde_copia)
+                despues = consultar_accion(cargado, numero, reconstruir_desde_copia)
+                self.assertEqual(estado_del_resumen(antes), real)
+                self.assertEqual(estado_del_resumen(despues), real)
+
+    def test_la_linea_continua_al_seguir_jugando(self):
+        """La partida cargada sigue registrando sin cortes."""
+        juego, _ = construir_partida_con_linea(copias_cada=5)
+        jugar_guardando_el_estado(juego, 12)
+
+        cargado = self.guardar_y_cargar(juego)
+        antes = cargado.timeline.cantidad_de_acciones()
+
+        nuevas = jugar_guardando_el_estado(cargado, 6)
+
+        self.assertGreater(cargado.timeline.cantidad_de_acciones(), antes)
+
+        for desplazamiento, real in enumerate(nuevas):
+            numero = antes + desplazamiento
+            with self.subTest(accion=numero):
+                resumen = consultar_accion(cargado, numero, reconstruir_desde_copia)
+                self.assertEqual(estado_del_resumen(resumen), real)
+
+    def test_las_copias_del_archivo_no_llevan_la_linea_dentro(self):
+        """Si la llevaran, cada copia contendria las anteriores.
+
+        El tamano creceria de forma exponencial con la cantidad de copias.
+        """
+        juego, linea = construir_partida_con_linea(copias_cada=2)
+        jugar_guardando_el_estado(juego, 16)
+
+        self.assertGreater(linea.cantidad_de_copias(), 5)
+
+        tamanos = [len(copia.bloque) for copia in linea.copias()]
+
+        self.assertLess(max(tamanos), 2 * min(tamanos))
+
+    def test_un_archivo_de_una_version_anterior_se_rechaza(self):
+        """FR-021: no se lee a medias."""
+        juego, _ = construir_partida_con_linea()
+        jugar_guardando_el_estado(juego, 6)
+        AlmacenPartida(self.ruta).guardar(juego, versiones=("c", "1", "1"))
+
+        crudo = bytearray(self.ruta.read_bytes())
+        crudo[8:10] = struct.pack("<H", VERSION_DEL_FORMATO - 1)
+        self.ruta.write_bytes(bytes(crudo))
+
+        with self.assertRaises(PartidaIncompatible) as error:
+            AlmacenPartida(self.ruta).cargar()
+
+        self.assertIn(str(VERSION_DEL_FORMATO), str(error.exception))
+
+
+class ComandoYVistaTest(unittest.TestCase):
+    """T015: el comando de consulta y la impresion del resumen."""
+
+    def test_el_comando_acepta_las_dos_formas(self):
+        """FR-003."""
+        from controller.commands import HISTORY, parse_command
+
+        por_instante = parse_command("historia 1500")
+        self.assertEqual(por_instante.name, HISTORY)
+        self.assertEqual(por_instante.argument, 1500)
+
+        por_accion = parse_command("historia #10")
+        self.assertEqual(por_accion.name, HISTORY)
+        self.assertEqual(por_accion.argument, "#10")
+
+    def test_el_comando_no_es_una_accion_del_juego(self):
+        """FR-006: no entra en la bitacora de reproduccion."""
+        from controller.commands import is_game_action, parse_command
+
+        self.assertFalse(is_game_action(parse_command("historia 100")))
+
+    def test_un_comando_mal_escrito_da_un_error_legible(self):
+        from controller.commands import CommandError, parse_command
+
+        for texto in ("historia", "historia xx", "historia #a", "historia 1 2"):
+            with self.subTest(texto=texto):
+                with self.assertRaises(CommandError):
+                    parse_command(texto)
+
+    def test_la_vista_imprime_el_resumen(self):
+        """La vista decide como se ve; el modelo, que va adentro."""
+        from view.console_view import ConsoleView
+
+        juego, _ = construir_partida_con_linea()
+        jugar_guardando_el_estado(juego, 12)
+        resumen = consultar_accion(juego, 4, reconstruir_desde_copia)
+
+        lineas = []
+        vista = ConsoleView()
+        vista._print = lineas.append
+
+        vista.show_history(resumen)
+
+        texto = chr(10).join(lineas)
+        self.assertIn("Instante", texto)
+        self.assertIn("Sala", texto)
+        self.assertIn("Vida", texto)
+        self.assertIn("Inventario", texto)
+        self.assertIn("Efectos", texto)
+        self.assertIn("Mapa conocido", texto)
 
 
 if __name__ == "__main__":
