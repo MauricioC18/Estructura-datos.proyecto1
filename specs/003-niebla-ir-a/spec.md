@@ -20,6 +20,11 @@
 - Q: ¿Cuándo observa el jugador una puerta: solo al entrar a una sala, o también cuando la puerta cambia mientras él está en una de sus dos salas? → A: En los dos casos: al entrar a una sala observa todas sus puertas, y mientras está en una de las dos salas que conecta una puerta, observa cada cambio de esa puerta en el instante en que ocurre.
 - Q: ¿Cómo se muestra una sala avistada? → A: Como «hay algo en esa dirección», sin revelar su identificador ni su nombre.
 - Q: Cuando un mismo paso cumple varios motivos de detención a la vez, ¿qué motivo se informa? → A: Todos los que se cumplieron, en un orden fijo: el orden en que FR-028 los enumera.
+- Q: Si el jugador enciende la antorcha estando ya dentro de una sala, ¿se exploran en ese momento las vecinas de esa sala? → A: No. La antorcha solo explora vecinas al entrar a una sala; encenderla no explora nada hasta el siguiente movimiento.
+- Q: Mientras no se publique la cripta de referencia, ¿contra qué se mide el límite de 5 ms por paso de «ir a»? → A: Contra la cripta publicada más grande y contra criptas sintéticas deterministas de al menos ese tamaño. Si se publica la cripta de referencia o se ajusta el límite, se actualiza esta especificación. *(Reemplazada por la última aclaración.)*
+- Q: Si `ir a` recibe un identificador que no corresponde a ninguna sala, ¿se rechaza igual que una sala no explorada, sin revelar que no existe? → A: Sí. Mismo rechazo y mismo mensaje que una sala no explorada.
+- Q: ¿«Una sala que contiene enemigos» incluye a los enemigos muertos? → A: No. Solo cuentan los enemigos vivos, estén activos o dormidos. Un enemigo muerto deja de actuar (P1 §2.6) y no detiene el viaje.
+- Q: ¿La especificación debe fijar con qué criptas se mide FR-036? → A: No. El límite es el de §6.1, sobre el mapa conocido completo de la cripta de referencia. Con qué criptas se mide es una decisión del plan.
 
 ## Escenarios de uso y pruebas
 
@@ -101,7 +106,7 @@ Cada paso es una acción completa del jugador: cuesta lo que cuesta atravesar es
 
 ### Historia 5 — El viaje se detiene cuando algo importa (Prioridad: P1)
 
-Viajar no es un atajo para ignorar el peligro. El viaje se detiene cuando el jugador llega al destino, cuando entra a una sala que contiene enemigos, activos o dormidos, cuando recibe daño, sea de un ataque, de un veneno o de una trampa, y cuando deja de existir una ruta conocida hacia el destino. La interfaz le dice al jugador por qué se detuvo.
+Viajar no es un atajo para ignorar el peligro. El viaje se detiene cuando el jugador llega al destino, cuando entra a una sala que contiene enemigos vivos, activos o dormidos, cuando recibe daño, sea de un ataque, de un veneno o de una trampa, y cuando deja de existir una ruta conocida hacia el destino. La interfaz le dice al jugador por qué se detuvo.
 
 **Por qué esta prioridad**: sin estas paradas, un solo comando podría llevar al jugador a la muerte sin darle oportunidad de decidir.
 
@@ -221,15 +226,12 @@ El jugador tiene un comando para ver su mapa conocido: las salas exploradas, sus
 - **FR-027**: El viaje NO DEBE abrir puertas, aunque el jugador tenga la llave.
 - **FR-028**: El viaje DEBE detenerse cuando ocurra cualquiera de estas condiciones:
   - (a) el jugador llega al destino;
-  - (b) el jugador entra a una sala que contiene enemigos, activos o dormidos;
+  - (b) el jugador entra a una sala que contiene enemigos vivos, activos o dormidos;
   - (c) el jugador recibe daño de cualquier origen, sea un ataque, un veneno o una trampa;
   - (d) no existe una ruta conocida hacia el destino, en cuyo caso NO DEBE consumir tiempo adicional;
   - (e) la partida termina;
   - (f) el contenido de la sala siguiente no puede obtenerse, en cuyo caso ese paso NO DEBE consumir tiempo.
 - **FR-029**: La interfaz DEBE informar al jugador el motivo por el que se detuvo el viaje. Si en el mismo paso se cumplen varios motivos, DEBE informarlos todos, en el orden en que FR-028 los enumera.
-- Q: Si el jugador enciende la antorcha estando ya dentro de una sala, ¿se exploran en ese momento las vecinas de esa sala? → A: No. La antorcha solo explora vecinas al entrar a una sala; encenderla no explora nada hasta el siguiente movimiento.
-- Q: Mientras no se publique la cripta de referencia, ¿contra qué se mide el límite de 5 ms por paso de «ir a»? → A: Contra la cripta publicada más grande y contra criptas sintéticas deterministas de al menos ese tamaño. Si se publica la cripta de referencia o se ajusta el límite, se actualiza esta especificación.
-- Q: Si `ir a` recibe un identificador que no corresponde a ninguna sala, ¿se rechaza igual que una sala no explorada, sin revelar que no existe? → A: Sí. Mismo rechazo y mismo mensaje que una sala no explorada.
 - **FR-030**: Partir de una sala que contiene enemigos NO DEBE impedir ni detener el viaje.
 - **FR-031**: En la bitácora de reproducción, cada paso DEBE registrarse como un movimiento individual, igual que uno escrito a mano, y la orden `ir a` DEBE registrarse además como comentario. Reproducir esa bitácora DEBE producir la misma partida.
 - **FR-032**: El pergamino de retroceso usado después de un viaje DEBE revertir únicamente el último paso, porque cada paso es una acción del jugador, y el viaje NO DEBE reanudarse.
@@ -239,7 +241,7 @@ El jugador tiene un comando para ver su mapa conocido: las salas exploradas, sus
 - **FR-033**: Consultar si una sala está explorada, avistada o desconocida, y consultar el estado recordado de una puerta, NO DEBE costar más a medida que crece el mapa conocido.
 - **FR-034**: Explorar salas nuevas DEBE costar en proporción a la cantidad de salas reveladas, y no al tamaño del mapa conocido.
 - **FR-035**: Registrar y revertir los cambios de conocimiento de una acción DEBE costar en proporción a esos cambios, y no al tamaño del mapa conocido.
-- **FR-036**: Calcular un paso de «ir a» con el mapa conocido completo de la cripta de referencia DEBE tomar 5 ms o menos en el equipo local, sin contar red ni la presentación en pantalla. Mientras la cripta de referencia no esté publicada, el límite DEBE cumplirse con la cripta publicada más grande y con criptas sintéticas deterministas de al menos ese tamaño.
+- **FR-036**: Calcular un paso de «ir a» con el mapa conocido completo de la cripta de referencia DEBE tomar 5 ms o menos en el equipo local, sin contar red ni la presentación en pantalla.
 
 ### Entidades
 
@@ -256,7 +258,7 @@ El jugador tiene un comando para ver su mapa conocido: las salas exploradas, sus
 - **SC-003**: Reproducir la bitácora de una partida que usó `ir a` produce exactamente la misma partida, con el mismo conocimiento del jugador al final.
 - **SC-004**: Después de cada pergamino de retroceso, el conocimiento del jugador es idéntico al que tenía antes de la acción revertida, incluidas las entradas con la antorcha encendida.
 - **SC-005**: Guardar y cargar una partida deja al jugador con exactamente el mismo conocimiento.
-- **SC-006**: Un paso de «ir a» con el mapa conocido completo se calcula en 5 ms o menos, según una medición del modo de mediciones del programa, sobre la cripta publicada más grande y sobre criptas sintéticas deterministas de al menos ese tamaño.
+- **SC-006**: Un paso de «ir a» con el mapa conocido completo de la cripta de referencia se calcula en 5 ms o menos, según una medición del modo de mediciones del programa.
 - **SC-007**: Está medido que, al multiplicar el tamaño del mapa conocido, el costo de consultar el estado de una sala o de una puerta no crece en la misma proporción, y que explorar *k* salas nuevas cuesta en proporción a *k*.
 - **SC-008**: Ningún viaje atraviesa una salida cuya puerta el jugador no recordaba abierta, ni abre una puerta.
 - **SC-009**: Las 945 pruebas anteriores a esta capacidad siguen pasando sin modificarlas, con dos excepciones previstas: las que fijan la versión del formato del archivo de partida, porque guardar el conocimiento cambia ese formato, y las que fijan cómo la vista muestra las salidas hacia salas que el jugador no ha explorado. Cualquier otra prueba que falle es un defecto, no una prueba desactualizada.
@@ -271,6 +273,6 @@ El jugador tiene un comando para ver su mapa conocido: las salas exploradas, sus
 - «Recibir daño» incluye cualquier pérdida de vida del jugador mientras viaja: ataques, veneno y trampas. *(Supuesto del grupo.)*
 - La orden `ir a` en sí no consume tiempo; consume tiempo cada paso, como un movimiento.
 - Cómo se distingue visualmente a un cazador es decisión de la interfaz; esta especificación solo exige que se distinga.
-- La cripta de referencia de §6.1 todavía no está publicada; cómo se mide FR-036 mientras tanto quedó decidido en la sesión de aclaraciones. Si el profesor publica la cripta de referencia o ajusta el límite (§6.1 lo anuncia como enmienda de una «§2.7» que el enunciado no contiene), se actualiza esta especificación.
+- La cripta de referencia de §6.1 ya está publicada. Cómo se mide FR-036 es una decisión del `plan.md`. Si el profesor ajusta el límite (§6.1 lo anuncia como enmienda de una «§2.7» que el enunciado no contiene), se actualiza esta especificación.
 - Cómo se almacena el conocimiento, cómo se calcula la ruta y si se comparte el cálculo con el cazador son asuntos del `plan.md` (§5.3 pide justificar esto último allí). Esta especificación solo fija qué conoce el jugador, qué ruta es la correcta y cuándo se detiene el viaje.
 - Cómo se guarda el conocimiento en el archivo de partida y cómo se recupera por instante para la línea de tiempo se coordina con las capacidades de guardado y de línea de tiempo; esta especificación solo exige que ambas cosas sean posibles y fieles.
