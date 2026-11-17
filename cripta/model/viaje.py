@@ -68,14 +68,48 @@ def validar_orden(game, mapa, destino):
     return ActionResult(True, f"Viajas hacia la sala {destino}.")
 
 
-def siguiente_paso(game, mapa, destino):
+class RutaDelViaje:
+    """La búsqueda de un viaje en curso, para reutilizarla entre pasos.
+
+    Vale mientras el destino y la versión del mapa conocido sean los mismos y
+    la sala del jugador haya quedado asentada en ella (mejora c del plan). La
+    crea el controlador al empezar un viaje y la descarta al terminarlo; no
+    es estado del juego.
+    """
+
+    def __init__(self):
+        self.destino = None
+        self.version = None
+        self.rutas = None
+
+
+def siguiente_paso(game, mapa, destino, ruta_del_viaje=None):
     """La salida por la que se da el próximo paso, o None si no hay ruta conocida.
 
     La búsqueda se detiene en cuanto asienta la sala del jugador (mejora b
     del plan): el primer paso es el mismo que con la búsqueda completa.
+
+    Con ruta_del_viaje se reutiliza la búsqueda del paso anterior si el
+    conocimiento no cambió desde entonces (mejora c). Las salas siguientes de
+    la ruta tienen distancia menor que la de la sala donde se detuvo, así que
+    ya están asentadas y su paso es el mismo que daría recalcular (FR-026).
+    Si el conocimiento cambió, o la sala no quedó asentada, se busca de nuevo.
     """
     sala = game.player.room_id
+
+    if ruta_del_viaje is not None and ruta_del_viaje.rutas is not None:
+        if ruta_del_viaje.destino == destino and ruta_del_viaje.version == mapa.version:
+            try:
+                return ruta_del_viaje.rutas.primer_paso_desde(sala)
+            except ValueError:
+                pass  # la sala no quedó asentada en la búsqueda guardada
+
     rutas = RutasMasBaratas(mapa.vecinas_conocidas, destino, parar_en=sala)
+
+    if ruta_del_viaje is not None:
+        ruta_del_viaje.destino = destino
+        ruta_del_viaje.version = mapa.version
+        ruta_del_viaje.rutas = rutas
 
     return rutas.primer_paso_desde(sala)
 

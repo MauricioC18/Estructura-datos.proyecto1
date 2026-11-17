@@ -105,9 +105,10 @@ class GameController:
             self.replay_log.comment(Command(TRAVEL, destination).to_text())
 
         steps = 0
+        route = viaje.RutaDelViaje()
 
         while True:
-            exit_ = viaje.siguiente_paso(self.game, known_map, destination)
+            exit_ = viaje.siguiente_paso(self.game, known_map, destination, route)
 
             if exit_ is None:
                 return self._stopped(destination, steps, sin_ruta=True)

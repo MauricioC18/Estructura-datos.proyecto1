@@ -89,9 +89,18 @@ class MapaConocido:
         self._contadores = TablaHash()
         self._puertas = TablaHash()
         self._orden = []
+        self._version = 0
 
     # ------------------------------------------------------------------
     # Consultas
+
+    @property
+    def version(self):
+        """Sube con cada cambio del conocimiento: una exploración, un cambio
+        de puerta recordada, una reversión o una importación. Quien guarde un
+        cálculo hecho sobre el mapa conocido lo reutiliza solo si la versión
+        no cambió (mejora c del plan, FR-026)."""
+        return self._version
     # ------------------------------------------------------------------
 
     def estado_de_sala(self, id_sala):
@@ -211,6 +220,7 @@ class MapaConocido:
 
     def importar(self, exploradas, puertas):
         """Deja el conocimiento como estaba al exportar. No anota nada."""
+        self._version += 1
         self._exploradas = TablaHash()
         self._contadores = TablaHash()
         self._puertas = TablaHash()
@@ -238,6 +248,7 @@ class MapaConocido:
         self._anotar(CallbackChange(self._deshacer_exploracion, id_sala))
 
     def _marcar_explorada(self, id_sala):
+        self._version += 1
         self._exploradas.insertar(id_sala, True)
         self._orden.append(id_sala)
 
@@ -254,6 +265,7 @@ class MapaConocido:
                 "explorada es otra."
             )
 
+        self._version += 1
         self._orden.pop()
         self._exploradas.eliminar(id_sala)
 
@@ -274,12 +286,16 @@ class MapaConocido:
         if anterior is not None and anterior == actual:
             return
 
+        self._version += 1
+
         for clave in claves:
             self._puertas.insertar(clave, actual)
 
         self._anotar(CallbackChange(self._restaurar_puerta, claves, anterior))
 
     def _restaurar_puerta(self, claves, anterior):
+        self._version += 1
+
         for clave in claves:
             if anterior is None:
                 self._puertas.eliminar(clave)

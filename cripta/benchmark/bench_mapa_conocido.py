@@ -346,10 +346,11 @@ def primer_paso_del_programa(mapa, destino, partida):
 def viaje_del_programa(mapa, destino, camino):
     """Todos los pasos de un viaje, calculados como los calcula el programa."""
     partida = _PartidaDePrueba(camino[0] if camino else destino)
+    ruta = viaje.RutaDelViaje()
 
     for sala in camino:
         partida.player.room_id = sala
-        viaje.siguiente_paso(partida, mapa, destino)
+        viaje.siguiente_paso(partida, mapa, destino, ruta)
 
 
 def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True):
