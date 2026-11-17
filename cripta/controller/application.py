@@ -48,6 +48,7 @@ from repository.repositorio_cripta import VersionesIncompatibles
 from repository.traductor import ErrorDatosCripta
 from structures.history import History, ReversibleEventQueue
 from structures.inventory import Inventory
+from structures.sorting import sort
 from structures.tabla_hash import TablaHash
 from structures.trail import PlayerTrail
 
@@ -179,6 +180,60 @@ def room_view(game):
     floor = [_item_view(game.player, item) for item in room.floor_items]
 
     return RoomView(room.name, exits, floor)
+
+
+@dataclass
+class KnownExitView:
+    """Una salida de una sala explorada, tal como la conoce el jugador.
+
+    destination es el id del destino si esta explorado, o None si solo esta
+    avistado: de una avistada no se revela el id (FR-005). door_state es el
+    estado recordado: abierta, cerrada o desconocida.
+    """
+
+    direction: str
+    cost: int
+    door_state: str
+    destination: int | None
+
+
+@dataclass
+class KnownRoomView:
+    room_id: int
+    name: str
+    exits: list
+
+
+def known_map_view(known_map, room_map):
+    """Las salas exploradas, ordenadas por id, con sus salidas (FR-018).
+
+    Todo sale del conocimiento del jugador (FR-012): las salas son las
+    exploradas, el estado de cada puerta es el recordado, y el destino de una
+    salida solo lleva id si el jugador exploro esa sala. Las desconocidas no
+    aparecen.
+    """
+    rooms = []
+
+    for room_id in sort(known_map.salas_exploradas()):
+        room = room_map.room(room_id)
+        exits = []
+
+        for exit_ in room.exits():
+            destination = (
+                exit_.destination if known_map.esta_explorada(exit_.destination) else None
+            )
+            exits.append(
+                KnownExitView(
+                    exit_.direction,
+                    exit_.cost,
+                    known_map.puerta_recordada(exit_.door),
+                    destination,
+                )
+            )
+
+        rooms.append(KnownRoomView(room_id, room.name, exits))
+
+    return rooms
 
 
 def inventory_view(game, criterion=None):

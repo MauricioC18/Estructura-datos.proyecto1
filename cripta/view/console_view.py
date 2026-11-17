@@ -70,6 +70,32 @@ class ConsoleView:
             for position, item in enumerate(room.floor):
                 self._print(f"  {position}. {item.name} ({item.item_class})")
 
+    def show_known_map(self, rooms):
+        """El mapa conocido: salas exploradas con sus salidas (FR-018).
+
+        Una salida hacia una sala avistada se muestra sin id, como algo que
+        hay en esa direccion (FR-005).
+        """
+        if not rooms:
+            self._print("Todavia no conoces ninguna sala.")
+            return
+
+        self._print("Mapa conocido:")
+
+        for room in rooms:
+            self._print(f"Sala {room.room_id}: {room.name}")
+
+            for exit_ in room.exits:
+                if exit_.destination is None:
+                    destination = "hay algo en esa direccion"
+                else:
+                    destination = str(exit_.destination)
+
+                self._print(
+                    f"  {exit_.direction} -> {destination} (costo {exit_.cost}) "
+                    f"{exit_.door_state}"
+                )
+
     def show_inventory(self, items, criterion=None):
         if not items:
             self._print("El inventario esta vacio.")
