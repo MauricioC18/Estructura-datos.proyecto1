@@ -1,13 +1,14 @@
 import unittest
 
 from model.enemy import Enemy
-from model.game import DEFEAT, IN_PROGRESS, VICTORY, Game
+from model.game import DEFEAT, IN_PROGRESS, OPEN_DOOR_COST, VICTORY, Game
 from model.game_state import GameState
 from model.item import Item
 from model.player import Player
-from model.room import Door, Exit, Room, RoomMap
+from model.room import DEFAULT_EXIT_COST, Door, Exit, Room, RoomMap
 from model.trap import Trap
 from structures.circular_log import CircularLog
+from structures.inventory import Inventory
 from structures.trail import PlayerTrail
 
 
@@ -55,7 +56,8 @@ def make_trap(instance_id="t-1", room_id=2, damage=4, rearm_interval=300):
     )
 
 
-def connect(room_a, room_b, direction, closed=False, key_id=None, auto_close=None):
+def connect(room_a, room_b, direction, closed=False, key_id=None, auto_close=None,
+            cost=DEFAULT_EXIT_COST):
     """Une dos salas con una sola puerta compartida, como hace el bloque 2."""
     door = Door(
         room_a.room_id,
@@ -63,6 +65,7 @@ def connect(room_a, room_b, direction, closed=False, key_id=None, auto_close=Non
         closed=closed,
         key_id=key_id,
         auto_close=auto_close,
+        cost=cost,
     )
     room_a.add_exit(Exit(direction, room_b.room_id, door))
     room_b.add_exit(Exit(OPPOSITE[direction], room_a.room_id, door))
@@ -910,6 +913,170 @@ class TestTheDefaultMessageLog(unittest.TestCase):
             game.wait()
 
         self.assertEqual(len(game.visible_state().messages), 20)
+
+
+
+class TestExitCost(unittest.TestCase):
+    """Terreno: el costo de transito de las salidas (§3.1).
+
+    Especificacion: specs/001-terreno-costo-salidas/spec.md
+    """
+
+    def test_moving_costs_what_the_exit_declares(self):
+        """FR-004: el intervalo sale del costo de la salida, no de un fijo."""
+        rooms = [Room(1, "A"), Room(2, "B")]
+
+        for room in rooms:
+            room.content_loaded = True
+
+        connect(rooms[0], rooms[1], "N", cost=50)
+        room_map = RoomMap()
+
+        for room in rooms:
+            room_map.add(room)
+
+        game = make_game(room_map)
+        game.move("N")
+
+        self.assertEqual(game.state.clock, 50)
+
+    def test_an_expensive_exit_takes_longer(self):
+        """FR-004: el mismo jugador tarda mas por una salida cara."""
+        rooms = [Room(1, "A"), Room(2, "B")]
+
+        for room in rooms:
+            room.content_loaded = True
+
+        connect(rooms[0], rooms[1], "N", cost=200)
+        room_map = RoomMap()
+
+        for room in rooms:
+            room_map.add(room)
+
+        game = make_game(room_map)
+        game.move("N")
+
+        self.assertEqual(game.state.clock, 200)
+
+    def test_an_exit_without_cost_behaves_as_before(self):
+        """FR-002 y FR-012: sin costo declarado, se comporta como antes."""
+        room_map, _ = make_map()
+        game = make_game(room_map)
+
+        game.move("N")
+
+        self.assertEqual(game.state.clock, DEFAULT_EXIT_COST)
+
+    def test_the_minimum_interval_is_one(self):
+        """Apendice B y FR-008: un actor muy rapido por una salida de costo 1.
+
+        Sin el minimo, la division entera daria 0, el actor quedaria programado
+        en el instante en que actua y el reloj no avanzaria nunca.
+        """
+        rooms = [Room(1, "A"), Room(2, "B")]
+
+        for room in rooms:
+            room.content_loaded = True
+
+        connect(rooms[0], rooms[1], "N", cost=1)
+        room_map = RoomMap()
+
+        for room in rooms:
+            room_map.add(room)
+
+        player = make_player()
+        player.speed = 10000
+        game = make_game(room_map, player=player)
+
+        game.move("N")
+
+        self.assertEqual(game.state.clock, 1)
+        self.assertGreater(game.state.clock, 0)
+
+    def test_more_rooms_but_cheaper_beats_fewer_and_dearer(self):
+        """SC-002: lo que importa es el costo total, no cuantas salas hay."""
+        caro = [Room(1, "A"), Room(2, "B")]
+        barato = [Room(1, "A"), Room(2, "B"), Room(3, "C")]
+
+        for room in caro + barato:
+            room.content_loaded = True
+
+        connect(caro[0], caro[1], "N", cost=300)
+        connect(barato[0], barato[1], "N", cost=50)
+        connect(barato[1], barato[2], "N", cost=50)
+
+        mapa_caro, mapa_barato = RoomMap(), RoomMap()
+
+        for room in caro:
+            mapa_caro.add(room)
+
+        for room in barato:
+            mapa_barato.add(room)
+
+        juego_caro = make_game(mapa_caro)
+        juego_caro.move("N")
+
+        juego_barato = make_game(mapa_barato)
+        juego_barato.move("N")
+        juego_barato.move("N")
+
+        self.assertEqual(juego_caro.state.clock, 300)
+        self.assertEqual(juego_barato.state.clock, 100)
+        self.assertLess(juego_barato.state.clock, juego_caro.state.clock)
+
+    def test_opening_a_door_still_costs_what_it_did(self):
+        """FR-006: el costo de la salida solo aplica a atravesarla."""
+        rooms = [Room(1, "A"), Room(2, "B")]
+
+        for room in rooms:
+            room.content_loaded = True
+
+        connect(rooms[0], rooms[1], "N", closed=True, key_id="itm_llave", cost=500)
+        room_map = RoomMap()
+
+        for room in rooms:
+            room_map.add(room)
+
+        player = make_player()
+        player.inventory = Inventory(10)
+        player.inventory.pick_up(
+            Item(instance_id="i-1", type_id="itm_llave", name="Llave",
+                 item_class=Item.KEY, weight=1, value=1)
+        )
+        game = make_game(room_map, player=player)
+
+        game.open_door("N")
+
+        self.assertEqual(game.state.clock, OPEN_DOOR_COST)
+
+    def test_an_enemy_also_pays_the_exit_cost(self):
+        """FR-005: la regla vale para todos los actores, no solo el jugador."""
+        rooms = [Room(1, "A"), Room(2, "B"), Room(3, "C")]
+
+        for room in rooms:
+            room.content_loaded = True
+
+        connect(rooms[0], rooms[1], "N", cost=100)
+        connect(rooms[1], rooms[2], "N", cost=400)
+        room_map = RoomMap()
+
+        for room in rooms:
+            room_map.add(room)
+
+        errante = Enemy(
+            actor_id="e-1", name="Errante", max_health=20, attack=1, defense=0,
+            speed=100, room_id=3, behavior=Enemy.WANDERER,
+        )
+        game = make_game(room_map, enemies=[errante])
+        game.move("N")
+
+        self.assertEqual(errante.room_id, 3)
+
+        game.wait()
+
+        if errante.room_id == 2:
+            self.assertGreaterEqual(errante.scheduled_event.time, 400)
+
 
 
 if __name__ == "__main__":

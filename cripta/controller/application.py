@@ -149,6 +149,7 @@ class ExitView:
     direction: str
     destination: int
     is_open: bool
+    cost: int = 100
 
 
 @dataclass
@@ -172,7 +173,7 @@ def room_view(game):
     """Salidas y suelo de la sala del jugador, solo para mostrar."""
     room = game.room_map.room(game.player.room_id)
     exits = [
-        ExitView(exit_.direction, exit_.destination, exit_.door.is_open)
+        ExitView(exit_.direction, exit_.destination, exit_.door.is_open, exit_.cost)
         for exit_ in room.exits()
     ]
     floor = [_item_view(game.player, item) for item in room.floor_items]

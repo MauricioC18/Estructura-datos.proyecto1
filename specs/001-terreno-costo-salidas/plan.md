@@ -93,6 +93,21 @@ El cambio no altera ninguna complejidad. Era de esperar: no se agrega estructura
 
 Las dos entran en `--bench` por el módulo del motor, que ya está registrado.
 
+### Resultado de las mediciones
+
+Hechas el 2026-11-16, en Python 3.14.6 sobre Windows 11, con 2 000 decisiones del jugador:
+
+| Escenario | Por ciclo | Del límite de 20 ms |
+| --- | ---: | ---: |
+| Costos uniformes, la carga de la primera parte | 0.1912 ms | 0.96 % |
+| Costos variables, la carga de esta capacidad | 0.1897 ms | 0.95 % |
+
+La diferencia está dentro del ruido de la medición: el cambio **no cuesta nada medible**, que es lo que se esperaba de leer un atributo en lugar de una constante. Sirve además para responder §5.6 en lo que toca a esta capacidad: la agenda de eventos no se ve afectada por los costos variables.
+
+La cripta sintética reparte costos de forma determinista por posición, no al azar, e incluye los extremos 1 y 400 para que la medición pase por el intervalo mínimo y por una salida cara.
+
+La segunda medición prevista, la de que una cripta sin costos declarados produce el mismo resultado que antes, quedó como prueba automatizada en vez de como medición: `test_an_exit_without_cost_behaves_as_before` y las 861 pruebas de la primera parte, que siguen pasando sin tocar ninguna.
+
 ## Riesgos
 
 - **El costo por omisión escrito en dos lugares.** Si el modelo asume 100 y el traductor también, pueden separarse. Se define una sola constante y el traductor la usa.

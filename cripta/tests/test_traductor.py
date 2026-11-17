@@ -500,5 +500,86 @@ class TestIdsEnUso(unittest.TestCase):
         self.assertTrue(self.traductor.ids_en_uso().esta_vacia())
 
 
+
+class PruebasCostoDeSalida(unittest.TestCase):
+    """Terreno: el traductor lee el costo del esqueleto (§3.1, §4.1).
+
+    Especificacion: specs/001-terreno-costo-salidas/spec.md
+    """
+
+    def dos_salas(self, costo_ida=None, costo_vuelta=None):
+        ida = {"sala": 2}
+        vuelta = {"sala": 1}
+
+        if costo_ida is not None:
+            ida["costo"] = costo_ida
+
+        if costo_vuelta is not None:
+            vuelta["costo"] = costo_vuelta
+
+        return [
+            {"id": 1, "nombre": "A", "salidas": {"N": ida}},
+            {"id": 2, "nombre": "B", "salidas": {"S": vuelta}},
+        ]
+
+    def test_una_salida_sin_costo_vale_cien(self):
+        """FR-002."""
+        traductor = nuevo_traductor()
+
+        mapa = traductor.crear_mapa(self.dos_salas())
+
+        self.assertEqual(mapa.room(1).exit_towards("N").cost, 100)
+        self.assertEqual(traductor.avisos, [])
+
+    def test_el_costo_declarado_llega_a_la_puerta(self):
+        """FR-001."""
+        mapa = nuevo_traductor().crear_mapa(self.dos_salas(costo_ida=250))
+
+        self.assertEqual(mapa.room(1).exit_towards("N").cost, 250)
+
+    def test_declarado_por_un_solo_lado_vale_para_los_dos(self):
+        """FR-003: y no debe avisar de discrepancia, porque no la hay."""
+        traductor = nuevo_traductor()
+
+        mapa = traductor.crear_mapa(self.dos_salas(costo_ida=250))
+
+        self.assertEqual(mapa.room(1).exit_towards("N").cost, 250)
+        self.assertEqual(mapa.room(2).exit_towards("S").cost, 250)
+        self.assertEqual(traductor.avisos, [])
+
+    def test_los_dos_lados_con_el_mismo_costo_no_avisan(self):
+        traductor = nuevo_traductor()
+
+        traductor.crear_mapa(self.dos_salas(costo_ida=250, costo_vuelta=250))
+
+        self.assertEqual(traductor.avisos, [])
+
+    def test_costos_distintos_gana_la_sala_de_menor_id_y_avisa(self):
+        """Caso borde de la especificacion: se reporta, no se resuelve callado."""
+        traductor = nuevo_traductor()
+
+        mapa = traductor.crear_mapa(self.dos_salas(costo_ida=250, costo_vuelta=80))
+
+        self.assertEqual(mapa.room(1).exit_towards("N").cost, 250)
+        self.assertEqual(len(traductor.avisos), 1)
+        self.assertIn("costo", traductor.avisos[0])
+
+    def test_un_costo_invalido_es_error_de_datos(self):
+        """FR-011: no se sustituye por el valor por omision en silencio."""
+        for malo in (0, -5, 1.5, "100"):
+            with self.subTest(costo=malo):
+                with self.assertRaises(ErrorDatosCripta):
+                    nuevo_traductor().crear_mapa(self.dos_salas(costo_ida=malo))
+
+    def test_costo_ya_no_se_reporta_como_campo_desconocido(self):
+        traductor = nuevo_traductor()
+
+        traductor.crear_mapa(self.dos_salas(costo_ida=250))
+
+        for aviso in traductor.avisos:
+            self.assertNotIn("costo", aviso)
+
+
+
 if __name__ == "__main__":
     unittest.main()

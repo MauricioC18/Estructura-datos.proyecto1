@@ -91,7 +91,7 @@ CAMPOS_POR_CLASE = (
 )
 CAMPOS_DE_COLOCACION_DE_ENEMIGO = ("instancia", "tipo", "vida")
 CAMPOS_DE_COLOCACION_DE_TRAMPA = ("instancia", "tipo")
-CAMPOS_DE_SALIDA = ("sala", "cerrada", "llave", "cierre_automatico")
+CAMPOS_DE_SALIDA = ("sala", "cerrada", "llave", "cierre_automatico", "costo")
 
 
 class ErrorDatosCripta(Exception):
@@ -177,22 +177,54 @@ class Traductor:
         cerrada = bool(salida.get("cerrada"))
         llave = salida.get("llave")
         cierre = salida.get("cierre_automatico")
+        costo = self._costo_de_salida(salida, direccion, origen)
 
         de_vuelta = pendientes.obtener(f"{destino}->{origen}")
         if de_vuelta:
-            puerta = de_vuelta.pop(0)
+            # Se guarda el costo DECLARADO por el otro lado, no el efectivo de
+            # la puerta: si el otro lado no lo declaro, la puerta ya trae el
+            # valor por omision y compararlo contra este avisaria de una
+            # discrepancia que no existe.
+            puerta, costo_del_otro_lado = de_vuelta.pop(0)
             puerta.closed = puerta.closed or cerrada
             puerta.key_id = self._combinar(puerta.key_id, llave, origen, destino, "llave")
             puerta.auto_close = self._combinar(puerta.auto_close, cierre, origen, destino,
                                                "cierre automático")
+            combinado = self._combinar(costo_del_otro_lado, costo, origen, destino, "costo")
+
+            if combinado is not None:
+                puerta.cost = combinado
         else:
             puerta = Door(origen, destino, closed=cerrada, key_id=llave, auto_close=cierre)
+
+            if costo is not None:
+                puerta.cost = costo
             clave = f"{origen}->{destino}"
             if not pendientes.contiene(clave):
                 pendientes.insertar(clave, [])
-            pendientes.obtener(clave).append(puerta)
+            pendientes.obtener(clave).append((puerta, costo))
 
         mapa.room(origen).add_exit(Exit(direccion, destino, puerta))
+
+    def _costo_de_salida(self, salida, direccion, origen):
+        """El costo declarado, o None si la salida no lo declara (§3.1).
+
+        Un costo malformado es un dato invalido de la cripta y se reporta como
+        tal: sustituirlo en silencio por el valor por omision escondería el
+        error.
+        """
+        if "costo" not in salida:
+            return None
+
+        costo = salida["costo"]
+
+        if not isinstance(costo, int) or isinstance(costo, bool) or costo < 1:
+            raise ErrorDatosCripta(
+                f"La salida {direccion} de la sala {origen} declara un costo "
+                f"invalido: {costo!r}. Debe ser un entero mayor o igual que 1."
+            )
+
+        return costo
 
     def _combinar(self, valor_del_otro_lado, valor_de_este_lado, este_lado, otro_lado, campo):
         """Un valor declarado por un solo lado se usa tal cual. Si los dos lados

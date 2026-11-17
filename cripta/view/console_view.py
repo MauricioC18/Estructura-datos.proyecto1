@@ -56,7 +56,9 @@ class ConsoleView:
 
             for exit_ in room.exits:
                 state = "" if exit_.is_open else " (cerrada)"
-                exits.append(f"{exit_.direction}->{exit_.destination}{state}")
+                exits.append(
+                    f"{exit_.direction}->{exit_.destination} (costo {exit_.cost}){state}"
+                )
 
             self._print("Salidas: " + ", ".join(exits))
         else:

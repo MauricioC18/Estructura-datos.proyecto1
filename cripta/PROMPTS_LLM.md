@@ -1459,3 +1459,21 @@ Cada salida de una sala puede declarar un campo "costo", entero mayor o igual qu
 Uso en el proyecto: `specs/001-terreno-costo-salidas/spec.md` y su lista de verificación.
 
 Cambios realizados por el estudiante: Se decidió separar el terreno del cazador en dos especificaciones distintas, aunque el enunciado las presente como una sola capacidad. La razón es de orden de trabajo y queda escrita en la especificación: el costo de las salidas es infraestructura de la que dependen el cazador, el viaje automático y las mediciones, así que entregarlo por separado desbloquea a los otros integrantes en vez de que esperen al cazador completo; el enunciado permite dividir una capacidad si se justifica. Al revisar la especificación contra su propia lista de verificación se detectó que la fórmula del intervalo estaba escrita con sintaxis de Python, y se reformuló como división entera para que no dependiera de ningún lenguaje. Se dejaron explícitamente fuera del alcance dos cosas que pertenecen a otras capacidades: qué conoce el jugador del costo de una salida que no ha explorado, que es de la niebla de guerra, y cómo se calculan rutas de costo mínimo, que es del cazador y del viaje automático.
+
+### 2.26 Plan, tareas e implementación del terreno
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Completar el flujo de spec-kit para la primera capacidad: planificar el costo de tránsito de las salidas, descomponerlo en tareas e implementarlo.
+
+Prompts utilizados:
+
+```text
+sí, dale, hacé el plan y las tareas e implementalo
+```
+
+Uso en el proyecto: `specs/001-terreno-costo-salidas/plan.md` y `tasks.md`; `model/room.py`, `model/game.py`, `repository/traductor.py`, `controller/application.py`, `view/console_view.py`, `benchmark/scheduler_bench.py` y las pruebas de `tests/test_room.py`, `tests/test_traductor.py`, `tests/test_movement.py` y `tests/test_actor.py`.
+
+Cambios realizados por el estudiante: La decisión de diseño fue guardar el costo en la puerta y no en la salida. La puerta ya era un único objeto compartido por las dos salas que conecta, así que el requisito de que el costo sea igual en ambos sentidos se cumple por construcción en vez de depender de una validación. Se descartaron guardar el costo en la salida, que obligaría a validar a mano que las dos direcciones coincidan, y guardarlo en una estructura aparte indexada por par de salas, que sería un índice y la sección 7 lo prohíbe. Se reutilizó el mecanismo que el traductor ya tenía para cuando los dos lados de una puerta declaran valores distintos, el mismo que usa para la llave y el cierre automático, en vez de inventar una regla nueva. Al revisar lo implementado se encontró un error propio: se estaba comparando el costo efectivo de la puerta, que siempre trae el valor por omisión, en vez del costo declarado, de modo que si un solo lado declaraba costo el traductor avisaba de una discrepancia inexistente; se corrigió guardando el valor declarado junto a la puerta pendiente de emparejar. También se eliminó la constante del costo de movimiento del motor, que quedaba repitiendo el mismo 100 que ya define el modelo, porque era el riesgo anotado en el propio plan. Dos requisitos resultaron ya satisfechos por el diseño de la primera parte, el intervalo mínimo de una unidad y el reescalado al cambiar de velocidad, así que sus tareas fueron demostrarlo con pruebas y no implementarlo. La medición cerró el ciclo: 0.1912 ms por ciclo con costos uniformes contra 0.1897 ms con costos variables, o sea que el cambio no cuesta nada medible.

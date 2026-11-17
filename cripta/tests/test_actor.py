@@ -167,6 +167,35 @@ class TestActorSpeedChange(unittest.TestCase):
         self.assertNotEqual(rescheduled, wrong_if_new_speed_were_used)
         self.assertEqual(rescheduled, 275)
 
+    def test_rescale_works_with_a_costly_exit(self):
+        """Apendice B y FR-009: cambiar de velocidad atravesando una salida cara.
+
+        El actor salio en el instante 0 por una salida de costo 400 a velocidad
+        100, asi que llega en el 400. En el 100 duplica su velocidad: le
+        faltaban 300, que a velocidad doble son 150, y llega en el 250. El
+        calculo usa la velocidad anterior, no la nueva.
+
+        Esta regla ya la cumplia el diseno de la primera parte; lo que fija
+        esta prueba es que siga cumpliendose con costos distintos de 100.
+        """
+        actor = Actor("a-1", "Actor", 30, 5, 1, 100, 1)
+        actor.scheduled_event = Event(400, 1, "actor_action", actor)
+
+        rescheduled = actor.change_speed(100, 200)
+
+        self.assertEqual(rescheduled, 250)
+        self.assertEqual(actor.speed, 200)
+
+    def test_a_costly_exit_never_reschedules_into_the_present(self):
+        """FR-008 y FR-009: el reescalado tampoco deja el reloj sin avanzar."""
+        actor = Actor("a-1", "Actor", 30, 5, 1, 100, 1)
+        actor.scheduled_event = Event(401, 1, "actor_action", actor)
+
+        rescheduled = actor.change_speed(400, 10000)
+
+        self.assertEqual(rescheduled, 401)
+        self.assertGreater(rescheduled, 400)
+
     def test_the_pending_event_is_not_modified(self):
         self.actor.change_speed(250, 200)
 

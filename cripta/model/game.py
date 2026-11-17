@@ -26,7 +26,6 @@ from structures.inventory import is_rewind_scroll
 from structures.sorting import sort
 
 
-MOVE_COST = 100
 ATTACK_COST = 100
 WAIT_COST = 100
 USE_ITEM_COST = 50
@@ -317,7 +316,7 @@ class Game:
 
             return ActionResult(True, message)
 
-        return self._finish_player_action(MOVE_COST, message)
+        return self._finish_player_action(exit_.cost, message)
 
     def open_door(self, direction):
         """Abre la puerta de esa salida si el jugador tiene la llave (§2.5).
@@ -709,7 +708,7 @@ class Game:
             cost = ATTACK_COST
         elif action == Enemy.MOVE:
             self.history.assign(enemy, "room_id", chosen_exit.destination)
-            cost = MOVE_COST
+            cost = chosen_exit.cost
         else:
             cost = WAIT_COST
 
