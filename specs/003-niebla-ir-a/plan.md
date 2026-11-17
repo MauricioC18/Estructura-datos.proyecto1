@@ -8,6 +8,8 @@
 
 La capacidad tiene dos partes que comparten un mismo dato: **lo que el jugador sabe del mapa**.
 
+**Terminología.** En estos artefactos, «mapa conocido» y «conocimiento del jugador» (el término de la especificación) son lo mismo. El plan usa «mapa conocido» porque es el nombre de la estructura que lo guarda.
+
 1. **El mapa conocido** es estado del juego. Lo frecuente es preguntarle cosas: en qué estado está una sala y qué recuerda el jugador de una puerta (§5.3). Lo raro es modificarlo: solo cambia cuando el jugador entra a una sala o cuando una puerta cambia con él presente. Por eso se diseña para consultas O(1) promedio y para que cada cambio deje una anotación barata de deshacer, igual que el rastro del jugador.
 2. **«ir a»** es una búsqueda de costo mínimo sobre ese mapa conocido. **Reutiliza la búsqueda que ya escribió el cazador** (`structures/rutas_mas_baratas.py`), pasándole un proveedor de vecinas que solo ve salas exploradas y puertas que el jugador recuerda abiertas. No se escribe ninguna búsqueda nueva.
 
@@ -29,7 +31,11 @@ La decisión central del plan es **qué se guarda y qué se deduce**:
 
 **Pruebas**: `unittest`, desde `cripta/` con `python -m unittest discover -s tests -t .`.
 
-**Rendimiento**: un paso de «ir a» debe calcularse en 5 ms o menos con el mapa conocido completo (FR-036). Según la aclaración del 2026-11-16, mientras no exista la cripta de referencia se mide sobre la cripta publicada más grande y sobre criptas sintéticas de al menos ese tamaño. **El tamaño de la cripta publicada más grande todavía no se conoce en este repositorio**: el paquete sin conexión solo trae `cripta-01`, de 6 salas. Hay que obtenerlo antes de fijar los tamaños de la medición; no se inventa.
+**Rendimiento**: un paso de «ir a» debe calcularse en 5 ms o menos con el mapa conocido completo (FR-036). Se mide con dos fuentes:
+1. **Criptas sintéticas deterministas por semilla, en tres tamaños crecientes**, generadas por el propio módulo de mediciones. Muestran la tendencia al crecer el mapa conocido.
+2. **Los datos reales de la cripta de referencia** (ya publicada), en cuanto exista un paquete sin conexión que la contenga. Se cargan como cualquier cripta, con la fuente sin conexión que ya existe. La medición recorre **todas** las criptas del paquete y las reporta con el id que traen sus datos, así que el código no nombra ninguna. Es la medición que comprueba FR-036 tal como lo pide §6.1.
+
+Ningún tamaño ni id de una cripta concreta se escribe en el código ni en este plan.
 
 **Alcance**: una estructura nueva, ganchos en el motor, el comando de mapa, el viaje en el controlador, la bitácora de reproducción, la vista, el guardado y el banco de mediciones.
 
@@ -180,7 +186,9 @@ La misma exportación sirve como **copia para un punto de control** de la línea
 
 ### Modelo
 
-- **`cripta/model/viaje.py`** (nuevo, mío): las reglas del viaje sobre el estado de la partida, sin efectos. Valida la orden (FR-022), calcula el siguiente paso reutilizando `RutasMasBaratas` (FR-023, FR-024, FR-026) y decide los motivos de parada después de un paso (FR-028), en el orden de FR-028. No carga contenido ni mueve al jugador.
+- **`cripta/model/viaje.py`** (nuevo, mío): las reglas del viaje sobre el estado de la partida, sin efectos. Valida la orden (FR-022), calcula el siguiente paso reutilizando `RutasMasBaratas` (FR-023, FR-024, FR-026) y decide los motivos de parada (FR-028), en el orden de FR-028. No carga contenido ni mueve al jugador.
+  - **Los enemigos se evalúan al entrar, no después del ciclo** (corrección del hallazgo F1). FR-028 (b) habla de la sala a la que el jugador **entra**. Si se evaluara después del ciclo de eventos, un enemigo que llega a la sala del jugador sin atacarlo detendría el viaje, cosa que el caso borde de la especificación excluye, y un enemigo que estaba al entrar y se fue antes de la siguiente decisión no lo detendría. Por eso, «¿hay enemigos vivos en la sala destino?» se pregunta justo antes del movimiento, con el contenido de esa sala ya cargado. Entre esa pregunta y la entrada no corre ningún evento: el movimiento ocurre en el instante de la decisión del jugador.
+  - Los demás motivos se evalúan después del paso: llegada (la sala del jugador), daño (la vida comparada con la de antes del paso) y partida terminada. «Sin ruta» y «contenido no disponible» se detectan antes de mover y no consumen tiempo.
 - **`cripta/model/game.py`** (de Carlos; **lo que necesito de él**). Ganchos pequeños, sin cambiar ninguna regla existente:
   1. Recibir el mapa conocido como colaborador opcional en el constructor y en `Game.load`, con un objeto nulo cuando no hay, igual que `_NoHistory` (`game.py:48`).
   2. «El jugador entró a la sala X», con el estado de la antorcha: en `_begin_new_game` (`game.py:159`), antes de activar enemigos, y en `move` (`game.py:304-307`), justo después de cambiar la sala del jugador y antes de activar enemigos y disparar trampas.
@@ -191,7 +199,11 @@ La misma exportación sirve como **copia para un punto de control** de la línea
 ### Controlador, reproducción y vista (míos)
 
 - **`cripta/controller/commands.py`**: dos comandos nuevos, `mapa` e `ir a <sala>`. Ninguno es una «acción del modelo» que se registre tal cual en la bitácora: `mapa` no cambia nada (FR-019) y `ir a` se registra como sus pasos (FR-031). Se agregan a la ayuda.
-- **`cripta/controller/game_controller.py`**: el bucle del viaje. Valida con el modelo; escribe el comentario en la bitácora; y mientras no haya motivo de parada, pide el siguiente paso, lo ejecuta con `execute(Command(MOVE, dirección))` (el mismo camino que un `mover` escrito a mano: carga contenido, registra y precarga) y pide los motivos de parada. Devuelve los motivos para que la vista los muestre (FR-029).
+- **`cripta/controller/game_controller.py`**: el bucle del viaje.
+  - El controlador **recibe el mapa conocido como parámetro opcional de su constructor** (corrección del hallazgo F3). Si no se le pasa, usa el de la partida, que existirá cuando `Game` lo reciba. Las pruebas que se escriben antes de los avisos del motor se lo pasan explícitamente.
+  - Valida con el modelo y, si acepta, escribe el comentario en la bitácora.
+  - Mientras no haya motivo de parada: pide el siguiente paso; carga el contenido de la sala destino con el mismo método que ya usa `execute` (`_load_destination`, que no hace nada si la sala ya está cargada); pregunta si hay enemigos vivos en ella; guarda la vida; ejecuta `execute(Command(MOVE, dirección))`, el mismo camino que un `mover` escrito a mano (registra y precarga); y pide los motivos de parada.
+  - Devuelve los motivos para que la vista los muestre (FR-029).
 - **`cripta/replay/replay_log.py`**: un método para escribir un comentario en la bitácora. **La lectura ya ignora las líneas que empiezan con `#`**, así que reproducir no cambia (FR-031, SC-003).
 - **`cripta/controller/application.py`**: armar la vista del mapa conocido; que `room_view` (`application.py:172`) muestre las salidas según el conocimiento, con los destinos avistados como «hay algo en esa dirección» y sin id (FR-020); atender `mapa` e `ir a` en el bucle de comandos.
 - **`cripta/view/console_view.py`**: mostrar el mapa conocido, los motivos de parada del viaje y una marca de cazador en la lista de enemigos.
@@ -224,7 +236,10 @@ La misma exportación sirve como **copia para un punto de control** de la línea
 
 ## Mediciones previstas
 
-Todas entran en `--bench` por una suite nueva, con criptas sintéticas deterministas por semilla. **Los tamaños se fijan cuando se conozca la cripta publicada más grande**; hasta entonces se miden tres tamaños crecientes de mapa conocido para ver la tendencia. No se escribe ningún número antes de medirlo.
+Todas entran en `--bench` por una suite nueva.
+- Las mediciones 1 a 5 se corren con **criptas sintéticas deterministas por semilla en tres tamaños crecientes de mapa conocido**, generadas por el módulo de mediciones.
+- La medición 5 se corre además **con el mapa conocido completo de cada cripta del paquete sin conexión**, cargada por la fuente sin conexión existente. Cuando el paquete contiene la cripta de referencia, esa fila es la que comprueba FR-036 y SC-006. Si el paquete no la tiene todavía, la suite lo informa y mide solo las sintéticas, sin fallar.
+- Ningún tamaño ni id de cripta se escribe ni se supone. No se escribe ningún número antes de medirlo.
 
 | # | Qué se mide | Elegida | Alternativa descartada, medida directamente | Qué debería mostrar | Requisito |
 | --- | --- | --- | --- | --- | --- |
@@ -254,11 +269,11 @@ Si la medición 5 da más de 5 ms, se cambia a la alternativa (a), se documenta 
 | FR-012, FR-013 | `structures/mapa_conocido.py` (proveedor de vecinas conocidas), `controller/application.py` | `tests/test_niebla.py`, `tests/test_ir_a.py`, `tests/test_console_view.py` |
 | FR-014 | `structures/mapa_conocido.py` (exportar e importar), `adapters/almacen_partida.py` | `tests/test_niebla.py`, `tests/test_almacen_partida.py` |
 | FR-015, FR-035 | anotaciones en `structures/mapa_conocido.py` | `tests/test_niebla.py` |
-| FR-016 | exportar o anotaciones, según el plan de Erick | prueba de la línea de tiempo (especificación de Erick) |
+| FR-016 | exportar o anotaciones, según el plan de Erick | **la prueba vive en la especificación de la línea de tiempo**, de Erick. Esta especificación no tiene escenario propio para FR-016, porque la consulta por instante está fuera de su alcance; aquí solo se exige que el conocimiento sea recuperable |
 | FR-017 | consecuencia del principio II | `tests/test_niebla.py` (dos corridas idénticas) |
 | FR-018, FR-019 | `controller/commands.py`, `controller/application.py`, `view/console_view.py` | `tests/test_commands.py`, `tests/test_console_view.py` |
 | FR-020, FR-021 | `controller/application.py`, `view/console_view.py` | `tests/test_console_view.py` |
-| FR-022 a FR-030 | `model/viaje.py`, `controller/game_controller.py` | `tests/test_ir_a.py` |
+| FR-022 a FR-030 | `model/viaje.py`, `controller/game_controller.py` | `tests/test_ir_a.py`, que incluye la comprobación de SC-008 a lo largo de un viaje completo |
 | FR-031 | `controller/game_controller.py`, `replay/replay_log.py` | `tests/test_ir_a.py`, `tests/test_replay_log.py` |
 | FR-032 | ninguno propio: cada paso es una acción del historial | `tests/test_ir_a.py` |
 | FR-033, FR-034, FR-036 | el diseño completo | mediciones 1, 3 y 5 |

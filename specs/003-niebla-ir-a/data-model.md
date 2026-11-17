@@ -4,7 +4,7 @@
 
 ## Mapa conocido
 
-Lo que el jugador sabe del mapa (entidad «Conocimiento del jugador» de la especificación). Es estado del juego.
+Lo que el jugador sabe del mapa. Es estado del juego.
 
 | Campo | Estructura | Contenido | Por qué |
 | --- | --- | --- | --- |
@@ -60,6 +60,7 @@ No es estado del juego y no se guarda. Vive mientras dura una orden `ir a`.
 | destino | id de una sala explorada distinta de la actual |
 | pasos | cuántos movimientos se ejecutaron |
 | motivos de parada | lista ordenada como en FR-028 |
+| enemigos al entrar | si la sala destino del paso en curso tenía enemigos vivos en el instante de entrar; se pregunta justo antes del movimiento |
 
 ## Motivo de parada
 

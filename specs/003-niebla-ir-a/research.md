@@ -41,7 +41,7 @@ Cada punto sigue el formato Decisión / Motivo / Alternativas. Las tablas comple
 - **Decisión**: después de cada paso, el modelo decide con el estado de la partida y la vida del jugador antes del paso.
 - **Motivo**:
   - (a) Llegada: la sala del jugador es el destino.
-  - (b) Enemigos: algún enemigo **vivo** está en la sala del jugador. `Game.enemies` conserva a los muertos con vida 0, y `visible_state` ya filtra por `is_alive` (`game.py:593`). El contenido de la sala destino lo carga el controlador antes del `move`, así que los dormidos ya están en la lista.
+  - (b) Enemigos: algún enemigo **vivo** (FR-028 (b), corregido tras la revisión) está en la sala destino **en el instante de entrar**. Se pregunta justo antes del `move`, después de cargar el contenido de esa sala con el mismo método que usa `execute` (`_load_destination`, `game_controller.py:72`, que no hace nada si la sala ya está cargada), de modo que los dormidos ya están en `Game.enemies`. Entre la pregunta y la entrada no corre ningún evento, porque el movimiento ocurre en el instante de la decisión del jugador. `Game.enemies` conserva a los muertos con vida 0; por eso se filtra por `is_alive`, como `visible_state` (`game.py:593`). **No se evalúa después del ciclo**: así, un enemigo que llega sin atacar no detiene el viaje (caso borde de la especificación) y uno que estaba al entrar sí lo detiene aunque se vaya antes de la siguiente decisión.
   - (c) Daño: la vida bajó. Ver el riesgo del plan.
   - (d) Sin ruta: el siguiente cálculo no encuentra primer paso.
   - (e) Partida terminada: `Game.is_over`.
@@ -56,6 +56,6 @@ Cada punto sigue el formato Decisión / Motivo / Alternativas. Las tablas comple
 
 ## 7. Tamaño de las mediciones
 
-- **Decisión**: tres tamaños crecientes de mapa conocido en criptas sintéticas, y fijar el mayor cuando se conozca la cripta publicada más grande.
-- **Motivo**: la aclaración del 2026-11-16 fija la referencia, pero el paquete sin conexión solo trae `cripta-01` (6 salas). El tamaño real se obtiene de la lista de criptas del servicio, que es de Mauricio. No se inventa un tamaño.
-- **Alternativas**: elegir un tamaño ahora. Descartada: sería un número sin respaldo.
+- **Decisión**: dos fuentes. (1) Criptas sintéticas deterministas por semilla en tres tamaños crecientes de mapa conocido, generadas por el módulo de mediciones. (2) Los datos reales de cada cripta del paquete sin conexión, cargados con `FuenteOffline` (`cripta/adapters/fuente_offline.py`), lo que incluye la cripta de referencia en cuanto el paquete la contenga. No se escribe ningún tamaño ni id de cripta.
+- **Motivo**: decisión del grupo tras la revisión de consistencia (hallazgos F5 e I1). Las sintéticas muestran la tendencia que piden FR-033 a FR-035 sin depender de datos externos. La cripta de referencia, ya publicada, es la condición literal de §6.1 para FR-036. Recorrer todas las criptas del paquete evita nombrar una en el código.
+- **Alternativas**: (a) Fijar un tamaño a partir de la cripta publicada más grande. Descartada: nombra un dato concreto y no es la condición de §6.1. (b) Medir solo sintéticas. Descartada: no comprueba FR-036 sobre la cripta que el enunciado indica.

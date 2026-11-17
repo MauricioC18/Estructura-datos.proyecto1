@@ -1599,3 +1599,65 @@ Prompts utilizados:
 Uso en el proyecto: `specs/003-niebla-ir-a/plan.md`, `research.md`, `data-model.md`, `contracts/comandos.md`, `contracts/interfaz-mapa-conocido.md` y `quickstart.md`.
 
 Cambios realizados por el estudiante: Antes de escribir el plan se revisó si la búsqueda del cazador servía para «ir a» y se encontró que sí, porque recibe las vecinas desde afuera, pero también se encontró un supuesto que comparte con el cazador y que nadie había comprobado: el traductor admite pasos de un solo sentido, y una búsqueda que corre desde el destino daría distancias por caminos que no se pueden recorrer en ese sentido. Se revisaron los datos de `cripta-01`, que no tiene ninguno, y se dejó como riesgo para coordinar con el dueño del cazador en vez de cambiar su estructura. La clave de una puerta en la memoria del jugador se pensó tres veces: una tupla no sirve porque la tabla hash del grupo la rechaza, y un texto con los ids de las dos salas no es único, porque dos salidas pueden unir las mismas dos salas; quedó un entero calculado desde un lado fijo de la puerta. Se descartó también deducir si una sala está avistada mirando sus propias salidas, porque con un paso de un solo sentido da una respuesta falsa, y se eligió un contador por sala que se suma al explorar y se resta al revertir. Se detectó una regla que la especificación no escribe y que el plan no debía inventar: si «una sala que contiene enemigos» cuenta a los enemigos muertos; se dejó señalada para corregir la especificación.
+
+### 2.32 Tareas y revisión de consistencia de la niebla de guerra con /speckit.tasks y /speckit.analyze
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Descomponer el plan de `specs/003-niebla-ir-a` en tareas trazables y revisar la consistencia entre especificación, plan y tareas antes de implementar, como pide §2.2.
+
+Prompts utilizados:
+
+```text
+/speckit.tasks y luego /speckit.analyze para specs/003-niebla-ir-a.
+
+[El prompt completo prohíbe implement, commit, push, cambiar de rama y tocar código o pruebas; pide que /speckit.analyze solo reporte y que nada se corrija sin preguntar, recordando que la especificación se corrige primero y en commit aparte. Reglas de las tareas: cada tarea cita sus FR y ninguna queda sin FR; cada escenario tiene una prueba que cita su FR, agrupadas por historia; tareas pequeñas con dependencias explícitas; orden mapa conocido, antorcha y reversión, luego «ir a», vista, exportar e importar, mediciones y documentación; marcar las bloqueadas por los avisos del motor y por la versión del formato de partida y decir qué se puede avanzar antes; marcar las estrictamente necesarias para los seis casos del Apéndice B; respetar §6.2.]
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/tasks.md` y el reporte de la revisión de consistencia (no se guardó como archivo).
+
+Cambios realizados por el estudiante: Se pidió seguir el orden de trabajo del grupo y no el de prioridad de las historias, y separar las pruebas que se pueden escribir sin los avisos del motor, armando el conocimiento a mano, de las que necesitan la partida real; así casi toda la capacidad puede avanzar mientras llegan los cambios de otros integrantes. El registro de prompts quedó fuera de la lista de tareas porque no atiende ningún requisito de la especificación, que era una regla explícita. La revisión encontró un problema que el plan había introducido sin notarlo: los motivos de parada se evaluaban después del ciclo de eventos, así que un enemigo que entrara a la sala del jugador sin atacarlo detenía el viaje, cosa que la especificación dice expresamente que no ocurre, y un enemigo que estuviera al entrar y se fuera antes de la siguiente decisión no lo detenía. Los hallazgos se reportaron sin corregir nada, a la espera de la decisión del grupo.
+
+### 2.33 Corrección de los hallazgos de la revisión de consistencia de la niebla de guerra
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Aplicar las correcciones aprobadas por el grupo a los hallazgos de `/speckit.analyze` sobre `specs/003-niebla-ir-a`, con la especificación primero y por separado.
+
+Prompts utilizados:
+
+```text
+Sí a todo, con este orden y estos límites: 1. A1: corrige FR-028 (b) en spec.md a "enemigos vivos, activos o dormidos" y registra la decisión en la sección de aclaraciones; esto toca SOLO spec.md y su checklist. 2. F1 a F8 y C1: aplica las correcciones propuestas en plan.md, research.md, data-model.md y tasks.md. En F5 NO pidas el tamaño de la cripta a nadie: usa criptas sintéticas deterministas por semilla en tres tamaños crecientes, sin escribir ningún tamaño de cripta concreto. 3. Mantén "conocimiento del jugador" y "mapa conocido" como lo mismo y acláralo una sola vez.
+
+[El prompt completo prohíbe commit, push, cambiar de rama, tocar código o pruebas y ejecutar /speckit.implement, y pide al final la lista de cambios por hallazgo con archivo y líneas, y confirmar que repetir la revisión ya no encuentra hallazgos de severidad media o alta.]
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` y su lista de verificación, por un lado; `plan.md`, `research.md`, `data-model.md` y `tasks.md`, por otro.
+
+Cambios realizados por el estudiante: Al corregir FR-028 (b) se encontró un defecto propio de la sesión de aclaración: tres de las aclaraciones habían quedado escritas dentro de la lista de requisitos, después de FR-029, y no en su sección, porque la edición se anclaba en una frase que aparecía en dos lugares del archivo. Ese defecto ya estaba en la especificación confirmada. Se movieron sin cambiar su texto, en la misma corrección de la especificación. La decisión de medir solo con criptas sintéticas contradice lo que la especificación dice sobre FR-036, que mide también sobre la cripta publicada más grande. Como el permiso para tocar la especificación se limitaba a A1, esa contradicción no se corrigió: se dejó anotada como pendiente en el plan y en las tareas para que el grupo decida. Al reestructurar dos tareas largas, sus requisitos habían quedado en una línea aparte, que era justamente uno de los hallazgos; se detectó al volver a comprobar y se corrigió.
+
+### 2.34 Alinear FR-036 con §6.1 y la medición de «ir a» con la cripta de referencia
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Resolver la contradicción entre la especificación y el plan sobre con qué criptas se mide el límite de 5 ms de «ir a», con la especificación fiel al enunciado.
+
+Prompts utilizados:
+
+```text
+Muéstrame, sin modificar nada, el texto exacto de FR-036, SC-006 y la aclaración de spec.md:24, y la nota pendiente de plan.md:34. Luego dime si realmente se contradicen con medir con criptas sintéticas por semilla. Mi criterio: la spec debe seguir fiel al enunciado §6.1. Si la spec dice eso, NO la cambies [...] Solo propón un cambio a la spec si el texto afirma algo que el enunciado no dice. Si propones cambiarla, muéstrame el cambio y espera mi confirmación. Repite /speckit-analyze completo al terminar.
+```
+
+```text
+Sí, aplica el cambio a la spec tal como lo propusiste [...] Luego ajusta plan.md, research.md y tasks.md (T042 y T044): criptas sintéticas deterministas por semilla en tres tamaños crecientes, y además los datos de la cripta de referencia en cuanto exista un paquete sin conexión con ella, cargados como cualquier cripta, sin ningún tamaño ni id de cripta en el código. Quita las dos notas "Pendiente". Un dato nuevo: la cripta de referencia ya está publicada.
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` y su lista de verificación, por un lado; `plan.md`, `research.md` y `tasks.md`, por otro.
+
+Cambios realizados por el estudiante: La comparación contra el texto del enunciado mostró que la contradicción no venía del plan sino de la especificación: la primera oración de FR-036 repetía §6.1, pero la segunda, SC-006 y una aclaración agregaban una regla de medición que el enunciado no dice y que había salido de una aclaración anterior del propio grupo. Se quitó esa regla de la especificación. La aclaración original no se borró, para que el registro de lo decidido ese día siga intacto; se marcó como reemplazada y se agregó la nueva. Para no escribir el id de la cripta de referencia en el código, la medición recorre todas las criptas del paquete sin conexión y las reporta con el id que traen sus datos.
