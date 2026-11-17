@@ -59,6 +59,9 @@ Complejidad (k = salas exploradas)
     deshacer los cambios de una acción: O(cambios de esa acción).
     vecinas_conocidas: O(grado de la sala), a lo sumo 4, sin buscar la
         dirección de ninguna puerta.
+    entrantes_conocidas: O(salidas que entran a la sala). El índice de
+        salidas entrantes se arma una vez, en O(V + E), y ocupa O(E): no es
+        conocimiento, no se exporta ni se revierte.
     exportar, importar: O(k + puertas recordadas).
 """
 from model.room import DIRECTIONS, direction_index
@@ -90,6 +93,7 @@ class MapaConocido:
         self._puertas = TablaHash()
         self._orden = []
         self._version = 0
+        self._entrantes = None
 
     # ------------------------------------------------------------------
     # Consultas
@@ -178,6 +182,55 @@ class MapaConocido:
                 vecinas.append((salida.destination, salida.cost, salida))
 
         return vecinas
+
+    def entrantes_conocidas(self, id_sala):
+        """Salidas que el jugador sabe que llevan a id_sala: (id_origen, costo, salida).
+
+        Es el proveedor que expande la búsqueda de «ir a» cuando hay salidas
+        de un solo sentido: la búsqueda va desde el destino y necesita las
+        salidas que ENTRAN a cada sala (plan, alternativa 9). Cuenta una
+        salida si las dos salas están exploradas y su puerta se recuerda
+        abierta, con la clave del lado de la sala de origen; es el mismo
+        criterio que vecinas_conocidas, mirado desde la otra punta.
+
+        El índice de salidas entrantes depende solo de la topología, que no
+        cambia, así que se arma una vez y no se toca al explorar ni al
+        revertir: lo que cambia se filtra al consultar.
+        """
+        if not self._exploradas.contiene(id_sala):
+            return []
+
+        if self._entrantes is None:
+            self._armar_entrantes()
+
+        entrantes = []
+
+        for origen, posicion, salida in self._entrantes.obtener(id_sala, []):
+            if not self._exploradas.contiene(origen):
+                continue
+
+            if self._puertas.obtener(origen * len(DIRECTIONS) + posicion) is True:
+                entrantes.append((origen, salida.cost, salida))
+
+        return entrantes
+
+    def _armar_entrantes(self):
+        """Índice id de sala -> [(id_origen, posición de la dirección, salida)].
+
+        O(V + E) una sola vez, recorriendo las salidas de cada sala del mapa.
+        """
+        self._entrantes = TablaHash()
+
+        for id_origen in self._room_map.room_ids():
+            for salida in self._room_map.room(id_origen).exits():
+                destino = salida.destination
+                lista = self._entrantes.obtener(destino)
+
+                if lista is None:
+                    lista = []
+                    self._entrantes.insertar(destino, lista)
+
+                lista.append((id_origen, direction_index(salida.direction), salida))
 
     # ------------------------------------------------------------------
     # Avisos del motor

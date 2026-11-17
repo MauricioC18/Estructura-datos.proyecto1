@@ -509,6 +509,86 @@ class TestVecinasConocidas(unittest.TestCase):
         self.assertEqual(self.mapa.vecinas_conocidas(1), [])
 
 
+def un_sentido(room_map, id_a, id_b, direccion, costo=DEFAULT_EXIT_COST, cerrada=False):
+    """Salida de id_a a id_b sin vuelta: id_b no la declara."""
+    puerta = Door(id_a, id_b, closed=cerrada, cost=costo)
+    room_map.room(id_a).add_exit(Exit(direccion, id_b, puerta))
+    return puerta
+
+
+class TestEntrantesConocidas(unittest.TestCase):
+    """Salidas que llegan a una sala, para expandir la búsqueda de «ir a» con
+    salidas de un solo sentido (plan, alternativa 9)."""
+
+    def setUp(self):
+        # 1 -> 2 (un solo sentido), 3 <-> 2, 4 -> 2 cerrada, 5 -> 2 sin explorar.
+        self.room_map = mapa_de_salas(1, 2, 3, 4, 5)
+        un_sentido(self.room_map, 1, 2, "E", costo=7)
+        conectar(self.room_map, 3, 2, "N", costo=9)
+        un_sentido(self.room_map, 4, 2, "S", cerrada=True)
+        un_sentido(self.room_map, 5, 2, "O")
+        self.history = historial()
+        self.mapa = MapaConocido(self.room_map, self.history)
+
+    def origenes(self, id_sala):
+        return sorted((origen, costo) for origen, costo, _ in self.mapa.entrantes_conocidas(id_sala))
+
+    def test_cuenta_las_salidas_que_llegan_en_su_sentido(self):
+        """FR-023: llegan a 2 la salida de un solo sentido desde 1 y la de
+        doble sentido desde 3, cada una con su costo; de 2 no sale nada hacia
+        1, así que 1 no tiene entrantes desde 2."""
+        for id_sala in (1, 2, 3):
+            self.mapa.jugador_entro(id_sala)
+
+        self.assertEqual(self.origenes(2), [(1, 7), (3, 9)])
+        self.assertEqual(self.origenes(1), [])
+        self.assertEqual(self.origenes(3), [(2, 9)])
+
+    def test_solo_cuenta_lo_que_el_jugador_conoce(self):
+        """FR-012, FR-023: una salida desde una sala no explorada no cuenta,
+        aunque su puerta esté abierta; una recordada cerrada tampoco."""
+        for id_sala in (1, 2, 4):
+            self.mapa.jugador_entro(id_sala)
+
+        self.assertEqual(self.origenes(2), [(1, 7)])
+
+    def test_una_sala_no_explorada_no_tiene_entrantes(self):
+        """FR-012."""
+        self.mapa.jugador_entro(1)
+
+        self.assertEqual(self.mapa.entrantes_conocidas(2), [])
+
+    def test_coincide_con_las_vecinas_conocidas_al_reves(self):
+        """FR-023: cada salida conocida aparece una vez como vecina de su
+        origen y una vez como entrante de su destino."""
+        for id_sala in (1, 2, 3, 4, 5):
+            self.mapa.jugador_entro(id_sala)
+        desde_vecinas = []
+        desde_entrantes = []
+
+        for id_sala in (1, 2, 3, 4, 5):
+            for destino, costo, salida in self.mapa.vecinas_conocidas(id_sala):
+                desde_vecinas.append((id_sala, destino, costo))
+            for origen, costo, salida in self.mapa.entrantes_conocidas(id_sala):
+                desde_entrantes.append((origen, id_sala, costo))
+
+        self.assertEqual(sorted(desde_vecinas), sorted(desde_entrantes))
+
+    def test_revertir_no_necesita_mantener_nada(self):
+        """FR-015, FR-023: al deshacer la exploración de una sala de origen,
+        sus salidas dejan de contar como entrantes sin ningún cambio propio
+        del índice."""
+        self.mapa.jugador_entro(2)
+        self.mapa.entrantes_conocidas(2)  # arma el índice
+        self.history.begin_action()
+        self.mapa.jugador_entro(1)
+        self.assertEqual(self.origenes(2), [(1, 7)])
+
+        self.history.undo()
+
+        self.assertEqual(self.origenes(2), [])
+
+
 class TestExportarImportar(unittest.TestCase):
     """Historia 6, escenario 3: el conocimiento se guarda y se carga."""
 
