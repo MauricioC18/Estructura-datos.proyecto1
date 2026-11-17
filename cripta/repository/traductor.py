@@ -163,7 +163,30 @@ class Traductor:
                 salida = salidas.get(direccion)
                 if salida is not None:
                     self._agregar_salida(mapa, pendientes, sala["id"], direccion, salida)
+        self._avisar_salidas_de_un_solo_sentido(pendientes)
         return mapa
+
+    def _avisar_salidas_de_un_solo_sentido(self, pendientes):
+        """Avisa de las salidas que ningun otro lado declaro de vuelta.
+
+        El contrato del servicio describe cada salida como dirigida y no exige
+        que la sala destino declare la vuelta, asi que el esqueleto puede
+        producir un grafo asimetrico. El programa lo soporta: la sala destino
+        simplemente no tiene esa salida.
+
+        Lo que hay que saber es que ocurrio, porque las busquedas de rutas de
+        costo minimo del cazador (§3.2) suponen que toda salida tiene vuelta.
+        Un aviso convierte un resultado silenciosamente equivocado en algo
+        visible.
+        """
+        for clave in pendientes.claves():
+            for _ in pendientes.obtener(clave) or []:
+                origen, destino = clave.split("->")
+                self.avisos.append(
+                    f"La salida de la sala {origen} hacia la sala {destino} no "
+                    f"tiene vuelta declarada: el mapa queda de un solo sentido "
+                    f"en ese tramo."
+                )
 
     def _agregar_salida(self, mapa, pendientes, origen, direccion, salida):
         destino = _campo_obligatorio(salida, "sala", f"la salida {direccion} de la sala {origen}")

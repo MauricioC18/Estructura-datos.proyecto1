@@ -96,7 +96,7 @@ En la defensa se escoge un requisito al azar y hay que mostrar su escenario, su 
 ## Cómo se trabaja
 
 - **Comentarios solo cuando son necesarios.** El código se explica por sus nombres y su estructura; las explicaciones largas van en los docstrings de módulo y en el Documento de Decisiones.
-- **Las pruebas acompañan al código**, no se dejan para después. El proyecto tiene 861 pruebas de la primera parte y todas deben seguir pasando.
+- **Las pruebas acompañan al código**, no se dejan para después. El proyecto tenia 861 pruebas al terminar la primera parte y ninguna debe dejar de pasar. La cifra crece en cada capacidad, asi que lo que no cambia es la regla, no el numero: cada capacidad reporta su total en su propio plan.
 - **Cada integrante debe poder explicar cualquier decisión**, no solo la de la capacidad que implementó.
 - **Cada invocación de un comando de spec-kit con texto propio es un prompt a un modelo de lenguaje** y se registra en `cripta/PROMPTS_LLM.md`, con fecha, herramienta, el texto enviado y para qué se usó la respuesta.
 - Si algo del enunciado es ambiguo, se resuelve con `/speckit.clarify` y la respuesta queda escrita en la especificación, no en la cabeza de quien la escribió.

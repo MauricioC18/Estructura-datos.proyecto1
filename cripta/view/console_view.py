@@ -180,7 +180,12 @@ class ConsoleView:
         else:
             self._print("  Enemigos en la sala: ninguno")
 
-        self._print(f"  Mapa conocido: {resumen.mapa_conocido}")
+        if isinstance(resumen.mapa_conocido, str):
+            self._print(f"  Mapa conocido: {resumen.mapa_conocido}")
+        else:
+            cuantas = len(resumen.mapa_conocido)
+            salas = ", ".join(str(sala) for sala in resumen.mapa_conocido)
+            self._print(f"  Mapa conocido: {cuantas} salas exploradas ({salas})")
 
     def show_scores(self, entries, crypt_id=None):
         title = "Puntajes" if crypt_id is None else f"Puntajes de {crypt_id}"
@@ -236,8 +241,12 @@ class ConsoleView:
         self._print("Enemigos:")
 
         for enemy in enemies:
+            # El cazador se marca porque la decision que le conviene al jugador
+            # es la opuesta: de un guardian puede alejarse y olvidarlo, de un
+            # cazador no (FR-019 de la capacidad 002, §7.3 del enunciado).
+            marca = "[cazador] " if enemy.is_hunter else ""
             self._print(
-                f"  {enemy.name} [{enemy.actor_id}] "
+                f"  {marca}{enemy.name} [{enemy.actor_id}] "
                 f"vida {enemy.health}/{enemy.max_health}"
             )
 

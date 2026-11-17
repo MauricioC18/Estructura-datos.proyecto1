@@ -53,6 +53,20 @@ def connect(rooms, id_a, id_b, direction, cost=DEFAULT_EXIT_COST, closed=False,
     return door
 
 
+def connect_one_way(rooms, id_a, id_b, direction, cost=DEFAULT_EXIT_COST,
+                    closed=False):
+    """Salida de un solo sentido: solo la sala de origen la declara.
+
+    Es lo que produce el traductor cuando el esqueleto declara una salida y la
+    sala destino no declara la vuelta. El contrato del servicio lo permite:
+    describe cada salida como dirigida.
+    """
+    door = Door(id_a, id_b, closed=closed, cost=cost)
+    rooms[id_a].add_exit(Exit(direction, id_b, door))
+
+    return door
+
+
 def make_rooms(ids):
     """Salas de prueba, buscables por id para armar la topologia.
 
@@ -721,6 +735,98 @@ class HunterIsStillAnEnemyTest(unittest.TestCase):
         game._run_enemy_turn(hunter)
 
         self.assertEqual(hunter.scheduled_event.time, start + ATTACK_COST)
+
+
+class HunterOnOneWayExitsTest(unittest.TestCase):
+    """El contrato describe cada salida como dirigida (seccion 4.1).
+
+    Buscar desde la sala del jugador por salidas SALIENTES daria el costo de
+    que el JUGADOR llegue a cada sala, y lo que el cazador necesita es el
+    costo de llegar HASTA el jugador. En un grafo simetrico es lo mismo; en
+    uno dirigido, no.
+    """
+
+    def test_persigue_por_un_camino_que_solo_existe_en_un_sentido(self):
+        """El cazador llega al jugador aunque no haya vuelta.
+
+        3 -> 2 -> 1, todas de un solo sentido. La sala 1 no tiene ninguna
+        salida, asi que una busqueda que se expandiera por las salientes del
+        jugador no alcanzaria a nadie y el cazador esperaria para siempre.
+        """
+        rooms = make_rooms([1, 2, 3])
+        connect_one_way(rooms, 3, 2, "N", cost=10)
+        connect_one_way(rooms, 2, 1, "N", cost=10)
+        hunter = make_hunter(room_id=3, pursuit_range=10 ** 6)
+        game = make_game(rooms, enemies=[hunter])
+
+        action, chosen = decision_of(game, hunter)
+
+        self.assertEqual(action, Enemy.MOVE)
+        self.assertEqual(chosen.destination, 2)
+        self.assertEqual(game._routes_towards_player().distancia_a(3), 20)
+
+    def test_el_camino_del_jugador_no_le_sirve_al_cazador(self):
+        """El caso que delata el error, porque la respuesta cambia.
+
+        El cazador en la sala 1 solo puede llegar al jugador por la sala 4,
+        costo 100. El jugador, en la sala 9, puede llegar a la 1 por la 7 con
+        costo 2, pero por salidas que el cazador no puede usar. Expandiendo
+        las salientes del jugador, el cazador creeria estar a 2 y no
+        encontraria ningun primer paso valido: se quedaria esperando.
+        """
+        rooms = make_rooms([1, 4, 7, 9])
+        connect_one_way(rooms, 1, 4, "N", cost=50)
+        connect_one_way(rooms, 4, 9, "N", cost=50)
+        connect_one_way(rooms, 9, 7, "E", cost=1)
+        connect_one_way(rooms, 7, 1, "E", cost=1)
+        hunter = make_hunter(room_id=1, pursuit_range=10 ** 6)
+        game = make_game(rooms, player=make_player(room_id=9), enemies=[hunter])
+
+        rutas = game._routes_towards_player()
+
+        self.assertEqual(rutas.distancia_a(1), 100)
+        self.assertEqual(rutas.distancia_a(4), 50)
+
+        action, chosen = decision_of(game, hunter)
+
+        self.assertEqual(action, Enemy.MOVE)
+        self.assertEqual(chosen.destination, 4)
+
+    def test_sin_camino_de_ida_espera(self):
+        """1 -> 2 -> 3 de un solo sentido: el cazador en 3 no puede volver."""
+        rooms = make_rooms([1, 2, 3])
+        connect_one_way(rooms, 1, 2, "N", cost=10)
+        connect_one_way(rooms, 2, 3, "N", cost=10)
+        hunter = make_hunter(room_id=3, pursuit_range=10 ** 6)
+        game = make_game(rooms, enemies=[hunter])
+
+        action, _ = decision_of(game, hunter)
+
+        self.assertEqual(action, Enemy.WAIT)
+        self.assertIsNone(game._routes_towards_player().distancia_a(3))
+
+    def test_el_desempate_sigue_valiendo_con_salidas_dirigidas(self):
+        """Dos caminos de un solo sentido del mismo costo: gana el id menor."""
+        rooms = make_rooms([1, 4, 7, 9])
+        connect_one_way(rooms, 1, 7, "N", cost=100)
+        connect_one_way(rooms, 7, 9, "N", cost=100)
+        connect_one_way(rooms, 1, 4, "E", cost=100)
+        connect_one_way(rooms, 4, 9, "E", cost=100)
+        hunter = make_hunter(room_id=1, pursuit_range=10 ** 6)
+        game = make_game(rooms, player=make_player(room_id=9), enemies=[hunter])
+
+        _, chosen = decision_of(game, hunter)
+
+        self.assertEqual(chosen.destination, 4)
+
+    def test_una_puerta_cerrada_de_un_solo_sentido_no_da_paso(self):
+        rooms = make_rooms([1, 2, 3])
+        connect_one_way(rooms, 3, 2, "N", cost=10, closed=True)
+        connect_one_way(rooms, 2, 1, "N", cost=10)
+        hunter = make_hunter(room_id=3, pursuit_range=10 ** 6)
+        game = make_game(rooms, enemies=[hunter])
+
+        self.assertEqual(decision_of(game, hunter)[0], Enemy.WAIT)
 
 
 if __name__ == "__main__":

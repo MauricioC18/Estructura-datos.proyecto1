@@ -673,5 +673,48 @@ class PruebasRangoDeCazador(unittest.TestCase):
         self.assertIn("rango", campos_conocidos_de_la_clase(CLASE_ENEMIGO))
 
 
+class PruebasSalidaDeUnSoloSentido(unittest.TestCase):
+    """El contrato describe cada salida como dirigida y no exige la vuelta.
+
+    El programa lo soporta, pero las busquedas de rutas de costo minimo
+    suponen simetria, asi que tiene que avisar en vez de callar.
+    """
+
+    def armar(self, salas):
+        traductor = nuevo_traductor()
+        return traductor, traductor.crear_mapa(salas)
+
+    def test_una_salida_sin_vuelta_produce_un_mapa_de_un_solo_sentido(self):
+        traductor, mapa = self.armar([
+            {"id": 1, "nombre": "Una", "salidas": {"N": {"sala": 2}}},
+            {"id": 2, "nombre": "Dos", "salidas": {}},
+        ])
+
+        self.assertEqual(len(mapa.room(1).exits()), 1)
+        self.assertEqual(len(mapa.room(2).exits()), 0)
+
+    def test_una_salida_sin_vuelta_se_avisa(self):
+        traductor, _ = self.armar([
+            {"id": 1, "nombre": "Una", "salidas": {"N": {"sala": 2}}},
+            {"id": 2, "nombre": "Dos", "salidas": {}},
+        ])
+
+        avisos = [a for a in traductor.avisos if "un solo sentido" in a]
+        self.assertEqual(len(avisos), 1)
+        self.assertIn("1", avisos[0])
+        self.assertIn("2", avisos[0])
+
+    def test_un_mapa_simetrico_no_produce_ningun_aviso(self):
+        traductor, mapa = self.armar([
+            {"id": 1, "nombre": "Una", "salidas": {"N": {"sala": 2}}},
+            {"id": 2, "nombre": "Dos", "salidas": {"S": {"sala": 1}}},
+        ])
+
+        self.assertEqual(
+            [a for a in traductor.avisos if "un solo sentido" in a], []
+        )
+        self.assertIs(mapa.room(1).exits()[0].door, mapa.room(2).exits()[0].door)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -55,6 +55,10 @@ La segunda decisión es **qué invalida el cálculo**. Buscar desde el jugador h
 
 El supuesto del grafo sin dirección queda escrito aquí a propósito: es lo que habría que revisar primero si el enunciado cambiara.
 
+**Y hubo que revisarlo.** El contrato del servicio 1.1.0 describe cada salida como «One **directed** exit from a room» y no exige que la sala destino declare la vuelta, así que el esqueleto **puede** producir un grafo asimétrico. Con un grafo así, expandir la búsqueda por las salidas que **salen** del jugador da el costo de que el **jugador** llegue a cada sala, y lo que el cazador necesita es el costo de llegar **hasta** el jugador: dos cosas distintas.
+
+El arreglo no fue un rediseño, y la razón es que la búsqueda estaba parametrizada por quién provee las vecinas: se le pasa un proveedor de salidas **entrantes** para expandir y se mantienen las **salientes** para el primer paso. El motor arma el índice de salidas entrantes una sola vez, en O(V + E), porque la topología no cambia durante la partida; lo que cambia es el estado de las puertas, y eso se filtra al consultar. En una cripta donde toda salida tiene vuelta los dos proveedores coinciden y el comportamiento es idéntico al anterior, lo que confirmaron las pruebas que ya existían sin tocar ninguna.
+
 ### Qué cola de prioridad usa la búsqueda
 
 | Alternativa | A favor | En contra | Decisión |
@@ -116,7 +120,11 @@ El viaje automático «ir a» (§3.4), que es de Steven, también busca rutas de
 
 - **`cripta/benchmark/`** — un módulo nuevo para la persecución, con los cuatro escenarios de abajo y los tres modos de cálculo. Las criptas sintéticas son deterministas por semilla, como exige la constitución.
 
-**Lo que no se toca**: el rastro, la lógica de guardián, errante y rastreador, el cálculo del intervalo, el combate y la vista. El cazador usa la espera y el ataque que ya existen con sus costos de siempre.
+### Vista
+
+- **`cripta/view/console_view.py`** — la lista de enemigos de la sala marca al cazador. Es lo mínimo que hace visible la regla que esta capacidad agrega: el jugador tiene que poder decir cuál de los enemigos que ve lo va a perseguir por la cripta (FR-019, §7.3 del enunciado). El dato lo expone el motor en la vista de enemigo; la vista decide cómo se ve.
+
+**Lo que no se toca**: el rastro, la lógica de guardián, errante y rastreador, el cálculo del intervalo y el combate. El cazador usa la espera y el ataque que ya existen con sus costos de siempre.
 
 ## Complejidad esperada
 
@@ -199,6 +207,43 @@ De paso explica la fila tercera: con las puertas quietas el modo compartido cues
 
 Cincuenta cazadores persiguiendo al jugador no mueven la aguja del ciclo completo: la diferencia está dentro del ruido de la medición. Con el cálculo compartido, la persecución de cincuenta enemigos cuesta 0.012 ms por instante, frente a los 0.185 ms que cuesta el ciclo entero. SC-006 se cumple con dos órdenes de magnitud de margen.
 
+## Remedición a escala de la cripta de referencia
+
+El 2026-11-17 se supo que la cripta de referencia publicada es **cripta-06: 300 salas y 36 cazadores**, y que cripta-01 ya no aparece en la lista del servicio. Las mediciones de arriba se hicieron con criptas sintéticas de 60 salas, así que se repitieron a esa escala. Misma máquina, Python 3.14.6.
+
+**El corte por rango (FR-017, SC-005).** Un cazador de rango 300:
+
+| Cripta | Por decisión |
+| ---: | ---: |
+| 60 salas | 0.0057 ms |
+| 300 salas | 0.0055 ms |
+| 1 200 salas | 0.0058 ms |
+| 1 200 salas, sin corte efectivo | **3.7777 ms** |
+
+Sigue plano, ahora hasta veinte veces el tamaño de la cripta de referencia. Y el contraste creció: sin el corte, la misma decisión cuesta **650 veces más**.
+
+**Compartir el cálculo frente a uno por cazador (SC-008).** 36 cazadores en 300 salas:
+
+| Escenario | Compartido | Uno por cazador | Del límite de 20 ms |
+| --- | ---: | ---: | ---: |
+| Rangos iguales (300) | 0.0119 ms | 0.2045 ms | 1.0 % |
+| Rangos desiguales (300 y sin tope) | 0.8730 ms | **15.3555 ms** | **77 %** |
+
+**Este es el número que vuelve obligatoria la decisión, y a 60 salas no se veía.** Con rangos desiguales, un cálculo por cazador cuesta 15.36 ms por instante: el **77 % del presupuesto completo de 20 ms**, solo para que los enemigos decidan, antes de cualquier otra cosa que el ciclo tenga que hacer. Compartir lo deja en 0.8730 ms, el 4.4 %.
+
+A 60 salas la diferencia era de 0.20 contra 3.87 ms y parecía una comodidad de 19 veces. A la escala real es la diferencia entre caber y no caber. Conviene decirlo así en la defensa: **la decisión no se tomó por los números de la cripta de prueba, y los de la cripta de referencia son los que la justifican.**
+
+El sobrecosto de compartir con rangos desiguales también creció: 0.8730 contra 0.0119 ms, unas 73 veces, porque el corte es el rango mayor. Sigue siendo lo correcto, porque la alternativa es 17 veces peor que ese sobrecosto.
+
+**El ciclo de eventos (FR-018, SC-006).**
+
+| Escenario | Por ciclo | Del límite de 20 ms |
+| --- | ---: | ---: |
+| 60 salas, 50 cazadores | 0.1854 ms | 0.93 % |
+| **300 salas, 36 cazadores** | **0.1259 ms** | **0.63 %** |
+
+Se cumple con margen de dos órdenes de magnitud. Que la cripta grande salga más rápida por ciclo no es raro: con 300 salas el jugador camina más y pelea menos, y los turnos de combate son los caros.
+
 ## Riesgos
 
 - **La invalidación incompleta es el riesgo grande de esta capacidad.** Un evento que cambia el grafo y no invalida produce una decisión distinta de la del cálculo desde cero, y FR-011 se rompe sin que ninguna partida se vea rara. Por eso la prueba de equivalencia compara contra el modo recalcular siempre en vez de contra valores esperados escritos a mano.
@@ -226,6 +271,7 @@ Cincuenta cazadores persiguiendo al jugador no mueven la aguja del ciclo complet
 | FR-016 | consecuencia de II; ningún código propio | `tests/test_cazador.py` |
 | FR-017 | `structures/rutas_mas_baratas.py` (corte por rango) | medición 1 |
 | FR-018 | el diseño completo | medición 4 |
+| FR-019 | `model/game.py` (el dato) y `view/console_view.py` (cómo se ve) | `tests/test_console_view.py`, `tests/test_linea_de_tiempo.py` |
 
 ## Fases
 

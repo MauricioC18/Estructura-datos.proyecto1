@@ -1600,6 +1600,36 @@ Se corrigieron además tres errores propios en las pruebas, todos detectados al 
 
 El valor por omisión de K quedó en 50, elegido con las mediciones como exige el enunciado. La alternativa ingenua de una copia por acción cuesta 43 veces más memoria para ganar menos de 0.6 ms por consulta. Entre los valores razonables el argumento resultó ser de latencia y no de memoria: con 98 KiB la memoria ya es irrelevante en términos absolutos, así que lo que queda por optimizar es cuánto tarda una consulta, y K de 200 ahorra 71 KiB que nadie nota y duplica el tiempo. También quedó anotado que esas cifras son de una cripta de 40 salas y que la memoria de las copias crece con el tamaño de la cripta, más la optimización evidente que no se hizo a propósito: guardar en la copia solo el estado mutable y no el esqueleto, que no cambia nunca. Se prefirió reutilizar el serializador ya probado antes que escribir un segundo serializador, y el costo está medido.
 
+### 2.31 Cierre: el Documento de Decisiones y la vista del cazador
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-17
+
+Objetivo: Escribir las secciones de la segunda parte del Documento de Decisiones de Diseño (§7.1) y cerrar el último pendiente propio.
+
+Prompts utilizados:
+
+```text
+hacé el documento de decisiones
+```
+
+```text
+Ok, sí, perfecto. Termina con lo mío
+```
+
+Uso en el proyecto: las secciones 5.1, 5.2, 5.5 y 5.6 de `docs/DECISIONES.md`; el requisito FR-019 y la Historia 6 de `specs/002-cazador-ruta-mas-barata/spec.md`; `view/console_view.py` y `tests/test_console_view.py`.
+
+Cambios realizados por el estudiante: Antes de escribir se revisó cómo había titulado su sección el compañero que escribe la 5.3, para usar la misma convención y que al juntar las ramas el conflicto fuera trivial de resolver. Las secciones 5.3 y 5.4 quedaron con una nota de a quién pertenecen y qué les falta, siguiendo la convención que el documento ya usaba para las secciones de la primera parte sin escribir.
+
+Lo que §7.1 pide y más suma es indicar si la decisión final coincide con la del plan original. Dos no coinciden y las dos quedaron escritas con lo que motivó el cambio. En §5.2 la decisión se mantiene pero la justificación cambió: el plan esperaba que el ahorro viniera de reutilizar el cálculo cuando las puertas están quietas, y la medición mostró 252 búsquedas en 300 decisiones, porque el jugador se mueve y moverse invalida; el ahorro real es compartir una búsqueda entre los cazadores del mismo instante. En §5.5 la idea de anotar solo el estado del generador en cada pergamino la tumbó la prueba de equivalencia, porque el pergamino también consume un pergamino del inventario.
+
+Para la §5.6 se repitieron las mediciones de la primera parte con la carga nueva, como exige el enunciado. El montículo de la agenda sigue siendo 6.5 veces más rápido que la lista sin ordenar que se había descartado, así que esa decisión no cambia; se anotó además que los cazadores no agregan eventos a la agenda, solo cambian a dónde se mueven, de modo que la carga sobre la agenda crece con los actores y no con el terreno.
+
+Al revisar la capacidad contra §7.3 se encontró que la vista debía distinguir a los cazadores de los demás enemigos y que ninguna especificación lo cubría: el dato ya estaba en la vista de enemigo del motor, pero la vista no lo pintaba distinto. Se agregó el requisito a la especificación del cazador, con su historia, sus escenarios, un caso borde y un criterio de éxito, en una confirmación aparte y antes de tocar el código. Ese orden se eligió a propósito porque es el ejercicio que §7.4 anuncia para la defensa: pedir un cambio pequeño a una regla y mostrar primero la modificación de la especificación y luego la del código.
+
+También se actualizó el resumen de pruebas del Documento, que fijaba 861 como si fuera definitivo. Ahora reporta 1 029 con el desglose por capacidad y explica que la cifra sube al juntar las ramas, de modo que lo que queda fijo es la regla —que ninguna prueba deje de pasar— y no el número.
+
 ### 2.30 Niebla de guerra e «ir a»: análisis del repositorio, /speckit.specify y /speckit.clarify
 
 Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
@@ -1859,3 +1889,21 @@ Agrega a specs/003-niebla-ir-a/spec.md (y su checklist), SIN reenumerar FR exist
 Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` (aclaración de la sesión 2026-11-17, caso borde y escenarios 7 y 8 de la Historia 4) y `specs/003-niebla-ir-a/checklists/requirements.md` (nota de la corrección).
 
 Cambios realizados por el estudiante: No se agregó ningún requisito ni se reenumeró ninguno, porque FR-023 ya pide recorrer salidas y minimizar su costo: el defecto estaba en el código y en el plan, no en el requisito. Lo que faltaba era que la especificación lo hiciera verificable. El escenario 7 es el mapa de tres salas del análisis anterior (2.41), con el que la implementación actual se declara sin ruta teniendo una salida directa de costo 1; así la prueba que lo cubra falla hoy y deja de fallar con la corrección. El escenario 8 cubre el caso contrario, que la ruta no use una salida al revés. La especificación sigue sin nombrar estructuras, clases ni algoritmos. El cambio queda sin commit hasta revisarlo.
+
+### 2.43 Merge de la rama de Carlos (salidas dirigidas y objeto nulo del mapa conocido)
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Terminar el merge de `origin/mauricio-logica-juego` en `Parte_2-niebla-ir-a`: limpiar las marcas de conflicto que quedaron en este archivo, revisar la versión de Carlos de la búsqueda de costo mínimo y correr todas las pruebas antes de commitear.
+
+Prompts utilizados:
+
+```text
+Estoy en medio de un merge de origin/mauricio-logica-juego en mi rama Parte_2-niebla-ir-a. NO abortes el merge. [...] 1. Limpia las marcas de PROMPTS_LLM.md conservando AMBOS lados completos, sin borrar ninguna entrada. Solo quita las líneas de marca. Verifica que no quede ninguna marca en ningún archivo del repo. 2. Revisa que rutas_mas_baratas.py quedó con parar_en y salidas_de, y que las protecciones de distancia_a, alcanza y primer_paso_desde siguen ahí. 3. Corre TODAS las pruebas con un Python 3.11 o superior real [...] 4. Si TODAS pasan: haz el commit del merge [...] 5. Si alguna falla: NO hagas commit. Dime cuáles y por qué.
+```
+
+Uso en el proyecto: `cripta/PROMPTS_LLM.md`. Se revisaron `cripta/structures/rutas_mas_baratas.py`, `cripta/model/game.py`, `cripta/controller/game_controller.py` y `cripta/tests/test_ir_a.py`.
+
+Cambios realizados por el estudiante: Quitar solo las líneas de marca habría dejado entradas mezcladas, porque git había alineado el encabezado de la entrada 2.31 de Carlos con fragmentos de las entradas 2.40 y 2.42 de esta rama. Se rearmó el archivo con la parte común, la entrada 2.31 de Carlos y, a continuación, las entradas 2.30 a 2.42 de esta rama, y se comprobó que tiene exactamente las mismas líneas que el archivo con las marcas quitadas, más las líneas comunes («Prompts utilizados:», la apertura del bloque de texto y líneas vacías) que cada entrada necesita para quedar completa. No quedó ninguna marca en el repositorio. La búsqueda de Carlos conserva `parar_en`, `salidas_de` y las protecciones de `distancia_a`, `alcanza` y `primer_paso_desde`. De 1158 pruebas falló una, `test_ir_a.TestOrden.test_sin_mapa_conocido_no_hay_viaje`: la partida de Carlos ya no deja el mapa conocido en `None`, sino que pone un objeto nulo con `disponible = False`, y el controlador del viaje solo comprobaba `None`, así que le pedía a ese objeto un método que no tiene. Por eso el merge no se commiteó.

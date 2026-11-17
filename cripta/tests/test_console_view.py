@@ -11,6 +11,7 @@ class EnemyStub:
     name: str
     health: int
     max_health: int
+    is_hunter: bool = False
 
 
 @dataclass
@@ -69,6 +70,44 @@ class TestShowState(unittest.TestCase):
 
         self.assertIn("Rata gigante [e-201] vida 12/12", text)
         self.assertIn("Rata gigante [e-202] vida 5/12", text)
+
+    def test_marks_the_hunter_apart_from_the_other_enemies(self):
+        """FR-019 y SC-010: el jugador tiene que poder decir cual lo persigue.
+
+        De un guardian puede alejarse y olvidarlo; de un cazador no, asi que
+        la decision que le conviene es la opuesta.
+        """
+        enemies = [
+            EnemyStub("e-201", "Sabueso oseo", 18, 18, is_hunter=True),
+            EnemyStub("e-202", "Centinela", 20, 20),
+        ]
+
+        text = render(StateStub(enemies=enemies))
+        lineas = [linea for linea in text.splitlines() if "vida" in linea]
+        del_cazador = [linea for linea in lineas if "e-201" in linea][0]
+        del_otro = [linea for linea in lineas if "e-202" in linea][0]
+
+        self.assertIn("cazador", del_cazador)
+        self.assertNotIn("cazador", del_otro)
+
+    def test_the_hunter_still_shows_its_name_id_and_health(self):
+        """Historia 6, escenario 3: se agrega la marca, no se quita nada."""
+        enemies = [EnemyStub("e-201", "Sabueso oseo", 7, 18, is_hunter=True)]
+
+        text = render(StateStub(enemies=enemies))
+
+        self.assertIn("Sabueso oseo", text)
+        self.assertIn("[e-201]", text)
+        self.assertIn("vida 7/18", text)
+
+    def test_without_hunters_the_list_looks_like_before(self):
+        """Historia 6, escenario 2: no se agrega ruido donde no hay cazador."""
+        enemies = [EnemyStub("e-202", "Centinela", 20, 20)]
+
+        text = render(StateStub(enemies=enemies))
+
+        self.assertIn("Centinela [e-202] vida 20/20", text)
+        self.assertNotIn("cazador", text)
 
     def test_without_enemies(self):
         self.assertIn("No hay enemigos", render(StateStub()))
