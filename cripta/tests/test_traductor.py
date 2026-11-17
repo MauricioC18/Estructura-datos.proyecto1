@@ -45,6 +45,9 @@ def contenido_de(id_sala):
     raise ValueError(id_sala)
 
 
+_SIN_CAMPO = object()
+
+
 def nuevo_traductor(fichas=FICHAS_CRIPTA_01):
     return Traductor(crear_buscador_de_fichas(fichas))
 
@@ -579,6 +582,94 @@ class PruebasCostoDeSalida(unittest.TestCase):
         for aviso in traductor.avisos:
             self.assertNotIn("costo", aviso)
 
+
+
+class PruebasRangoDeCazador(unittest.TestCase):
+    """El cuarto comportamiento y su rango (FR-001, FR-002, FR-014)."""
+
+    FICHA_DE_CAZADOR = {
+        "id": "ent_sabueso_oseo",
+        "nombre": "Sabueso óseo",
+        "clase": "enemigo",
+        "vida_max": 18,
+        "ataque": 6,
+        "defensa": 2,
+        "velocidad": 120,
+        "comportamiento": "cazador",
+        "rango": 600,
+        "suelta": [],
+    }
+
+    def cazador_con(self, **cambios):
+        ficha = dict(self.FICHA_DE_CAZADOR)
+        ficha.update(cambios)
+
+        for campo, valor in list(ficha.items()):
+            if valor is _SIN_CAMPO:
+                del ficha[campo]
+
+        traductor = nuevo_traductor(FICHAS_CRIPTA_01 + [ficha])
+
+        return traductor, traductor.crear_enemigo(
+            {"instancia": "e-1", "tipo": ficha["id"]}, 1
+        )
+
+    def test_una_ficha_de_cazador_produce_un_cazador_con_su_rango(self):
+        _, cazador = self.cazador_con()
+
+        self.assertEqual(cazador.behavior, Enemy.HUNTER)
+        self.assertEqual(cazador.pursuit_range, 600)
+
+    def test_un_rango_de_cero_es_valido(self):
+        _, cazador = self.cazador_con(rango=0)
+
+        self.assertEqual(cazador.pursuit_range, 0)
+
+    def test_una_ficha_de_cazador_sin_rango_es_un_error_de_datos(self):
+        """FR-014: no se sustituye por un valor por omisión."""
+        with self.assertRaises(ErrorDatosCripta) as error:
+            self.cazador_con(rango=_SIN_CAMPO)
+
+        self.assertIn("rango", str(error.exception))
+
+    def test_un_rango_invalido_es_un_error_de_datos(self):
+        for invalido in (-1, "600", 1.5, True, [600]):
+            with self.subTest(rango=invalido):
+                with self.assertRaises(ErrorDatosCripta):
+                    self.cazador_con(rango=invalido)
+
+    def test_el_campo_rango_ya_no_se_avisa_como_desconocido(self):
+        traductor, _ = self.cazador_con()
+
+        self.assertEqual(
+            [aviso for aviso in traductor.avisos if "rango" in aviso],
+            [],
+        )
+
+    def test_rango_en_una_ficha_que_no_es_de_cazador_se_avisa_y_se_ignora(self):
+        ficha = {
+            "id": "ent_espectro",
+            "nombre": "Espectro",
+            "clase": "enemigo",
+            "vida_max": 9,
+            "ataque": 3,
+            "defensa": 0,
+            "velocidad": 80,
+            "comportamiento": "errante",
+            "rango": 400,
+        }
+        traductor = nuevo_traductor(FICHAS_CRIPTA_01 + [ficha])
+
+        espectro = traductor.crear_enemigo(
+            {"instancia": "e-1", "tipo": "ent_espectro"}, 1
+        )
+
+        self.assertEqual(espectro.behavior, Enemy.WANDERER)
+        self.assertEqual(espectro.pursuit_range, 0)
+        self.assertTrue(any("rango" in aviso for aviso in traductor.avisos))
+
+    def test_el_campo_rango_es_conocido_para_la_clase_enemigo(self):
+        self.assertIn("rango", campos_conocidos_de_la_clase(CLASE_ENEMIGO))
 
 
 if __name__ == "__main__":

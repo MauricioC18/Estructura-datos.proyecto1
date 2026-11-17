@@ -233,7 +233,7 @@ SYNTHETIC_EXIT_COSTS = (100, 250, 50, 400, 1, 150)
 
 
 def build_synthetic_crypt(room_count, trap_rearm=150, auto_close=400,
-                          varied_costs=True):
+                          varied_costs=True, closed_every=3):
     """Salas en linea, con trampas en todas y una puerta de cada tres cerrada.
 
     Las puertas cerradas no piden llave, de modo que el jugador tiene que
@@ -243,6 +243,11 @@ def build_synthetic_crypt(room_count, trap_rearm=150, auto_close=400,
     Con varied_costs las salidas reparten costos distintos, que es la carga de
     la segunda parte. Con varied_costs=False todas cuestan 100, que es la carga
     con la que se midio la primera parte; sirve para comparar.
+
+    Con closed_every=0 ninguna puerta nace cerrada. Sirve para medir la busqueda
+    del cazador: con una puerta cerrada de cada tres, la region alcanzable es
+    diminuta por mas grande que sea la cripta, asi que el corte por rango no se
+    podria distinguir del bloqueo por puertas.
     """
     rooms = []
 
@@ -262,7 +267,7 @@ def build_synthetic_crypt(room_count, trap_rearm=150, auto_close=400,
         rooms.append(room)
 
     for index in range(room_count - 1):
-        closed = index % 3 == 0
+        closed = closed_every > 0 and index % closed_every == 0
         cost = (
             SYNTHETIC_EXIT_COSTS[index % len(SYNTHETIC_EXIT_COSTS)]
             if varied_costs

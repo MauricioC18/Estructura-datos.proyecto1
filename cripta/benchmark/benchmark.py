@@ -24,6 +24,7 @@ SUITES = (
     ("Inventario, historial, rastro, bitacora y ordenamientos", "benchmark.persona3_bench"),
     ("Bitacora de partida y reproduccion", "benchmark.replay_bench"),
     ("Guardado binario de la partida", "benchmark.bench_almacen_partida"),
+    ("Persecucion del cazador", "benchmark.bench_cazador"),
 )
 
 

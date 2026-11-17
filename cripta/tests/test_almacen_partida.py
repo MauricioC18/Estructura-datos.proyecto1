@@ -100,6 +100,8 @@ def construir_partida(cuantas_salas=3, acciones=2, veneno=True):
         Enemy("e-1", "Rata gigante", 20, 4, 1, 150, 1, Enemy.GUARDIAN,
               drops=[objeto("i-oro", "Oro", Item.POTION, heal=5)]),
         Enemy("e-2", "Errante", 30, 5, 2, 80, 2, Enemy.WANDERER, regeneration=2),
+        Enemy("e-3", "Sabueso oseo", 18, 6, 2, 120, 2, Enemy.HUNTER,
+              pursuit_range=600),
     ]
 
     juego = Game(
@@ -460,7 +462,7 @@ class PruebasAlmacenPartida(unittest.TestCase):
 
         self.assertEqual(guardada.room.room_id, 2)
         self.assertEqual(len(guardada.room.traps), 1)
-        self.assertEqual([e.actor_id for e in guardada.enemies], ["e-2"])
+        self.assertEqual([e.actor_id for e in guardada.enemies], ["e-2", "e-3"])
 
     def test_leer_una_sala_que_no_esta_devuelve_none(self):
         self.guardar(construir_partida())
@@ -746,6 +748,50 @@ class PruebasPartidaCargadaConHistorial(unittest.TestCase):
         juego.rewind()
 
         self.assertEqual(len(juego.events.active_events()), pendientes)
+
+
+class PruebasRangoDeCazadorEnElArchivo(unittest.TestCase):
+    """El rango de un cazador se guarda y se recupera (FR-002, FR-016).
+
+    El bloque de enemigo ya guardaba el comportamiento; sin el rango, un
+    cazador cargado perseguiria con un rango inventado y la partida cargada no
+    seria la misma que la guardada.
+    """
+
+    def setUp(self):
+        self._carpeta_temporal = tempfile.TemporaryDirectory()
+        self.ruta = Path(self._carpeta_temporal.name) / "guardados" / "partida.cripta"
+        self.almacen = AlmacenPartida(self.ruta)
+
+    def tearDown(self):
+        self._carpeta_temporal.cleanup()
+
+    def test_el_rango_sobrevive_la_ida_y_vuelta(self):
+        juego = construir_partida()
+        self.almacen.guardar(juego, versiones=("cripta-01", "3", "7"))
+
+        cargado = self.almacen.cargar()
+        cazadores = [
+            enemigo
+            for enemigo in cargado.enemies
+            if enemigo.behavior == Enemy.HUNTER
+        ]
+
+        self.assertEqual(len(cazadores), 1)
+        self.assertEqual(cazadores[0].pursuit_range, 600)
+
+    def test_los_demas_enemigos_siguen_con_rango_neutro(self):
+        juego = construir_partida()
+        self.almacen.guardar(juego, versiones=("cripta-01", "3", "7"))
+
+        cargado = self.almacen.cargar()
+
+        for enemigo in cargado.enemies:
+            if enemigo.behavior != Enemy.HUNTER:
+                self.assertEqual(enemigo.pursuit_range, 0)
+
+    def test_la_version_del_formato_subio_porque_el_bloque_cambio(self):
+        self.assertEqual(VERSION_DEL_FORMATO, 2)
 
 
 if __name__ == "__main__":

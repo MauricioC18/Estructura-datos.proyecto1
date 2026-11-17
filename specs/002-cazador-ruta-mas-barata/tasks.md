@@ -10,40 +10,40 @@ Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porqu
 
 ### Fase 1 — Base, bloquea todo lo demás
 
-- [ ] T001 La búsqueda de costos mínimos, en `cripta/structures/rutas_mas_baratas.py`
-- [ ] T002 [P] Pruebas de la búsqueda, en `cripta/tests/test_rutas_mas_baratas.py`
-- [ ] T003 El comportamiento cazador y su rango, en `cripta/model/enemy.py`
-- [ ] T004 [P] El traductor lee el cazador y su rango, en `cripta/repository/traductor.py`
-- [ ] T005 [P] Pruebas del traductor, en `cripta/tests/test_traductor.py`
-- [ ] T006 El motor le pasa al cazador las vecinas abiertas, en `cripta/model/game.py`
+- [x] T001 La búsqueda de costos mínimos, en `cripta/structures/rutas_mas_baratas.py`
+- [x] T002 [P] Pruebas de la búsqueda, en `cripta/tests/test_rutas_mas_baratas.py`
+- [x] T003 El comportamiento cazador y su rango, en `cripta/model/enemy.py`
+- [x] T004 [P] El traductor lee el cazador y su rango, en `cripta/repository/traductor.py`
+- [x] T005 [P] Pruebas del traductor, en `cripta/tests/test_traductor.py`
+- [x] T006 El motor le pasa al cazador las vecinas abiertas, en `cripta/model/game.py`
 
 ### Fase 2 — Historia 1: persigue por donde le cuesta menos (P1)
 
-- [ ] T007 [H1] Pruebas de la persecución, en `cripta/tests/test_cazador.py`
+- [x] T007 [H1] Pruebas de la persecución, en `cripta/tests/test_cazador.py`
 
 ### Fase 3 — Historia 2: dos rutas igual de baratas (P1)
 
-- [ ] T008 [P] [H2] Pruebas del desempate y del determinismo, en `cripta/tests/test_cazador.py`
+- [x] T008 [P] [H2] Pruebas del desempate y del determinismo, en `cripta/tests/test_cazador.py`
 
 ### Fase 4 — Historia 3: el rango (P2)
 
-- [ ] T009 [P] [H3] Pruebas del rango y de la espera, en `cripta/tests/test_cazador.py`
+- [x] T009 [P] [H3] Pruebas del rango y de la espera, en `cripta/tests/test_cazador.py`
 
 ### Fase 5 — Historia 4: la decisión se recalcula (P2)
 
-- [ ] T010 [H4] Invalidar el cálculo compartido, en `cripta/model/game.py`
-- [ ] T011 [H4] Prueba de equivalencia contra recalcular siempre, en `cripta/tests/test_cazador.py`
+- [x] T010 [H4] Invalidar el cálculo compartido, en `cripta/model/game.py`
+- [x] T011 [H4] Prueba de equivalencia contra recalcular siempre, en `cripta/tests/test_cazador.py`
 
 ### Fase 6 — Historia 5: sigue siendo un enemigo como los otros (P3)
 
-- [ ] T012 [P] [H5] Pruebas de activación y de no regresión, en `cripta/tests/test_enemy.py`
+- [x] T012 [P] [H5] Pruebas de activación y de no regresión, en `cripta/tests/test_cazador.py`
 
 ### Fase 7 — Cierre
 
-- [ ] T013 El guardado binario guarda el rango y sube de versión, en `cripta/adapters/almacen_partida.py`
-- [ ] T014 El banco de mediciones de la persecución, en `cripta/benchmark/`
-- [ ] T015 Correr las cuatro mediciones y anotarlas en `specs/002-cazador-ruta-mas-barata/plan.md`
-- [ ] T016 No romper nada: la suite completa
+- [x] T013 El guardado binario guarda el rango y sube de versión, en `cripta/adapters/almacen_partida.py`
+- [x] T014 El banco de mediciones de la persecución, en `cripta/benchmark/`
+- [x] T015 Correr las cuatro mediciones y anotarlas en `specs/002-cazador-ruta-mas-barata/plan.md`
+- [x] T016 No romper nada: la suite completa
 - [ ] T017 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
 
 ---
@@ -243,7 +243,9 @@ Cubrir además: la única ruta cortada por una puerta que se cerró deja al caza
 
 **Requisitos**: FR-013, FR-015
 
-**Archivo**: `cripta/tests/test_enemy.py`
+**Archivo**: `cripta/tests/test_cazador.py`
+
+Las tareas preveían `tests/test_enemy.py`, que no existe: los tres comportamientos de la primera parte se prueban en `tests/test_movement.py`. Estas pruebas quedaron junto a las demás del cazador, y las de los otros tres comportamientos siguen donde estaban.
 
 - Un cazador que todavía no se ha activado no persigue ni consume turnos.
 - Un cazador no abre una puerta cerrada, aunque fuera el camino más barato si estuviera abierta.

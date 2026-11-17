@@ -91,7 +91,7 @@ from structures.sorting import sort
 from structures.tabla_hash import TablaHash
 
 FIRMA_DEL_ARCHIVO = b"CRIPTAPA"
-VERSION_DEL_FORMATO = 1
+VERSION_DEL_FORMATO = 2
 
 # "<" = little-endian, sin relleno. B = 1 byte, H = 2, I = 4, i = 4 con signo,
 # q = 8 con signo, Q = 8 sin signo, d = flotante de 8.
@@ -368,6 +368,7 @@ def _empacar_enemigo(enemy):
         _empacar_bandera(enemy.is_active),
         _empacar_texto(enemy.behavior),
         _empacar_entero(enemy.regeneration),
+        _empacar_entero(enemy.pursuit_range),
         _empacar_lista_de_objetos(enemy.drops),
     ])
 
@@ -384,6 +385,7 @@ def _leer_enemigo(lector):
     is_active = lector.bandera()
     behavior = lector.texto()
     regeneration = lector.entero()
+    pursuit_range = lector.entero()
     drops = _leer_lista_de_objetos(lector)
 
     enemy = Enemy(
@@ -398,6 +400,7 @@ def _leer_enemigo(lector):
         health=health,
         drops=drops,
         regeneration=regeneration,
+        pursuit_range=pursuit_range,
     )
     enemy.is_active = is_active
     return enemy

@@ -23,6 +23,7 @@ from structures.circular_log import CircularLog
 from structures.event_queue import EventQueue
 from structures.history import use_rewind_scroll
 from structures.inventory import is_rewind_scroll
+from structures.rutas_mas_baratas import RutasMasBaratas
 from structures.sorting import sort
 
 
@@ -131,6 +132,7 @@ class Game:
         message_log=None,
         event_queue=None,
         start=True,
+        always_recompute_routes=False,
     ):
         self.state = state
         self.player = player
@@ -147,6 +149,9 @@ class Game:
         self.player_actions = 0
         self.enemies_defeated = 0
         self.events_processed = 0
+        self.always_recompute_routes = always_recompute_routes
+        self.route_searches = 0
+        self._routes = None
 
         if start:
             self._begin_new_game()
@@ -298,6 +303,7 @@ class Game:
 
         self.history.begin_action()
         self.history.assign(self.player, "room_id", destination.room_id)
+        self._invalidate_routes()
         self._activate_enemies_in(destination.room_id)
         message = f"Entras a {destination.name}."
         self._log(message)
@@ -346,6 +352,7 @@ class Game:
 
         self.history.begin_action()
         self.history.assign(door, "closed", False)
+        self._invalidate_routes()
         message = f"Abres la puerta hacia {direction}."
 
         if door.auto_close is not None:
@@ -473,6 +480,7 @@ class Game:
             return ActionResult(False, "No hay ninguna accion que revertir.")
 
         use_rewind_scroll(self.player.inventory, self.history)
+        self._invalidate_routes()
         self._log("Usas un pergamino de retroceso. El tiempo vuelve atras.")
 
         return ActionResult(True, "Usas un pergamino de retroceso.")
@@ -687,6 +695,60 @@ class Game:
         elif event.event_type == TRAP_REARM:
             self._rearm_trap(event.room_id, event.instance_id)
 
+    def _invalidate_routes(self):
+        """Olvida el calculo compartido de rutas (§5.2).
+
+        Se llama donde cambia lo unico de lo que ese calculo depende: la sala
+        del jugador y el estado de las puertas. El movimiento de un cazador,
+        la muerte de un actor y un cambio de velocidad no lo invalidan, porque
+        ninguno puede cambiar la respuesta.
+        """
+        self._routes = None
+
+    def _open_exits_of(self, room_id):
+        """Vecinas alcanzables de una sala: (id, costo, salida).
+
+        Solo las salidas cuya puerta esta abierta en este instante, porque un
+        enemigo no abre puertas cerradas (§2.5).
+        """
+        neighbours = []
+
+        for exit_ in self.room_map.room(room_id).exits():
+            if exit_.door.is_open:
+                neighbours.append((exit_.destination, exit_.cost, exit_))
+
+        return neighbours
+
+    def _routes_towards_player(self):
+        """Costos minimos desde la sala del jugador, para los cazadores.
+
+        Se busca una sola vez desde la sala del jugador y sirve a todos los
+        cazadores activos: el grafo no tiene direccion, asi que la distancia
+        desde el jugador es la distancia hasta el jugador. El corte es el
+        rango mayor entre los cazadores activos; cada uno compara despues su
+        propia distancia contra su propio rango.
+        """
+        if self._routes is not None and not self.always_recompute_routes:
+            return self._routes
+
+        cut = 0
+
+        for enemy in self.enemies:
+            if enemy.behavior == Enemy.HUNTER and enemy.is_active and enemy.is_alive:
+                cut = max(cut, enemy.pursuit_range)
+
+        self.route_searches += 1
+        routes = RutasMasBaratas(self._open_exits_of, self.player.room_id, cut)
+        self._routes = routes
+
+        return routes
+
+    def _routes_for(self, enemy):
+        if enemy.behavior != Enemy.HUNTER or self.room_map is None:
+            return None
+
+        return self._routes_towards_player()
+
     def _run_enemy_turn(self, enemy):
         action, chosen_exit = enemy.decide_action(
             self.player,
@@ -694,6 +756,7 @@ class Game:
             self.state.random_generator,
             self.trail,
             self.state.clock,
+            self._routes_for(enemy),
         )
 
         if action == Enemy.ATTACK:
@@ -985,6 +1048,7 @@ class Game:
             return
 
         self.history.assign(exit_.door, "closed", True)
+        self._invalidate_routes()
         self._log(f"La puerta hacia {direction} se cierra sola.")
 
     def _rearm_trap(self, room_id, instance_id):

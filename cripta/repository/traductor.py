@@ -72,6 +72,7 @@ COMPORTAMIENTOS = (
     ("guardián", Enemy.GUARDIAN),
     ("errante", Enemy.WANDERER),
     ("rastreador", Enemy.TRACKER),
+    ("cazador", Enemy.HUNTER),
 )
 
 # Campos que permite el contrato del API (esquemas del Swagger, versión 1.0.0).
@@ -79,7 +80,7 @@ COMPORTAMIENTOS = (
 CAMPOS_COMUNES_DE_OBJETO = ("id", "nombre", "clase", "peso", "valor")
 CAMPOS_POR_CLASE = (
     (CLASE_ENEMIGO, ("id", "nombre", "clase", "vida_max", "ataque", "defensa",
-                     "velocidad", "comportamiento", "suelta")),
+                     "velocidad", "comportamiento", "suelta", "rango")),
     (Item.WEAPON, CAMPOS_COMUNES_DE_OBJETO + ("ataque_bonus",)),
     (Item.ARMOR, CAMPOS_COMUNES_DE_OBJETO + ("defensa_bonus",)),
     (Item.POTION, CAMPOS_COMUNES_DE_OBJETO + ("cura", "modificador_velocidad", "duracion")),
@@ -284,6 +285,7 @@ class Traductor:
                                          "Una colocación de enemigo")
         ficha = self._ficha_de_clase(id_tipo, (CLASE_ENEMIGO,))
         comportamiento = _comportamiento_del_modelo(ficha.get("comportamiento"), id_tipo)
+        rango = self._rango_de_cazador(ficha, id_tipo, comportamiento)
 
         soltados = []
         for posicion, id_tipo_soltado in enumerate(ficha.get("suelta") or []):
@@ -302,6 +304,7 @@ class Traductor:
                 health=colocacion.get("vida"),
                 drops=soltados,
                 regeneration=0,  # el contrato del API no tiene campo de regeneración (S13)
+                pursuit_range=rango,
             )
         except (KeyError, ValueError, TypeError) as error:
             raise ErrorDatosCripta(f"Datos inválidos para el enemigo {id_instancia} ({id_tipo}): {error}") from error
@@ -390,6 +393,35 @@ class Traductor:
             self._avisar_campos_desconocidos(ficha, campos_conocidos_de_la_clase(clase),
                                              f"La ficha {id_tipo}")
         return ficha
+
+    def _rango_de_cazador(self, ficha, id_tipo, comportamiento):
+        """Rango de la ficha de un cazador (§3.2, §4.1).
+
+        Un cazador sin rango, o con un rango que no es entero mayor o igual
+        que 0, es un dato inválido de la cripta: no se sustituye por un valor
+        por omisión, porque eso escondería el error.
+        """
+        declarado = ficha.get("rango")
+
+        if comportamiento != Enemy.HUNTER:
+            if declarado is not None:
+                self.avisos.append(
+                    f"La ficha {id_tipo} declara rango sin ser cazador; se ignora."
+                )
+            return 0
+
+        if declarado is None:
+            raise ErrorDatosCripta(
+                f"La ficha de cazador {id_tipo} no declara rango."
+            )
+
+        if isinstance(declarado, bool) or not isinstance(declarado, int) or declarado < 0:
+            raise ErrorDatosCripta(
+                f"El rango de la ficha de cazador {id_tipo} debe ser un entero "
+                f"mayor o igual que 0: {declarado!r}."
+            )
+
+        return declarado
 
     def _avisar_campos_desconocidos(self, datos, campos_conocidos, que_dato_es):
         """Anota un aviso por cada campo que no está en campos_conocidos.

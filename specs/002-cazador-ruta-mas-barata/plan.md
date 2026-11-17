@@ -145,6 +145,60 @@ Las cuatro entran en `--bench`.
 
 **Qué se reporta si el resultado no es el esperado**: si recalcular siempre resulta competitivo, se reporta tal cual y se discute quedarse con lo simple. La constitución pide un número incómodo documentado antes que uno favorable sin respaldo, y en esta capacidad el resultado honesto puede ser que la cripta de prueba es demasiado pequeña para que la diferencia importe.
 
+### Resultado de las mediciones
+
+Hechas el 2026-11-16, en Python 3.14.6 sobre Windows 11, con criptas sintéticas deterministas por semilla.
+
+**1. El corte por rango (FR-017, SC-005).** Un cazador de rango 300, decidiendo en criptas de tamaño creciente:
+
+| Cripta | Por decisión |
+| --- | ---: |
+| 60 salas | 0.0048 ms |
+| 240 salas | 0.0048 ms |
+| 600 salas | 0.0049 ms |
+| 600 salas, sin corte efectivo | **1.5588 ms** |
+
+Plano, como predecía el plan: cuadruplicar y decuplicar la cripta no mueve la cifra. La última fila es la que da sentido a las otras tres: sin el corte, la misma decisión en la misma cripta cuesta **320 veces más**. El rango no es solo una regla del juego, es lo que hace barata la decisión.
+
+**Esta medición hubo que corregirla.** La primera versión salió plana también *sin* corte, y el motivo no era bueno: la cripta sintética de la primera parte nace con una puerta cerrada de cada tres, así que la región alcanzable desde la sala del jugador es de dos o tres salas por grande que sea la cripta. No se estaba midiendo el corte por rango sino el bloqueo por puertas. Se agregó al generador la opción de no cerrar ninguna puerta y se volvió a medir. Queda anotado porque es exactamente el tipo de medición que parece confirmar la hipótesis sin haberla probado.
+
+**2. Compartir el cálculo frente a uno por cazador (SC-008).** Cincuenta cazadores persiguiendo al mismo jugador en una cripta de 60 salas:
+
+| Escenario | Compartido | Uno por cazador | Veces |
+| --- | ---: | ---: | ---: |
+| Rangos iguales (300) | 0.0120 ms | 0.2377 ms | 19.8× |
+| Rangos desiguales (300 y sin tope) | 0.2025 ms | 3.8722 ms | 19.1× |
+
+Compartir gana por un orden de magnitud en los dos casos, que es lo que se esperaba: cincuenta búsquedas pasan a ser una.
+
+**El sobrecosto que FR-017 obliga a reportar está en la primera columna.** Con rangos desiguales, el cálculo compartido cuesta 0.2025 ms contra 0.0120 ms con rangos iguales: **diecisiete veces más**, porque el corte es el rango mayor y los cuarenta y nueve cazadores de rango pequeño pagan por la región del que no tiene tope. El dato es real y hay que decirlo. Lo que lo deja aceptable es que la alternativa, un cálculo por cazador, cuesta 3.8722 ms en ese mismo escenario: compartir con sobrecosto sigue siendo diecinueve veces más barato que no compartir.
+
+**3. Puertas que cambian mucho y puertas que casi nunca cambian (SC-007).** Diez cazadores sin tope de rango, 300 decisiones del jugador:
+
+| Cripta | Modo | Tiempo | Búsquedas |
+| --- | --- | ---: | ---: |
+| Puertas que cambian mucho | compartido | 0.0187 s | 297 |
+| Puertas que cambian mucho | recalcular siempre | 0.0557 s | 3902 |
+| Puertas que casi no cambian | compartido | 0.0557 s | 247 |
+| Puertas que casi no cambian | recalcular siempre | 0.6047 s | 4120 |
+
+**La columna de búsquedas desmiente la mitad de lo que el plan esperaba, y es el hallazgo de esta capacidad.** El plan suponía que el ahorro vendría de reutilizar el cálculo entre turnos cuando las puertas están quietas. No es así: 297 búsquedas en 300 decisiones significa que el cálculo se invalida **casi en cada decisión del jugador**, y con las puertas quietas también, 247 de 300. La razón es que el jugador se mueve, y moverse invalida.
+
+Entonces el ahorro real no es la reutilización entre turnos: es **compartir una búsqueda entre los diez cazadores del mismo instante**. De 3902 búsquedas a 297 es casi exactamente dividir por el número de cazadores, no por la quietud de las puertas.
+
+Eso cambia cuál es la justificación de la decisión, y conviene decirlo así en la defensa: lo que vale no es la caché, es buscar desde el jugador en vez de desde cada cazador. Si el cálculo se hiciera desde cada cazador, compartirlo sería imposible y este ahorro no existiría.
+
+De paso explica la fila tercera: con las puertas quietas el modo compartido cuesta *más* (0.0557 s contra 0.0187 s) aunque haga *menos* búsquedas, porque con las puertas abiertas la región alcanzable es toda la cripta y cada búsqueda es mucho más cara.
+
+**4. El ciclo de eventos con cazadores (FR-018, SC-006).**
+
+| Escenario | Por ciclo | Del límite de 20 ms |
+| --- | ---: | ---: |
+| Sin cazadores (capacidad 001) | 0.1897 ms | 0.95 % |
+| Con 50 cazadores activos | 0.1854 ms | 0.93 % |
+
+Cincuenta cazadores persiguiendo al jugador no mueven la aguja del ciclo completo: la diferencia está dentro del ruido de la medición. Con el cálculo compartido, la persecución de cincuenta enemigos cuesta 0.012 ms por instante, frente a los 0.185 ms que cuesta el ciclo entero. SC-006 se cumple con dos órdenes de magnitud de margen.
+
 ## Riesgos
 
 - **La invalidación incompleta es el riesgo grande de esta capacidad.** Un evento que cambia el grafo y no invalida produce una decisión distinta de la del cálculo desde cero, y FR-011 se rompe sin que ninguna partida se vea rara. Por eso la prueba de equivalencia compara contra el modo recalcular siempre en vez de contra valores esperados escritos a mano.
