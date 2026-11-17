@@ -1979,3 +1979,21 @@ Continúa donde te detuviste: los pasos 3, 4 y 5 del prompt anterior. Mismas reg
 Uso en el proyecto: `cripta/main.py`, `cripta/controller/application.py` (`show_instant`, parámetros `copias_cada` y `hasta`), `cripta/view/console_view.py` (`lineas_de_historia`), las pruebas `tests/test_banderas_linea_de_tiempo.py` y `tests/test_vista_sala_actual.py`, `cripta/docs/DECISIONES.md` §5.3, `cripta/README.md`, `specs/003-niebla-ir-a/plan.md` y `tasks.md`.
 
 Cambios realizados por el estudiante: Para imprimir el resumen de `--hasta` sin instanciar la vista, el formato que ya tenía `show_history` se sacó a una función del módulo de la vista, y el método la usa igual; las pruebas de la vista y de la línea de tiempo pasaron sin cambios. Una prueba de `--hasta` reemplaza la vista por una que falla si alguien la crea, para comprobar de verdad que no se instancia. Las pruebas que dependen de un movimiento usan una copia por acción, porque con copias espaciadas aparece el defecto de reconstrucción ya reportado; ese defecto quedó como nota visible en el README y en las tareas. Al revisar `--bench` contra §6.3 faltan dos cosas que son de otros: la resolubilidad, que nadie tomó, y la alternativa de la línea de tiempo sin puntos de control. En el cierre se cuidaron tres cosas: la sección §5.3 estaba como borrador delante de §5.1 y se movió a su lugar; las mediciones nuevas, de WSL con Python 3.12, se separaron de las de Windows con Python 3.11 en vez de mezclarlas en una tabla; y cada cifra del documento se comparó con la salida de las tres corridas, lo que llevó a corregir dos frases que decían más de lo medido (cuántas corridas eran de `--bench` completo y cuánto cuesta el índice frente a una búsqueda). También se encontró que el plan del cazador ya sabía que la cripta de referencia es cripta-06, de 300 salas: se dejó dicho sin interpolar un número entre las cuadrículas de 100 y 400 salas. La auditoría encontró que FR-021 no tenía prueba propia en esta capacidad y se agregó una con el motor real. Un comando de la terminal se quedó esperando entrada y la nota de la auditoría llegó en un commit aparte, en vez de reescribir el anterior.
+
+### 2.48 Renombrar la especificación de la niebla de guerra a 005
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Aplicar la numeración que acordó el grupo (001 a 003 de Carlos, 004 de Mauricio, 005 de esta capacidad) renombrando `specs/003-niebla-ir-a` a `specs/005-niebla-ir-a`, y subir la rama.
+
+Prompts utilizados:
+
+```text
+Renombra mi spec de specs/003-niebla-ir-a a specs/005-niebla-ir-a y sube la rama. [...] PASO 1. Renombra con git mv (para conservar el historial), no copiando. PASO 2. Actualiza las referencias a la ruta y al nombre [...] NO cambies nada que diga "003-linea-de-tiempo". NO modifiques las entradas anteriores de PROMPTS_LLM.md: es un registro histórico [...] Si encuentras menciones sueltas tipo "spec 003" o "003" sin el nombre, muéstrame la lista y cambia solo las que sean claramente de niebla; reporta las ambiguas sin tocarlas. [...] PASO 5. Haz git push normal a origin/Parte_2-niebla-ir-a. NO uses --force.
+```
+
+Uso en el proyecto: `specs/005-niebla-ir-a/` (renombrada con `git mv`), las referencias en `spec.md`, `plan.md`, `tasks.md`, `cripta/docs/DECISIONES.md`, `cripta/README.md`, `cripta/benchmark/bench_mapa_conocido.py` y los docstrings de quince archivos de pruebas, y `.specify/feature.json`, que git ignora.
+
+Cambios realizados por el estudiante: Solo se cambiaron identificadores y rutas: 25 apariciones de `003-niebla-ir-a` en 20 archivos versionados, más `.specify/feature.json`. Ninguna regla, requisito ni lógica cambió, y las pruebas dieron lo mismo antes y después: 1205, con los dos fallos esperados de los escenarios 7 y 8. Las entradas anteriores de este registro conservan la ruta vieja a propósito, porque cuentan lo que se hizo en su momento. La única mención suelta de esta capacidad por número está en `structures/rutas_mas_baratas.py` («de la capacidad 003»), que es de Carlos: no se tocó y queda para que él la actualice. Las demás apariciones de «003» son números de requisito (FR-003, SC-003) o datos de mediciones.
