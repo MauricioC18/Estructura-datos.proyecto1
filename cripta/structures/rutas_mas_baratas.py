@@ -38,6 +38,16 @@ Estructuras, todas propias
     Distancias y salas asentadas: TablaHash. No se usa dict como índice ni
         set, que el proyecto prohíbe (P1 §7).
 
+Parada anticipada (parar_en), de la capacidad 003
+    Quien solo necesita el primer paso desde una sala puede pedir que la
+    busqueda se detenga al asentar esa sala. El resultado es el mismo: las
+    vecinas que cumplen costo + distancia = d tienen distancia menor que d,
+    porque todo costo es al menos 1, asi que ya estan asentadas; y una no
+    asentada tiene distancia de al menos d, asi que nunca cumple la igualdad.
+    Detenida la busqueda, solo las salas asentadas tienen distancia
+    definitiva, y preguntar por cualquier otra es un error en vez de una
+    respuesta a medias.
+
 Corte por rango
     Se deja de expandir en cuanto la distancia pasa del corte, así que el
     trabajo depende de la región dentro del corte y no del tamaño de la
@@ -120,11 +130,37 @@ class RutasMasBaratas:
         return self._corte
 
     def distancia_a(self, id_sala):
-        """Costo mínimo desde el origen, o None si quedó fuera del corte."""
+        """Costo mínimo desde el origen, o None si quedó fuera del corte.
+
+        Con una búsqueda detenida por parar_en, solo las salas asentadas
+        tienen distancia definitiva: las demás pueden tener una tentativa, que
+        es mayor o igual que la verdadera. Pedirla es un error, igual que
+        pedir el primer paso, para que esta clase nunca devuelva una
+        distancia que no sea definitiva.
+        """
+        self._exigir_definitiva(id_sala)
+
         return self._distancias.obtener(id_sala)
 
     def alcanza(self, id_sala):
+        self._exigir_definitiva(id_sala)
+
         return self._distancias.contiene(id_sala)
+
+    def se_detuvo(self):
+        """True si la búsqueda paró por parar_en antes de agotar la región."""
+        return self._se_detuvo
+
+    def esta_asentada(self, id_sala):
+        """True si la distancia de esa sala es definitiva."""
+        return self._asentadas.contiene(id_sala)
+
+    def _exigir_definitiva(self, id_sala):
+        if self._se_detuvo and not self._asentadas.contiene(id_sala):
+            raise ValueError(
+                f"La búsqueda se detuvo en la sala {self._parar_en} y la sala "
+                f"{id_sala} no quedó asentada: su distancia no es definitiva."
+            )
 
     def primer_paso_desde(self, id_sala):
         """Primera salida de la ruta más barata de id_sala hacia el origen.
@@ -136,11 +172,7 @@ class RutasMasBaratas:
         costo mínimo, gana la de menor id; entre dos salidas abiertas hacia
         esa misma vecina, la más barata.
         """
-        if self._se_detuvo and not self._asentadas.contiene(id_sala):
-            raise ValueError(
-                f"La búsqueda se detuvo en la sala {self._parar_en} y la sala "
-                f"{id_sala} no quedó asentada: su distancia no es definitiva."
-            )
+        self._exigir_definitiva(id_sala)
 
         distancia = self._distancias.obtener(id_sala)
 
