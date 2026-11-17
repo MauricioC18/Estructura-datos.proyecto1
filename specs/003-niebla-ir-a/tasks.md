@@ -136,9 +136,9 @@ Formato: `- [ ] Tnnn [P] [Hn] [AB] [BLOQUEADA: …] Descripción, en archivo —
 
 ## Fase 7 — Documentación y cierre
 
-- [ ] T045 Escribir la sección de §5.3 en `cripta/docs/DECISIONES.md` con los seis apartados de P1 §8, enlazando la especificación y el plan, e indicando si la decisión final coincide con la del plan y, si no, qué medición la cambió (§7.1) (depende de T044) — FR-033, FR-034, FR-035, FR-036
-- [ ] T046 [P] Agregar `mapa` e `ir a <sala>` a la tabla de comandos de `cripta/README.md`, y cómo correr las pruebas de aceptación de esta capacidad — FR-018, FR-022
-- [ ] T047 Correr la suite completa desde `cripta/` y comprobar que solo cambiaron las pruebas que admite SC-009 — FR-013, FR-017
+- [ ] T045 Escribir la sección de §5.3 en `cripta/docs/DECISIONES.md` con los seis apartados de P1 §8, enlazando la especificación y el plan, e indicando si la decisión final coincide con la del plan y, si no, qué medición la cambió (§7.1) (depende de T044) — FR-033, FR-034, FR-035, FR-036. **Avance**: hay un borrador con los seis apartados y la evidencia sintética; faltan la decisión sobre FR-036, la fila de la cripta de referencia y la frecuencia medida en partida
+- [X] T046 [P] Agregar `mapa` e `ir a <sala>` a la tabla de comandos de `cripta/README.md`, y cómo correr las pruebas de aceptación de esta capacidad — FR-018, FR-022
+- [X] T047 Correr la suite completa desde `cripta/` y comprobar que solo cambiaron las pruebas que admite SC-009 — FR-013, FR-017
 
 ---
 

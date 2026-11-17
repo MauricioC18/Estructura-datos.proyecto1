@@ -59,6 +59,16 @@ python -m unittest discover -s tests -t . -v
 
 En Windows también funciona `py` en lugar de `python`.
 
+### Pruebas de aceptación por capacidad
+
+Cada prueba cita en su docstring el requisito (`FR-xxx`) de la especificación que comprueba (§2.5). Para correr solo las de una capacidad, también desde `cripta/`:
+
+| Capacidad | Especificación | Comando |
+| --- | --- | --- |
+| Niebla de guerra e «ir a» | `specs/003-niebla-ir-a/spec.md` | `python -m unittest discover -s tests -t . -p "test_mapa_conocido.py"`, y lo mismo con `test_viaje.py`, `test_ir_a.py` y `test_vista_mapa_conocido.py` |
+
+Las mediciones de esta capacidad están en la suite «Mapa conocido y viaje ir a» de `python main.py --bench`.
+
 ## Cómo jugar
 
 Desde la carpeta `cripta/`:
@@ -97,6 +107,8 @@ Comandos dentro de la partida (con `ayuda` se ven en pantalla):
 | `retroceder` | Usar un pergamino de retroceso |
 | `guardar <archivo>` | Guardar la partida en el archivo binario indicado |
 | `cargar <archivo>` | Deja la partida actual y continúa la guardada, con una bitácora nueva. Si el archivo no sirve, se sigue en la partida actual |
+| `mapa` | Ver las salas exploradas, sus salidas y las salas avistadas (niebla de guerra, §3.3). *Pendiente*: se activa cuando el motor avise al mapa conocido |
+| `ir a <sala>` | Viajar a una sala explorada por la ruta conocida más barata, un movimiento por paso (§3.4); al detenerse dice por qué. *Pendiente*: hasta que el motor avise al mapa conocido, responde que la partida todavía no lo tiene |
 | `salir` | Terminar la sesión |
 
 Al terminar una partida el programa muestra el resultado, la registra en la tabla de puntajes si se ganó o se perdió, y muestra el reporte de red: solicitudes realizadas, presupuesto de la cripta, aciertos y fallos de caché (§5.1).

@@ -1978,6 +1978,100 @@ sin reproducir ninguna acción.
 
 ---
 
+## 5.3 El mapa conocido (segunda parte) — BORRADOR
+
+> **Borrador.** Falta lo que depende de otros integrantes y una decisión pendiente sobre FR-036; está marcado en cada apartado. Proviene de la especificación [`specs/003-niebla-ir-a/spec.md`](../../specs/003-niebla-ir-a/spec.md) y del plan [`specs/003-niebla-ir-a/plan.md`](../../specs/003-niebla-ir-a/plan.md), que tiene el detalle de cada alternativa y la tabla completa de mediciones.
+
+### Problema
+
+Con la niebla de guerra, el jugador ya no ve la cripta completa: cada sala está, para él, explorada, avistada o desconocida, y de cada puerta recuerda el estado de la última vez que la vio (§3.3). Ese conocimiento es estado del juego, así que el pergamino lo revierte, la partida lo guarda y la línea de tiempo lo reconstruye. Sobre él se calcula el viaje automático «ir a» (§3.4).
+
+Las operaciones y su frecuencia, según §5.3:
+- **Consultar** si una sala está explorada, avistada o desconocida, y qué se recuerda de una puerta. Ocurre en cada vista, en cada paso de «ir a» y, durante la búsqueda, por cada vecina examinada. Es la operación más frecuente.
+- **Explorar.** Una sala por movimiento; hasta cinco con la antorcha.
+- **Revertir** los cambios de una acción con el pergamino.
+- **Calcular un paso de «ir a»**: una búsqueda de costo mínimo sobre el mapa conocido.
+
+La frecuencia real de cada una en una partida **todavía no está medida**: hace falta que el motor dé los avisos (T011–T013).
+
+### Alternativas consideradas
+
+| Decisión | Elegida | Descartada, y por qué |
+| --- | --- | --- |
+| Dónde vive el conocimiento | Estructura propia, separada del mapa de salas | Atributos en las salas y las puertas: mezclan el mapa real con lo que sabe el jugador, cambian el archivo de partida y obligan a recorrer la cripta entera para copiar el conocimiento |
+| ¿Está explorada? | `TablaHash` por id de sala | Lista recorrida en cada consulta: O(k). **Medida** |
+| ¿Está avistada? | Contador por sala de salidas de exploradas que llevan a ella | Recalcular todas las avistadas al explorar: O(mapa conocido). **Medida** |
+| Clave de una puerta | Entero: id de `room_a` × 4 + dirección | Texto `"a-b"`: no es única cuando dos salidas unen las mismas salas. **Medida** (ver Evidencia) |
+| Reversión | Anotar en el historial la inversa de cada cambio | Copiar el conocimiento antes de cada acción: es copia de estado por acción. **Medida** |
+| Ruta de «ir a» | Reutilizar la búsqueda del cazador con un proveedor de vecinas conocidas | Una búsqueda propia (duplicaría el desempate); recorrido en anchura (cuenta salas, no costo); búsqueda sin montículo. **Medida** |
+| Recalcular o reutilizar la ruta | Recalcular antes de cada paso | Reutilizar la búsqueda del viaje. **Medida** |
+
+### Decisión
+
+El mapa conocido (`structures/mapa_conocido.py`) guarda solo lo que no se deduce del esqueleto: las salas exploradas y el recuerdo de cada puerta, en `TablaHash` con claves enteras. Mantiene además un contador de avistamiento por sala y el orden de exploración como pila (una `list`). El nombre, las salidas y los costos de una sala explorada se leen del mapa de salas, porque no cambian durante la partida.
+
+Cada cambio anota su inversa en el historial reversible que ya existía, como el rastro del jugador. Si nada cambia, no anota nada.
+
+«ir a» tiene sus reglas en el modelo (`model/viaje.py`) y su bucle de pasos en el controlador. Cada paso pasa por el mismo camino que un `mover` escrito a mano.
+
+**¿Coincide con el `plan.md` original?** En las estructuras, sí. En dos puntos la evidencia contradice lo que el plan esperaba y **la decisión está pendiente del grupo**:
+1. la clave de puerta (ver Evidencia, medición 2);
+2. el límite de FR-036 (ver Evidencia, medición 5).
+
+### Análisis de complejidad
+
+*k* = salas exploradas.
+
+| Operación | Costo |
+| --- | --- |
+| Estado de una sala | O(1) promedio |
+| Puerta recordada | O(1) promedio, más la búsqueda de la dirección, a lo sumo 4 salidas |
+| Entrar a una sala | O(1); con antorcha, a lo sumo 5 salas y 20 contadores |
+| Revertir una acción | O(cambios de la acción) |
+| Paso de «ir a» | O((k + e) log k), con *e* ≤ 4*k* salidas |
+| Memoria | O(k + puertas recordadas) |
+
+### Evidencia empírica
+
+Medida con `python main.py --bench` (suite «Mapa conocido y viaje ir a») el 2026-11-16, en Python 3.11.3 sobre Windows. Criptas sintéticas en cuadrícula de 100, 400 y 1600 salas con costos deterministas por semilla. El paquete sin conexión todavía no contiene la cripta de referencia.
+
+| Medición | 100 salas | 400 salas | 1600 salas |
+| --- | ---: | ---: | ---: |
+| 1. Estado de una sala, tabla / lista | 0.51 / 26.42 µs | 0.55 / 109.38 µs | 0.53 / 508.11 µs |
+| 2. Puerta recordada, entera / texto | 2.33 / 1.06 µs | 2.35 / 1.09 µs | 2.52 / 1.12 µs |
+| 3. Explorar una sala más, contadores / recalcular | 21.62 / 222.13 µs | 20.17 / 882.34 µs | 20.77 / 3708.92 µs |
+| 4. Antorcha y revertir, anotaciones / copia | 74.08 / 835.54 µs | 69.39 / 3051.14 µs | 75.09 / 13882.56 µs |
+| 5. Un paso de «ir a», elegida / sin montículo | 2.60 / 4.20 ms | 11.55 / 32.01 ms | 61.44 / 174.91 ms |
+| 5. Por paso, reutilizando la búsqueda del viaje | 0.15 ms | 0.37 ms | 0.65 ms |
+
+Lo que muestran:
+- Las mediciones 1, 3 y 4 respaldan FR-033, FR-034 y FR-035: la elegida queda plana y la descartada crece con el mapa conocido.
+- **Medición 2, contra lo esperado**: la clave entera es plana, pero cuesta el doble que la de texto, porque hay que buscar por qué dirección sale la puerta. La de texto sigue siendo incorrecta, así que no es reemplazo. Se reporta tal cual.
+- **Medición 5, contra lo esperado**: la elegida **no cumple los 5 ms de FR-036 desde 400 salas**.
+  - Reutilizar la búsqueda durante el viaje baja el promedio por paso, pero no el primer paso de cada viaje.
+  - Un experimento aparte midió la misma búsqueda con las vecinas reales: 1.40, 6.64 y 30.72 ms. La búsqueda misma supera el límite en mapas medianos.
+- **Falta**: la fila de la cripta de referencia. Sin su tamaño no se puede decir si FR-036 se cumple en la condición de §6.1.
+
+### Límites conocidos
+
+- Un paso de «ir a» con el mapa conocido completo pasa de 5 ms en mapas de varios cientos de salas (medición 5). Si la cripta de referencia es de ese tamaño, la decisión tiene que cambiar.
+- Explorar, consultar y revertir dependen de que el motor avise de cada entrada y de cada cambio de puerta. Un camino del motor que cambie una puerta sin avisar dejaría el recuerdo desactualizado sin ningún error. **Los avisos todavía no existen** (T011–T013, de Carlos).
+- La búsqueda supone que cada paso entre salas se puede recorrer en los dos sentidos, igual que el cazador. El formato de datos admite pasos de un solo sentido. En `cripta-01` no hay ninguno; falta comprobarlo en las demás criptas.
+
+### Pruebas
+
+| Archivo | Qué cubre | Pruebas |
+| --- | --- | ---: |
+| `tests/test_mapa_conocido.py` | Tres estados, memoria de puertas, antorcha, reversión, vecinas conocidas, exportar e importar | 48 |
+| `tests/test_viaje.py` | Reglas del viaje en el modelo: aceptar la orden, siguiente paso, motivos de parada | 26 |
+| `tests/test_ir_a.py` | Viaje completo por el controlador, bitácora y reproducción, paradas, pergamino | 23 |
+| `tests/test_vista_mapa_conocido.py` | Vista y presentación del mapa conocido | 10 |
+| `tests/test_commands.py`, `tests/test_replay_log.py` | Comandos `mapa` e `ir a`, comentario en la bitácora | 10 |
+
+**Falta** la prueba del caso del Apéndice B de la puerta recordada abierta que estaba cerrada, con el motor real (T029). Necesita los avisos del motor.
+
+---
+
 ---
 
 ## El reloj virtual y la numeración de eventos
