@@ -19,6 +19,12 @@ Qué se mide y contra qué
        completa sin mejoras, que queda fija como referencia, y con una
        búsqueda que escoge el mínimo recorriendo una lista, sin montículo.
        FR-036.
+    6. Salidas de un solo sentido (plan, alternativa 9). Tiempo y memoria de
+       armar el índice de salidas entrantes, cuántas salidas entran a cada
+       sala, y la búsqueda completa expandida por las salidas que entran
+       contra la de hoy, por las que salen. En la cuadrícula simétrica y en
+       una variante con la misma semilla donde una de cada cuatro uniones
+       existe en un solo sentido. FR-036.
 
 Criptas
     Sintéticas: cuadrículas de tres tamaños crecientes, con el costo de cada
@@ -36,6 +42,7 @@ el programa no las usa.
 """
 import random
 import time
+import tracemalloc
 
 from adapters.fuente_offline import FuenteOffline
 from benchmark.utilidades_medicion import Measurement, calentar_procesador
@@ -390,6 +397,94 @@ def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True):
     return primero, por_paso, completa, lineal, len(camino)
 
 
+# ----------------------------------------------------------------------
+# 6. Salidas de un solo sentido (plan, alternativa 9)
+# ----------------------------------------------------------------------
+
+PROPORCION_UN_SENTIDO = 0.25
+
+
+def cuadricula_un_sentido(lado, semilla=SEMILLA, proporcion=PROPORCION_UN_SENTIDO):
+    """La misma cuadrícula, con los mismos costos, pero una de cada cuatro
+    uniones (en promedio) existe solo hacia el E o hacia el N, sin vuelta.
+
+    Como toda unión se puede recorrer hacia el E y hacia el N, siempre hay
+    ruta de la primera sala a la última, que es el recorrido de la medición 5.
+    """
+    azar = random.Random(semilla)
+    sentido = random.Random(semilla + 1)
+    room_map = RoomMap()
+
+    for numero in range(1, lado * lado + 1):
+        room_map.add(Room(numero, f"Sala {numero}"))
+
+    for fila in range(lado):
+        for columna in range(lado):
+            numero = fila * lado + columna + 1
+
+            if columna + 1 < lado:
+                _unir_quizas_un_sentido(room_map, numero, numero + 1, "E", "O", azar,
+                                        sentido.random() < proporcion)
+            if fila + 1 < lado:
+                _unir_quizas_un_sentido(room_map, numero, numero + lado, "N", "S", azar,
+                                        sentido.random() < proporcion)
+
+    return room_map
+
+
+def _unir_quizas_un_sentido(room_map, id_a, id_b, ida, vuelta, azar, un_sentido):
+    puerta = Door(id_a, id_b, cost=azar.randint(1, COSTO_MAXIMO))
+    room_map.room(id_a).add_exit(Exit(ida, id_b, puerta))
+
+    if not un_sentido:
+        room_map.room(id_b).add_exit(Exit(vuelta, id_a, puerta))
+
+
+def medir_indice_de_entrantes(room_map):
+    """Tiempo y memoria de armar el índice de salidas entrantes, y cuántas
+    salidas entran a cada sala: (segundos, bytes, mínimo, promedio, máximo)."""
+    segundos = mejor_tiempo(lambda: MapaConocido(room_map)._armar_entrantes())
+
+    mapa = MapaConocido(room_map)
+    tracemalloc.start()
+    antes = tracemalloc.get_traced_memory()[0]
+    mapa._armar_entrantes()
+    despues = tracemalloc.get_traced_memory()[0]
+    tracemalloc.stop()
+
+    cantidades = [len(mapa._entrantes.obtener(id_sala, [])) for id_sala in room_map.room_ids()]
+    promedio = sum(cantidades) / len(cantidades)
+
+    return segundos, despues - antes, min(cantidades), promedio, max(cantidades)
+
+
+def medir_busqueda_con_entrantes(room_map):
+    """La búsqueda completa de «ir a» desde el destino, expandida por las
+    salidas que salen (como hoy) y por las que entran, con el primer paso por
+    las que salen (como quedará). Sin parada anticipada en ninguna de las
+    dos: la búsqueda compartida todavía no acepta la parada junto con el
+    proveedor de salidas, así que esto mide el costo del proveedor y no el
+    del paso final del viaje.
+
+    Devuelve (con salientes, con entrantes, mismo primer paso).
+    """
+    mapa = conocimiento_completo(room_map)
+    partida, destino = recorrido_de_prueba(room_map)
+    mapa.entrantes_conocidas(destino)  # el índice se arma fuera de la medición
+
+    def con_salientes():
+        return RutasMasBaratas(mapa.vecinas_conocidas, destino).primer_paso_desde(partida)
+
+    def con_entrantes():
+        return RutasMasBaratas(
+            mapa.entrantes_conocidas, destino, salidas_de=mapa.vecinas_conocidas
+        ).primer_paso_desde(partida)
+
+    mismo = con_salientes() is con_entrantes()
+
+    return mejor_tiempo(con_salientes), mejor_tiempo(con_entrantes), mismo
+
+
 def _us(segundos):
     return f"{segundos * 1e6:.2f} us"
 
@@ -442,6 +537,28 @@ def run(carpeta_sin_conexion=CARPETA_SIN_CONEXION):
             f"primer paso {_ms(primero)}; por paso en un viaje de {largo} pasos "
             f"{_ms(por_paso)}; busqueda completa {_ms(completa)}; sin monticulo {_ms(lineal)}",
         ))
+
+    for lado in LADOS:
+        for nombre, room_map in (("simetrica", cuadricula(lado)),
+                                 ("con un sentido", cuadricula_un_sentido(lado))):
+            segundos, memoria, minimo, promedio, maximo = medir_indice_de_entrantes(room_map)
+            mediciones.append(Measurement(
+                f"6. Indice de entrantes, {lado * lado} salas, {nombre}", segundos,
+                f"armarlo {_ms(segundos)}, {memoria / 1024:.1f} KiB; salidas que "
+                f"entran por sala: min {minimo}, promedio {promedio:.2f}, max {maximo}",
+            ))
+
+    for lado in LADOS:
+        for nombre, room_map in (("simetrica", cuadricula(lado)),
+                                 ("con un sentido", cuadricula_un_sentido(lado))):
+            salientes, entrantes, mismo = medir_busqueda_con_entrantes(room_map)
+            comparacion = "mismo primer paso" if mismo else "primer paso distinto"
+            mediciones.append(Measurement(
+                f"6. Busqueda completa con entrantes, {lado * lado} salas, {nombre}",
+                entrantes,
+                f"expandir por entrantes {_ms(entrantes)} contra por salientes "
+                f"{_ms(salientes)}, sin parada; {comparacion}",
+            ))
 
     reales = criptas_sin_conexion(carpeta_sin_conexion)
 
