@@ -27,6 +27,7 @@ from controller.commands import (
     HELP,
     LOAD,
     HISTORY,
+    MAP,
     QUIT,
     SAVE,
     TRAVEL,
@@ -63,6 +64,8 @@ from structures.trail import PlayerTrail
 
 
 LOG_DIRECTORY = "partidas"
+
+NO_KNOWN_MAP = "Todavia no se puede ver el mapa: la partida no tiene el mapa conocido."
 
 # Errores de datos que el programa reporta con su mensaje en vez de caerse
 # (§3.1). Todos traen un texto listo para mostrar.
@@ -517,6 +520,19 @@ def _command_loop(controller, view):
 
             view.show_travel_result(travel, command.argument)
             show = travel.steps > 0
+            continue
+
+        if command.name == MAP:
+            # Solo lee el conocimiento: no pasa por el modelo ni por la
+            # bitacora, no consume tiempo ni cambia nada (FR-019).
+            known_map = controller.known_map
+
+            if known_map is None:
+                view.show_message(NO_KNOWN_MAP)
+            else:
+                view.show_known_map(known_map_view(known_map, game.room_map))
+
+            show = False
             continue
 
         if not is_game_action(command):
