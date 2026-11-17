@@ -55,6 +55,12 @@ class Enemy(Actor):
 
     @pursuit_range.setter
     def pursuit_range(self, value):
+        """El 0 es el valor neutro de los enemigos que no son cazadores.
+
+        El minimo que el contrato del servicio declara para la ficha de un
+        cazador es 1, y eso lo exige el traductor, donde entran los datos. El
+        modelo solo exige que no sea negativo.
+        """
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             raise ValueError(
                 f"El rango de {self.actor_id} debe ser un entero mayor o igual "

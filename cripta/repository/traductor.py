@@ -398,8 +398,9 @@ class Traductor:
         """Rango de la ficha de un cazador (§3.2, §4.1).
 
         Un cazador sin rango, o con un rango que no es entero mayor o igual
-        que 0, es un dato inválido de la cripta: no se sustituye por un valor
-        por omisión, porque eso escondería el error.
+        que 1, es un dato inválido de la cripta: no se sustituye por un valor
+        por omisión, porque eso escondería el error. El mínimo es 1 porque así
+        lo declara el contrato del servicio 1.1.0.
         """
         declarado = ficha.get("rango")
 
@@ -415,10 +416,10 @@ class Traductor:
                 f"La ficha de cazador {id_tipo} no declara rango."
             )
 
-        if isinstance(declarado, bool) or not isinstance(declarado, int) or declarado < 0:
+        if isinstance(declarado, bool) or not isinstance(declarado, int) or declarado < 1:
             raise ErrorDatosCripta(
                 f"El rango de la ficha de cazador {id_tipo} debe ser un entero "
-                f"mayor o igual que 0: {declarado!r}."
+                f"mayor o igual que 1: {declarado!r}."
             )
 
         return declarado
