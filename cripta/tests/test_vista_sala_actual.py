@@ -7,7 +7,8 @@ import unittest
 
 from controller.application import ExitView, room_view
 from structures.mapa_conocido import ABIERTA, CERRADA
-from tests.test_ir_a import conectar, mapa_de_salas
+from model.enemy import Enemy
+from tests.test_ir_a import conectar, guardian, mapa_de_salas
 from tests.test_niebla import antorcha, partida_con_niebla
 from view.console_view import ConsoleView
 
@@ -91,6 +92,31 @@ class TestSalaActual(unittest.TestCase):
         self.assertIn("E->hay algo en esa direccion (costo 40)", texto)
         self.assertIn("S->hay algo en esa direccion (costo 100) (cerrada)", texto)
         self.assertNotIn("->2", texto)
+
+
+class TestCazadorEnLaVista(unittest.TestCase):
+
+    def test_el_cazador_se_distingue_con_el_motor_real(self):
+        """FR-021: en la sala del jugador, el cazador lleva su marca y el
+        guardián no, partiendo del estado visible que arma el motor."""
+        room_map = mapa_de_salas(1, 2)
+        conectar(room_map, 1, 2, "E")
+        cazador = Enemy(
+            actor_id="e-1", name="Sabueso", max_health=10, attack=1, defense=0,
+            speed=100, room_id=1, behavior=Enemy.HUNTER, pursuit_range=300,
+        )
+        game, _ = partida_con_niebla(room_map, [cazador, guardian(1, "e-2")])
+        salida = io.StringIO()
+
+        ConsoleView(output=salida).show_state(game.visible_state())
+
+        lineas = salida.getvalue().split("\n")
+        del_cazador = [linea for linea in lineas if "e-1" in linea]
+        del_guardian = [linea for linea in lineas if "e-2" in linea]
+        self.assertEqual(len(del_cazador), 1)
+        self.assertEqual(len(del_guardian), 1)
+        self.assertIn("cazador", del_cazador[0])
+        self.assertNotIn("cazador", del_guardian[0])
 
 
 if __name__ == "__main__":
