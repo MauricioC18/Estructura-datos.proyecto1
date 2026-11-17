@@ -106,11 +106,11 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 ### Casos borde
 
 - **Un cazador y el jugador en regiones incomunicadas** de la cripta: no existe ruta, así que espera, por grande que sea su rango.
-- **El jugador y el cazador en la misma sala con rango 0**: compartir sala tiene prioridad sobre todo lo demás, así que ataca. El rango solo limita la persecución.
-- **Rango 0 y el jugador en otra sala**: cualquier ruta cuesta al menos 1, así que nunca persigue; se queda esperando. Es una ficha válida, no un error.
+- **El jugador y el cazador en la misma sala con el rango mínimo**: compartir sala tiene prioridad sobre todo lo demás, así que ataca. El rango solo limita la persecución.
+- **Rango 1 y una salida de costo 100**: cualquier ruta cuesta más que el rango, así que nunca persigue; se queda esperando. Es una ficha válida, no un error. El rango 1 es el mínimo que el contrato del servicio admite.
 - **Rango enorme**, mayor que el costo de cruzar la cripta entera: persigue siempre que exista ruta. No hay tope.
 - **Varios cazadores en la misma sala**: cada uno decide por su cuenta en su propio turno y todos llegan al mismo resultado, porque la regla de desempate no depende de quién pregunta.
-- **Una ficha de cazador sin el campo de rango, o con un rango que no es entero mayor o igual que 0**: es un dato inválido de la cripta y se reporta como tal, sin inventar un valor por omisión que oculte el error.
+- **Una ficha de cazador sin el campo de rango, o con un rango que no es entero mayor o igual que 1**: es un dato inválido de la cripta y se reporta como tal, sin inventar un valor por omisión que oculte el error. El contrato declara el campo como nulable porque el mismo esquema sirve a los cuatro comportamientos y los otros tres no lo traen; un cazador sí lo trae siempre.
 - **El cazador llega a la sala del jugador en su movimiento**: ese turno fue un movimiento; atacar es decisión del turno siguiente, cuando ya comparte sala.
 - **El jugador muere o la partida termina** mientras un cazador tiene turno programado: se aplica lo mismo que a cualquier enemigo con turno programado, sin regla nueva.
 - **Dos salidas abiertas distintas que llevan a la misma sala vecina con costos distintos**: cuenta la más barata, tanto para el costo mínimo como para el paso que el cazador atraviesa. La vecina es la misma, así que el desempate por identificador no decide nada aquí.
@@ -121,7 +121,7 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 ### Requisitos funcionales
 
 - **FR-001**: El juego DEBE reconocer un cuarto comportamiento de enemigo, el cazador, junto a guardián, errante y rastreador.
-- **FR-002**: La ficha de catálogo de un cazador DEBE aportar su rango, un entero mayor o igual que 0, expresado en las mismas unidades que el costo de las salidas.
+- **FR-002**: La ficha de catálogo de un cazador DEBE aportar su rango, un entero mayor o igual que 1, expresado en las mismas unidades que el costo de las salidas. El mínimo es 1 porque así lo declara el contrato del servicio en su versión 1.1.0, que el enunciado designa como la referencia exacta.
 - **FR-003**: Un cazador que comparte sala con el jugador DEBE atacar, sin considerar rutas ni rango.
 - **FR-004**: Un cazador que no comparte sala con el jugador DEBE considerar el costo mínimo de llegar desde su sala hasta la sala actual del jugador, sumando el costo de cada salida recorrida y contando únicamente salidas cuya puerta está abierta en ese instante.
 - **FR-005**: Cuando no existe ninguna ruta así, el cazador DEBE esperar, y la espera DEBE costar 100.
@@ -133,7 +133,7 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 - **FR-011**: La decisión de un cazador en cada turno DEBE ser idéntica a la que se obtendría calculando la ruta desde cero en ese instante, considerando que entre dos de sus turnos pueden haber ocurrido aperturas y cierres de puertas, movimientos del jugador, cambios de sala de otros actores y cambios de velocidad.
 - **FR-012**: La decisión de un cazador NO DEBE depender de si el contenido de alguna sala ya fue descargado, ni provocar ninguna solicitud nueva al servicio.
 - **FR-013**: Los comportamientos guardián, errante y rastreador DEBEN conservar exactamente su lógica de decisión. El cazador NO DEBE usar el rastro del jugador.
-- **FR-014**: Una ficha de cazador sin rango, o con un rango que no sea un entero mayor o igual que 0, DEBE reportarse como dato inválido de la cripta, sin sustituirlo por un valor por omisión.
+- **FR-014**: Una ficha de cazador sin rango, o con un rango que no sea un entero mayor o igual que 1, DEBE reportarse como dato inválido de la cripta, sin sustituirlo por un valor por omisión.
 - **FR-015**: Un cazador DEBE activarse con las mismas reglas que cualquier otro enemigo, y mientras no esté activo NO DEBE perseguir ni consumir turnos.
 - **FR-016**: La misma cripta, la misma semilla y la misma secuencia de acciones DEBEN producir las mismas decisiones del cazador en los mismos instantes.
 
@@ -164,6 +164,7 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 - El rango de un cazador es un dato de la cripta y llega en su ficha de catálogo, igual que su vida, su ataque y su velocidad. Esta especificación no define cómo se obtiene ese dato, solo qué significa.
 - Un rango inválido o ausente se trata con el mismo criterio que el proyecto ya aplica a los datos malformados de una cripta, y que la capacidad 001 aplicó al costo de las salidas: se reporta como error de datos y no se adivina un valor.
 - El rango es el costo máximo aceptado, de modo que una ruta que cuesta exactamente el rango sí se recorre. El enunciado dice que el cazador espera cuando el costo es **mayor** que el rango.
+- El mínimo del rango es 1, como lo declara el contrato del servicio 1.1.0. Esta capacidad se escribió antes de tener ese contrato a la vista y admitía 0; se ajustó al contrato, que el enunciado designa como la referencia exacta.
 - Que el jugador haya explorado o no las salas por donde pasa el cazador no cambia nada: la niebla de guerra es del jugador y no del enemigo. Qué ve el jugador del cazador es asunto de la capacidad de niebla de guerra (§3.3), no de esta.
 - El esqueleto de la cripta ya se descarga completo al iniciar y ya incluye el costo de cada salida, así que esta capacidad no agrega ninguna solicitud al servicio.
 - Reutilizar cálculos entre turnos está permitido mientras no cambie ninguna decisión. Es una decisión del `plan.md`, no una regla del juego, y FR-011 es la condición que cualquier reutilización tiene que respetar.
