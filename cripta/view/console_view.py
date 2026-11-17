@@ -96,6 +96,33 @@ class ConsoleView:
                     f"{exit_.door_state}"
                 )
 
+    TRAVEL_REASONS = (
+        ("llegada", "Llegaste a la sala {destination}."),
+        ("enemigos", "Hay enemigos en esta sala."),
+        ("daño", "Recibiste daño."),
+        ("sin_ruta", "No hay una ruta conocida hacia la sala {destination}."),
+        ("partida_terminada", "La partida terminó."),
+        ("contenido_no_disponible", "{message}"),
+    )
+
+    def show_travel_result(self, result, destination):
+        """Por que se rechazo o se detuvo un viaje «ir a» (FR-029).
+
+        Si se cumplieron varios motivos se muestran todos, en el orden en que
+        llegan, que es el de FR-028.
+        """
+        if not result.accepted:
+            self._print(result.message)
+            return
+
+        if result.steps:
+            self._print(f"Viaje: {result.steps} paso(s).")
+
+        for reason in result.reasons:
+            for name, text in self.TRAVEL_REASONS:
+                if name == reason:
+                    self._print(text.format(destination=destination, message=result.message))
+
     def show_inventory(self, items, criterion=None):
         if not items:
             self._print("El inventario esta vacio.")

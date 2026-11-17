@@ -12,8 +12,31 @@ from controller.commands import (
     WAIT,
     is_game_action,
 )
+from dataclasses import dataclass
+
 from adapters.fuente_datos import ErrorFuenteDatos
+from controller.commands import Command, TRAVEL
+from model import viaje
 from model.game import IN_PROGRESS, ActionResult
+
+
+@dataclass
+class TravelResult:
+    """Resultado de una orden «ir a».
+
+    accepted dice si la orden se acepto. steps son los movimientos que se
+    ejecutaron. reasons son los motivos de parada, en el orden de FR-028.
+    message explica un rechazo o el error de carga de una sala.
+    """
+
+    accepted: bool
+    message: str
+    steps: int = 0
+    reasons: list = None
+
+    def __post_init__(self):
+        if self.reasons is None:
+            self.reasons = []
 
 
 class GameController:
@@ -35,10 +58,97 @@ class GameController:
     solo despacha, que es lo que usan las pruebas del modelo.
     """
 
-    def __init__(self, game, replay_log=None, repository=None):
+    def __init__(self, game, replay_log=None, repository=None, known_map=None):
         self.game = game
         self.replay_log = replay_log
         self.repository = repository
+        self._known_map = known_map
+
+    @property
+    def known_map(self):
+        """El mapa conocido que se le paso, o el de la partida si lo tiene."""
+        if self._known_map is not None:
+            return self._known_map
+
+        return getattr(self.game, "known_map", None)
+
+    def travel(self, destination):
+        """Viaje automatico «ir a» (§3.4): una secuencia de movimientos ordinarios.
+
+        Las reglas (si se acepta, cual es el siguiente paso, por que se
+        detiene) son del modelo, en model/viaje.py. Aqui solo se orquestan los
+        pasos, porque cada uno tiene que cargar el contenido de la sala
+        destino antes de moverse, y eso el modelo no puede hacerlo.
+
+        Cada paso pasa por execute(mover), el mismo camino que un mover escrito
+        a mano: carga el contenido, queda en la bitacora y precarga. La orden
+        queda ademas como comentario en la bitacora (FR-031).
+
+        Los enemigos de la sala destino se cuentan justo antes de moverse, con
+        su contenido ya cargado: es la sala a la que el jugador entra
+        (FR-028 (b)). Entre esa pregunta y la entrada no corre ningun evento.
+        """
+        known_map = self.known_map
+
+        if known_map is None:
+            return TravelResult(
+                False,
+                "Todavia no se puede viajar: la partida no tiene el mapa conocido.",
+            )
+
+        validation = viaje.validar_orden(self.game, known_map, destination)
+
+        if not validation.accepted:
+            return TravelResult(False, validation.message)
+
+        if self.replay_log is not None and hasattr(self.replay_log, "comment"):
+            self.replay_log.comment(Command(TRAVEL, destination).to_text())
+
+        steps = 0
+
+        while True:
+            exit_ = viaje.siguiente_paso(self.game, known_map, destination)
+
+            if exit_ is None:
+                return self._stopped(destination, steps, sin_ruta=True)
+
+            rejection = self._load_destination(exit_.direction)
+
+            if rejection is not None:
+                return self._stopped(
+                    destination, steps, rejection.message, contenido_no_disponible=True
+                )
+
+            enemies_on_entry = viaje.hay_enemigos_vivos_en(self.game, exit_.destination)
+            health_before = self.game.player.health
+            result = self.execute(Command(MOVE, exit_.direction))
+
+            if not result.accepted:
+                # Solo pasa si la puerta de la sala actual cambio sin que el
+                # mapa conocido lo observara, es decir, sin los avisos del
+                # motor. El mapa ya no tiene una ruta que de verdad exista.
+                return self._stopped(destination, steps, result.message, sin_ruta=True)
+
+            steps += 1
+            reasons = viaje.motivos_de_parada(
+                self.game, destination, health_before, enemies_on_entry
+            )
+
+            if reasons:
+                return TravelResult(True, "", steps, reasons)
+
+    def _stopped(self, destination, steps, message="", sin_ruta=False,
+                 contenido_no_disponible=False):
+        reasons = viaje.motivos_de_parada(
+            self.game,
+            destination,
+            self.game.player.health,
+            False,
+            sin_ruta=sin_ruta,
+            contenido_no_disponible=contenido_no_disponible,
+        )
+
+        return TravelResult(True, message, steps, reasons)
 
     def execute(self, command):
         if not is_game_action(command):

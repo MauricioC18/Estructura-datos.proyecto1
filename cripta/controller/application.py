@@ -27,6 +27,7 @@ from controller.commands import (
     LOAD,
     QUIT,
     SAVE,
+    TRAVEL,
     VIEW,
     CommandError,
     is_game_action,
@@ -479,6 +480,17 @@ def _command_loop(controller, view):
 
             view.show_message(f"No se pudo cargar: {problem}")
             show = False
+            continue
+
+        if command.name == TRAVEL:
+            try:
+                travel = controller.travel(command.argument)
+            except DATA_ERRORS as error:
+                view.show_message(str(error))
+                continue
+
+            view.show_travel_result(travel, command.argument)
+            show = travel.steps > 0
             continue
 
         if not is_game_action(command):
