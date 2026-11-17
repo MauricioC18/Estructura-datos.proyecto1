@@ -142,6 +142,19 @@ Formato: `- [ ] Tnnn [P] [Hn] [AB] [BLOQUEADA: …] Descripción, en archivo —
 
 ---
 
+## Fase 8 — Salidas de un solo sentido (agregada el 2026-11-17)
+
+**Objetivo**: que «ir a» respete el sentido de las salidas (aclaración del 2026-11-17 y escenarios 7 y 8 de la Historia 4). Plan, alternativa 9; research, §3.
+
+- [X] T048 Actualizar `plan.md` (alternativa 9, complejidad, riesgos), `research.md` §3, esta lista y `cripta/docs/DECISIONES.md` §5.3 con la decisión, en un commit solo de documentos — FR-023, FR-024
+- [ ] T049 [H4] Pruebas de los escenarios 7 y 8 de la Historia 4 con el motor real, en `cripta/tests/test_ir_a_sentido.py`, escritas antes del código y comprobadas fallando — FR-023, FR-024
+- [ ] T050 (depende de T048) `entrantes_conocidas(u)` en `cripta/structures/mapa_conocido.py`, con el índice de salidas entrantes armado una vez desde la topología y filtrado por sala de origen explorada y puerta recordada abierta. Pruebas unitarias en `cripta/tests/test_mapa_conocido.py`, incluida la reversión con el pergamino sin mantenimiento propio — FR-012, FR-015, FR-023
+- [ ] T051 [P] (depende de T050) Prueba de equivalencia en `cripta/tests/test_equivalencia_sentido.py`: en mapas asimétricos aleatorios deterministas por semilla, con empates de costo, salidas paralelas y puertas cerradas, el primer paso de `RutasMasBaratas` con `salidas_de` (búsqueda completa) coincide con una búsqueda de referencia escrita en la prueba, y la referencia con parada en la sala del jugador da el mismo paso que sin ella — FR-023, FR-024
+- [ ] T052 [BLOQUEADA: Carlos — `cripta/structures/rutas_mas_baratas.py` rechaza `parar_en` con `salidas_de`] (depende de T050, T051) Cablear en `cripta/model/viaje.py`: expandir con `mapa.entrantes_conocidas`, primer paso con `salidas_de=mapa.vecinas_conocidas`, con `parar_en` y la reutilización de la ruta. Con esto pasan las pruebas de T049 — FR-023, FR-024, FR-026
+- [ ] T053 [P] (depende de T050) Mediciones en `cripta/benchmark/bench_mapa_conocido.py`, con los tamaños y semillas de la medición 5: tiempo y memoria de armar el índice, salidas que entran a cada sala en la cuadrícula simétrica y en una variante con salidas de un solo sentido, y el paso de «ir a» con salidas entrantes frente al actual — FR-036
+
+---
+
 ## Dependencias
 
 ```text

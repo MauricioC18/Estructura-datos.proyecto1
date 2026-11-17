@@ -127,6 +127,23 @@ FR-026 exige recalcular «con el conocimiento vigente». Como la búsqueda va de
 | Todo el viaje dentro del modelo | Un solo lugar | El modelo tendría que pedir contenido de salas, que no puede, o asumir que ya está cargado, que no es cierto | Descartada |
 | Todo en el controlador | Un solo lugar | Pondría reglas del juego (cuándo se detiene, qué ruta) fuera del modelo | Descartada |
 
+### 9. Salidas de un solo sentido (revisión del 2026-11-17)
+
+El grupo confirmó que el servicio puede publicar salidas de un solo sentido, y la especificación lo dejó escrito (aclaración del 2026-11-17, escenarios 7 y 8 de la Historia 4). La búsqueda de «ir a» va desde el destino y hoy expande por las salidas que **salen** de cada sala, así que calcula la distancia del destino a cada sala y no la de cada sala al destino. Con las salidas 1→3, 3→2 y 2→1, todas de costo 1 y sin vuelta, el jugador en 1 queda sin ruta hacia 3 aunque tiene una salida directa.
+
+La corrección es la misma que Carlos aplicó al cazador: expandir por las salidas que **entran** a cada sala y dar el primer paso por las que **salen**. `RutasMasBaratas` ya lo admite con el parámetro `salidas_de`. Lo que falta del lado del mapa conocido es un proveedor de salidas entrantes **conocidas**.
+
+| Alternativa | A favor | En contra | Decisión |
+| --- | --- | --- | --- |
+| **`entrantes_conocidas(u)` en `MapaConocido`, filtrando un índice de salidas entrantes armado una vez** | El índice depende solo de la topología, que no cambia durante la partida: se arma una vez en O(V + E) recorriendo las salidas de cada sala. Al consultar se filtra con lo que ya existe: la sala de origen *w* tiene que estar explorada y la puerta de esa salida recordada abierta, con la clave del lado de *w* (`w × 4 + dirección`). **No hay nada que mantener al explorar ni al revertir**: el filtro lee las salas exploradas y las puertas recordadas, que ya se revierten y ya suben la versión, así que la reutilización de la ruta sigue invalidándose sola. El índice no se guarda ni se copia: se rehace del esqueleto | Consultar cuesta O(salidas que entran a *u*), que en un grafo asimétrico puede pasar de 4; se paga recorrer también las que vienen de salas no exploradas | **Elegida** |
+| Mantener un índice de entrantes conocidas al explorar | Al consultar solo se recorren salidas ya conocidas | Explorar y revertir tendrían que actualizarlo, con una anotación inversa más por salida; es estado nuevo que puede quedar desalineado del conocimiento sin ningún error, para ahorrar un filtro O(1) por salida | Descartada |
+| Buscar desde la sala del jugador por las salidas salientes | No necesita salidas entrantes | El origen cambia en cada paso, así que se pierde la reutilización de la ruta durante el viaje (mejora c). Además, el desempate de FR-024 en cada paso pide la vecina de menor id entre las que empiezan una ruta mínima **desde la sala actual**, y una búsqueda desde el jugador no lo da sin rehacerla o sin escribir una segunda búsqueda con su propio desempate | Descartada |
+| Usar el índice de entrantes del motor (`Game._entrantes_por_sala`) | Ya existe | Es privado del motor, de Carlos, y su proveedor filtra por el estado **real** de las puertas, que el jugador no conoce (FR-012) | Descartada |
+
+**Parada anticipada con salidas dirigidas.** El argumento de la mejora (b) sigue valiendo: si *p* es la sala del jugador con distancia definitiva *d*, una salida saliente *p → v* con `costo + dist(v) = d` tiene `dist(v) < d` porque todo costo es al menos 1, así que *v* ya está asentada. La versión de `RutasMasBaratas` de Carlos todavía **rechaza** usar `parar_en` y `salidas_de` juntos («todavía no están probados»). Por eso el cableado en `model/viaje.py` queda bloqueado hasta que Carlos levante ese bloqueo, y mientras tanto una prueba de equivalencia sobre mapas asimétricos aleatorios, con empates y salidas paralelas, compara el primer paso de la búsqueda completa de Carlos con `salidas_de` contra una búsqueda de referencia con y sin parada.
+
+**Mediciones a agregar a la suite** (mismos tamaños y semillas que la medición 5): tiempo y memoria de armar el índice; cuántas salidas entran a cada sala, en la cuadrícula simétrica y en una variante con salidas de un solo sentido; y el paso de «ir a» con salidas entrantes, que en la cuadrícula simétrica no debería cambiar respecto del actual.
+
 ## Complejidad esperada
 
 Sea *k* el número de salas exploradas, *d* el número de puertas recordadas, *r* el número de salas que revela una entrada (1 sin antorcha, hasta 5 con antorcha) y *c* el número de cambios de conocimiento de una acción. El grado de una sala es a lo sumo 4.
@@ -142,10 +159,12 @@ Sea *k* el número de salas exploradas, *d* el número de puertas recordadas, *r
 | Revertir una acción con el pergamino | O(c) | — | Aplica las anotaciones al revés (FR-035) |
 | Un paso de «ir a» | O((k + e) log k) | O(k) | Búsqueda desde el destino sobre el subgrafo conocido (*e* ≤ 4*k* salidas), más O(4) para el primer paso con desempate |
 | Validar la orden `ir a` | O(1) promedio | — | ¿Está explorada? ¿Es la sala actual? |
+| Armar el índice de salidas entrantes | O(V + E), una vez | O(E) | Sobre la topología completa, que no cambia (alternativa 9) |
+| Salidas entrantes conocidas de una sala | O(salidas que entran a la sala) | O(1) extra | Filtra por sala de origen explorada y puerta recordada abierta |
 | Ver el mapa conocido | O(k log k) | O(k) | Recorre las exploradas y las ordena por id para mostrarlas, con el ordenamiento propio del proyecto. Es un comando que el jugador pide, no ocurre en el ciclo de eventos |
 | Exportar o copiar el conocimiento | O(k + d) | O(k + d) | Para el archivo de partida y para los puntos de control |
 | Importar | O(k + d) | O(k + d) | Los contadores de avistamiento se rehacen sumando las salidas de cada explorada |
-| Memoria total | — | O(k + d + avistadas) | Nunca proporcional a la cripta completa ni a la longitud de la partida |
+| Memoria total | — | O(k + d + avistadas) + O(E) del índice de entrantes | El conocimiento nunca es proporcional a la cripta completa ni a la longitud de la partida. **Revisión del 2026-11-17**: el índice de salidas entrantes de la alternativa 9 sí es O(E) de la cripta completa, del mismo orden que el esqueleto que el mapa de salas ya tiene en memoria. No es conocimiento: no se guarda, no se copia ni se revierte. La especificación no fija un límite de memoria |
 
 ## Cómo se revierte la exploración
 
@@ -365,7 +384,7 @@ Con el código final, 100 salas dan entre 1.70 y 1.91 ms en el primer paso y ent
 
 ## Riesgos
 
-- **Pasos de un solo sentido.** El traductor los admite: si una salida no tiene vuelta, la puerta solo aparece en la sala que la declara (`model/room.py:25-26`, `repository/traductor.py:183-206`). La búsqueda va desde el destino y expande por las salidas de cada sala, así que con un paso de un solo sentido calcularía una distancia por un camino que en realidad no se puede recorrer en ese sentido. **El cazador ya depende del mismo supuesto** (plan 002, «El supuesto del grafo sin dirección»). En `cripta-01` las 10 salidas tienen vuelta; no se sabe si alguna cripta publicada tiene un paso de un solo sentido. Si existen, la corrección es la misma para las dos capacidades: expandir por las salidas que **llegan** a cada sala y elegir el primer paso por las que **salen**. Se coordina con Carlos antes de implementar.
+- **Pasos de un solo sentido.** ~~Riesgo~~ **Confirmado el 2026-11-17**: el servicio puede publicarlos. La corrección está decidida en la alternativa 9: expandir por las salidas conocidas que **llegan** a cada sala y elegir el primer paso por las que **salen**. Carlos ya la aplicó al cazador. Para «ir a» falta que levante el bloqueo entre `parar_en` y `salidas_de` en `RutasMasBaratas`; mientras tanto, el viaje sigue calculando mal con salidas de un solo sentido.
 - **Una puerta que cambia y no avisa.** Si algún camino del motor cambia `closed` sin pasar por el gancho, el mapa queda desactualizado aunque el jugador esté presente, y FR-006 se rompe en silencio. Hoy solo hay dos lugares que cambian puertas (`open_door` y `_close_door`); el retroceso las cambia también pero no debe observar. La prueba de SC-002 compara, en cada instante, el recuerdo contra la realidad de las puertas de la sala del jugador.
 - **Detectar el daño.** FR-028 (c) se comprueba comparando la vida del jugador antes y después del paso. Durante el ciclo de eventos la vida del jugador solo baja (veneno, ataques, trampas); las curaciones son acciones del jugador y no ocurren a mitad de un paso. Si alguna regla futura curara al jugador dentro del ciclo, un daño y una curación iguales se cancelarían y no se detectarían; entonces habría que pedirle al motor un contador de daño recibido.
 - **La vista cambia y rompe pruebas existentes.** `room_view` hoy muestra el id de todos los destinos. Con FR-020 los destinos avistados dejan de mostrar su id, y las pruebas de la vista que lo fijan cambian. Es una de las dos excepciones que SC-009 admite.

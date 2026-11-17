@@ -2014,6 +2014,7 @@ La frecuencia real de cada una en una partida **todavía no está medida**: hace
 | Reversión | Anotar en el historial la inversa de cada cambio | Copiar el conocimiento antes de cada acción: es copia de estado por acción. **Medida** |
 | Ruta de «ir a» | Reutilizar la búsqueda del cazador con un proveedor de vecinas conocidas | Una búsqueda propia (duplicaría el desempate); recorrido en anchura (cuenta salas, no costo); búsqueda sin montículo. **Medida** |
 | Recalcular o reutilizar la ruta | Recalcular antes de cada paso | Reutilizar la búsqueda del viaje. **Medida** |
+| Salidas de un solo sentido (2026-11-17) | Expandir por las salidas conocidas que entran a cada sala (`entrantes_conocidas`, sobre un índice de entrantes armado una vez desde la topología y filtrado por lo explorado y lo recordado) y dar el primer paso por las que salen | Mantener el índice de entrantes conocidas al explorar: estado nuevo que explorar y revertir tendrían que actualizar. Buscar desde el jugador: pierde la reutilización de la ruta y el desempate de FR-024 en cada paso. Usar el índice del motor: filtra por el estado real de las puertas (FR-012) |
 
 ### Decisión
 
@@ -2081,7 +2082,7 @@ Lo que muestran:
 
 - **FR-036 no se cumple en el primer paso de un viaje largo en mapas de 400 salas o más.** Con el mapa conocido completo, el primer paso de un viaje entre los extremos de la cripta pasa de 5 ms; los pasos siguientes del mismo viaje no. Si la cripta de referencia tiene ese tamaño, FR-036 no se cumple en la condición de §6.1. Lo que queda por probar es aligerar la búsqueda misma, que es compartida con el cazador. Tampoco se sabe todavía el tamaño de la cripta de referencia: el paquete sin conexión no la trae.
 - Explorar, consultar y revertir dependen de que el motor avise de cada entrada y de cada cambio de puerta. Un camino del motor que cambie una puerta sin avisar dejaría el recuerdo desactualizado sin ningún error. **Los avisos todavía no existen** (T011–T013, de Carlos).
-- La búsqueda supone que cada paso entre salas se puede recorrer en los dos sentidos, igual que el cazador. El formato de datos admite pasos de un solo sentido. En `cripta-01` no hay ninguno; falta comprobarlo en las demás criptas.
+- **Salidas de un solo sentido.** El servicio puede publicarlas (confirmado el 2026-11-17). La búsqueda de «ir a» todavía expande por las salidas que salen de cada sala, así que con un paso de un solo sentido calcula la distancia al revés y puede declarar «sin ruta» teniendo una salida directa. La corrección está decidida (plan, alternativa 9): expandir por las salidas conocidas que entran y dar el primer paso por las que salen. Falta que la búsqueda compartida, de Carlos, acepte la parada anticipada junto con el proveedor de salidas.
 
 ### Pruebas
 

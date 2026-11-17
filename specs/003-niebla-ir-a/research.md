@@ -22,9 +22,11 @@ Cada punto sigue el formato Decisión / Motivo / Alternativas. Las tablas comple
 
 ## 3. Pasos de un solo sentido
 
-- **Decisión**: seguir el mismo supuesto del cazador (grafo sin dirección), dejarlo como riesgo y coordinarlo con Carlos.
-- **Motivo**: el traductor empareja cada salida con la de vuelta (`repository/traductor.py:183-206`) y, si no la hay, la puerta solo aparece en la sala que la declara. Se revisó `datos_offline/criptas/cripta-01`: 6 salas, 10 salidas, todas con vuelta. No hay evidencia de pasos de un solo sentido, pero el formato no los prohíbe.
-- **Alternativas**: un proveedor de salidas entrantes para expandir la búsqueda y otro de salidas para el primer paso. Es correcta en cualquier caso, pero obliga a cambiar la interfaz de `RutasMasBaratas`, que es de Carlos, y a construir las salidas entrantes al iniciar. Queda como la corrección a aplicar si se confirma que existen.
+- **Decisión (revisada el 2026-11-17)**: expandir la búsqueda de «ir a» por las salidas conocidas que **entran** a cada sala y dar el primer paso por las que **salen**. El mapa conocido ofrece `entrantes_conocidas(u)`: filtra un índice de salidas entrantes, armado una vez en O(V + E) desde la topología, por sala de origen explorada y puerta recordada abierta (clave `w × 4 + dirección` del lado de origen). Ver plan, alternativa 9.
+- **Motivo**: el grupo confirmó que el servicio puede publicar salidas de un solo sentido (el contrato describe cada salida como dirigida y no exige la vuelta), y la especificación lo recoge en los escenarios 7 y 8 de la Historia 4. Con ellas, buscar desde el destino por las salidas que salen calcula la distancia en el sentido contrario: con 1→3, 3→2 y 2→1, todas de costo 1, el jugador en 1 queda sin ruta hacia 3 teniendo una salida directa. Carlos ya cambió el cazador de la misma manera y `RutasMasBaratas` ya acepta `salidas_de`.
+- **Alternativas**: mantener el índice de entrantes conocidas al explorar (descartada: estado nuevo que explorar y revertir tendrían que actualizar, para ahorrar un filtro O(1) por salida); buscar desde el jugador por las salidas salientes (descartada: el origen cambia en cada paso y se pierde la reutilización de la ruta, y el desempate de FR-024 desde cada sala exigiría rehacer la búsqueda o escribir otra); reutilizar el índice del motor (descartada: es privado y filtra por el estado real de las puertas).
+- **Pendiente de Carlos**: su `RutasMasBaratas` rechaza `parar_en` junto con `salidas_de`. El cableado en `model/viaje.py` espera a que lo levante.
+- *Decisión original, del 2026-11-16*: seguir el supuesto del cazador (grafo sin dirección), porque en `cripta-01` las 10 salidas tienen vuelta y no había evidencia de pasos de un solo sentido.
 
 ## 4. Dónde se engancha el motor
 
