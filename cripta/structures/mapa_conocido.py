@@ -94,6 +94,15 @@ class MapaConocido:
     # ------------------------------------------------------------------
     # Consultas
 
+    def usar_historial(self, history):
+        """Anota los cambios siguientes en history.
+
+        Al cargar una partida, el historial lo arma quien la carga y existe
+        recién cuando la partida ya está armada; por eso no se puede pasar al
+        construir el mapa. Lo ya importado no se anota: no es reversible.
+        """
+        self._history = history
+
     @property
     def version(self):
         """Sube con cada cambio del conocimiento: una exploración, un cambio

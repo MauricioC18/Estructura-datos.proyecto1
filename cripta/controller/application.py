@@ -38,6 +38,7 @@ from controller.commands import (
 )
 from controller.game_controller import GameController
 from structures.linea_de_tiempo import COPIAS_CADA, LineaDeTiempo
+from structures.mapa_conocido import MapaConocido
 from model.consulta_historia import (
     ConsultaRechazada,
     consultar_accion,
@@ -126,6 +127,8 @@ def build_game(repository, seed, player_name=None, in_use=None,
     room_map = repository.crear_mapa()
     enemies = repository.cargar_contenido_de_sala(room_map.room(player.room_id))
 
+    # El mapa conocido comparte el historial, para que el pergamino revierta
+    # tambien lo explorado y lo observado (FR-015).
     game = Game(
         state,
         player,
@@ -137,10 +140,32 @@ def build_game(repository, seed, player_name=None, in_use=None,
         event_queue=ReversibleEventQueue(history),
         timeline=LineaDeTiempo(copias_cada=copias_cada),
         snapshot=tomar_copia_del_estado,
+        known_map=MapaConocido(room_map, history),
     )
 
     if in_use is not None:
         in_use.game = game
+
+    return game
+
+
+def build_saved_game(partida):
+    """El Game de una partida leida de un archivo, con su mapa conocido.
+
+    El mapa se arma con el mapa de salas de la partida y el adaptador le
+    importa el conocimiento guardado (FR-014). El historial lo crea el
+    adaptador, asi que se le entrega al mapa despues, para que el pergamino
+    revierta lo que se explore desde ahi (FR-015).
+
+    Un archivo sin conocimiento guardado deja el mapa vacio; entonces el
+    jugador explora la sala en la que esta, como al empezar una partida.
+    """
+    known_map = MapaConocido(partida.room_map)
+    game = construir_juego_reversible(partida, known_map=known_map)
+    known_map.usar_historial(game.history)
+
+    if partida.known_map is None:
+        known_map.jugador_entro(game.player.room_id)
 
     return game
 
@@ -335,7 +360,7 @@ def load_saved_game(repository, view, load_path, in_use=None):
 
     repository.iniciar_partida(partida.id_cripta)
     comprobar_versiones_vigentes(partida, repository)
-    game = construir_juego_reversible(partida)
+    game = build_saved_game(partida)
 
     if in_use is not None:
         in_use.game = game
@@ -710,4 +735,4 @@ def _game_from_logged_save(header, output):
         output(f"{cannot}, que es de otra cripta ({partida.id_cripta}).")
         return None
 
-    return construir_juego_reversible(partida)
+    return build_saved_game(partida)
