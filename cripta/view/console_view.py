@@ -55,9 +55,17 @@ class ConsoleView:
             exits = []
 
             for exit_ in room.exits:
-                state = "" if exit_.is_open else " (cerrada)"
+                # Lo que el jugador conoce (FR-020): una puerta abierta no se
+                # anota, y un destino solo avistado no muestra su id (FR-005).
+                state = "" if exit_.door_state == "abierta" else f" ({exit_.door_state})"
+
+                if exit_.destination is None:
+                    destination = "hay algo en esa direccion"
+                else:
+                    destination = exit_.destination
+
                 exits.append(
-                    f"{exit_.direction}->{exit_.destination} (costo {exit_.cost}){state}"
+                    f"{exit_.direction}->{destination} (costo {exit_.cost}){state}"
                 )
 
             self._print("Salidas: " + ", ".join(exits))

@@ -38,7 +38,7 @@ from controller.commands import (
 )
 from controller.game_controller import GameController
 from structures.linea_de_tiempo import COPIAS_CADA, LineaDeTiempo
-from structures.mapa_conocido import MapaConocido
+from structures.mapa_conocido import ABIERTA, CERRADA, MapaConocido
 from model.consulta_historia import (
     ConsultaRechazada,
     consultar_accion,
@@ -191,9 +191,15 @@ def new_log_path(crypt_id, directory=LOG_DIRECTORY):
 
 @dataclass
 class ExitView:
+    """Una salida de la sala del jugador, para mostrar.
+
+    destination es None si el destino solo esta avistado: no se revela su id
+    (FR-005, FR-020). door_state es abierta, cerrada o desconocida.
+    """
+
     direction: str
-    destination: int
-    is_open: bool
+    destination: int | None
+    door_state: str
     cost: int = 100
 
 
@@ -214,13 +220,29 @@ class RoomView:
     floor: list
 
 
-def room_view(game):
-    """Salidas y suelo de la sala del jugador, solo para mostrar."""
+def room_view(game, known_map=None):
+    """Salidas y suelo de la sala del jugador, solo para mostrar.
+
+    Con mapa conocido, las salidas salen del conocimiento del jugador
+    (FR-012, FR-020): el estado de la puerta es el recordado y el destino solo
+    lleva id si esta explorado. Sin mapa conocido, que es una partida sin
+    niebla de guerra, se muestra el estado real.
+    """
     room = game.room_map.room(game.player.room_id)
-    exits = [
-        ExitView(exit_.direction, exit_.destination, exit_.door.is_open, exit_.cost)
-        for exit_ in room.exits()
-    ]
+    exits = []
+
+    for exit_ in room.exits():
+        if known_map is None:
+            state = ABIERTA if exit_.door.is_open else CERRADA
+            destination = exit_.destination
+        else:
+            state = known_map.puerta_recordada(exit_.door)
+            destination = (
+                exit_.destination if known_map.esta_explorada(exit_.destination) else None
+            )
+
+        exits.append(ExitView(exit_.direction, destination, state, exit_.cost))
+
     floor = [_item_view(game.player, item) for item in room.floor_items]
 
     return RoomView(room.name, exits, floor)
@@ -468,7 +490,7 @@ def _command_loop(controller, view):
     while not controller.is_over:
         if show:
             view.show_state(controller.visible_state())
-            view.show_room(room_view(game))
+            view.show_room(room_view(game, controller.known_map))
 
         show = True
         text = view.read_command()
