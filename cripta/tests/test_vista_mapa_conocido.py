@@ -1,4 +1,4 @@
-"""Pruebas de la vista del mapa conocido (specs/003-niebla-ir-a, Historia 7).
+"""Pruebas de la vista del mapa conocido (specs/005-niebla-ir-a, Historia 7).
 
 Arman la vista desde un mapa conocido llenado a mano y la imprimen con la
 vista de consola. No pasan por el bucle de comandos, que todavía no tiene el

@@ -185,7 +185,7 @@ class TestInvalidLogs(LogFileTestCase):
 
 
 class TestComentarioDelViaje(LogFileTestCase):
-    """La orden «ir a» queda como comentario (specs/003-niebla-ir-a)."""
+    """La orden «ir a» queda como comentario (specs/005-niebla-ir-a)."""
 
     def test_el_comentario_se_escribe_y_la_lectura_lo_ignora(self):
         """FR-031: cada paso es un movimiento y la orden, un comentario."""

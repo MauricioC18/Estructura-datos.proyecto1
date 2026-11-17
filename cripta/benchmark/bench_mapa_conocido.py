@@ -1,5 +1,5 @@
 """
-Mediciones del mapa conocido y del viaje «ir a» (specs/003-niebla-ir-a, §5.3).
+Mediciones del mapa conocido y del viaje «ir a» (specs/005-niebla-ir-a, §5.3).
 
 Qué se mide y contra qué
     1. Estado de una sala. La tabla de exploradas y los contadores de

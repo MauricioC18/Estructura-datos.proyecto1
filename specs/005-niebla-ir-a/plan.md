@@ -1,6 +1,6 @@
 # Plan de implementación: Niebla de guerra y viaje automático «ir a»
 
-**Carpeta**: `specs/003-niebla-ir-a` | **Rama**: `Parte_2-niebla-ir-a` | **Fecha**: 2026-11-16 | **Especificación**: [spec.md](./spec.md)
+**Carpeta**: `specs/005-niebla-ir-a` | **Rama**: `Parte_2-niebla-ir-a` | **Fecha**: 2026-11-16 | **Especificación**: [spec.md](./spec.md)
 
 **Artefactos asociados**: [research.md](./research.md) · [data-model.md](./data-model.md) · [contracts/](./contracts/) · [quickstart.md](./quickstart.md)
 

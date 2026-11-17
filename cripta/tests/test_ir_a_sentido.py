@@ -1,4 +1,4 @@
-"""«ir a» respeta el sentido de las salidas (specs/003-niebla-ir-a, T049).
+"""«ir a» respeta el sentido de las salidas (specs/005-niebla-ir-a, T049).
 
 Escenarios 7 y 8 de la Historia 4 y la aclaración del 2026-11-17: una salida
 puede existir en un solo sentido, y la ruta solo puede atravesarla en ese

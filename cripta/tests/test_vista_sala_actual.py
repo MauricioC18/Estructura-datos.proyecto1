@@ -1,4 +1,4 @@
-"""La sala actual se muestra según el conocimiento del jugador (specs/003-niebla-ir-a, T032, T035).
+"""La sala actual se muestra según el conocimiento del jugador (specs/005-niebla-ir-a, T032, T035).
 
 Cada prueba cita en su docstring los requisitos que comprueba.
 """

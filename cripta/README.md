@@ -67,7 +67,7 @@ Cada prueba cita en su docstring el requisito (`FR-xxx`) de la especificación q
 
 | Capacidad | Especificación | Comando |
 | --- | --- | --- |
-| Niebla de guerra e «ir a» | `specs/003-niebla-ir-a/spec.md` | `python -m unittest discover -s tests -t . -p "test_mapa_conocido.py"`, y lo mismo con `test_viaje.py`, `test_ir_a.py`, `test_ir_a_sentido.py`, `test_equivalencia_sentido.py`, `test_niebla.py`, `test_niebla_guardado.py`, `test_comando_mapa.py`, `test_vista_mapa_conocido.py`, `test_vista_sala_actual.py`, `test_historia_mapa_conocido.py`, `test_parada_anticipada.py` y `test_reutilizar_ruta.py` |
+| Niebla de guerra e «ir a» | `specs/005-niebla-ir-a/spec.md` | `python -m unittest discover -s tests -t . -p "test_mapa_conocido.py"`, y lo mismo con `test_viaje.py`, `test_ir_a.py`, `test_ir_a_sentido.py`, `test_equivalencia_sentido.py`, `test_niebla.py`, `test_niebla_guardado.py`, `test_comando_mapa.py`, `test_vista_mapa_conocido.py`, `test_vista_sala_actual.py`, `test_historia_mapa_conocido.py`, `test_parada_anticipada.py` y `test_reutilizar_ruta.py` |
 
 Las mediciones de esta capacidad están en la suite «Mapa conocido y viaje ir a» de `python main.py --bench`.
 
@@ -124,7 +124,7 @@ El log de una sesión que empezó cargando un guardado, con `--cargar` o con `ca
 
 ## Lo que todavía no funciona
 
-- **«ir a» con salidas de un solo sentido.** La búsqueda todavía recorre cada salida en los dos sentidos, así que con una salida sin vuelta puede declarar «no hay ruta» teniendo una salida directa, o no ver una ruta válida. La corrección está escrita (`MapaConocido.entrantes_conocidas`) y probada por equivalencia, pero conectarla necesita que la búsqueda compartida (`structures/rutas_mas_baratas.py`) acepte la parada anticipada junto con el proveedor de salidas. Las dos pruebas de los escenarios 7 y 8 de la Historia 4 (`tests/test_ir_a_sentido.py`) están marcadas como fallo esperado hasta entonces (tarea T052 de `specs/003-niebla-ir-a/tasks.md`).
+- **«ir a» con salidas de un solo sentido.** La búsqueda todavía recorre cada salida en los dos sentidos, así que con una salida sin vuelta puede declarar «no hay ruta» teniendo una salida directa, o no ver una ruta válida. La corrección está escrita (`MapaConocido.entrantes_conocidas`) y probada por equivalencia, pero conectarla necesita que la búsqueda compartida (`structures/rutas_mas_baratas.py`) acepte la parada anticipada junto con el proveedor de salidas. Las dos pruebas de los escenarios 7 y 8 de la Historia 4 (`tests/test_ir_a_sentido.py`) están marcadas como fallo esperado hasta entonces (tarea T052 de `specs/005-niebla-ir-a/tasks.md`).
 - **`historia` y `--replay --hasta` con copias espaciadas.** Para un instante posterior a un movimiento hacia una sala cuyo contenido no estaba cargado cuando se tomó la copia, la reconstrucción repite el movimiento, el motor lo rechaza porque esa sala no tiene contenido, y el resumen entero sale en la sala anterior, sin ningún error. Con `--checkpoint-cada 1` no pasa. Es un defecto de la reconstrucción de la línea de tiempo, reportado a su responsable.
 - **La cripta de referencia de §6.1** (cripta-06, de 300 salas) no está en el paquete sin conexión, así que el límite de 5 ms por paso de «ir a» no está comprobado sobre ella. En las cuadrículas sintéticas, el primer paso de un viaje entre los extremos pasa de 5 ms desde 400 salas (`docs/DECISIONES.md`, §5.3).
 - `--verificar` y `--forzar` (resolubilidad) no están implementadas.

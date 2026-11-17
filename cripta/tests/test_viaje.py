@@ -1,4 +1,4 @@
-"""Pruebas de las reglas del viaje «ir a» en el modelo (specs/003-niebla-ir-a).
+"""Pruebas de las reglas del viaje «ir a» en el modelo (specs/005-niebla-ir-a).
 
 Usan el motor real para mover al jugador, pero el mapa conocido se actualiza
 a mano con jugador_entro, porque los avisos del motor todavía no existen. El

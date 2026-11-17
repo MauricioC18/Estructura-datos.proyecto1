@@ -1,4 +1,4 @@
-"""El comando «mapa» en el bucle de comandos de la aplicación (specs/003-niebla-ir-a, T033).
+"""El comando «mapa» en el bucle de comandos de la aplicación (specs/005-niebla-ir-a, T033).
 
 Cada prueba cita en su docstring los requisitos que comprueba.
 """

@@ -1,6 +1,6 @@
 # Especificación: Niebla de guerra y viaje automático «ir a»
 
-**Carpeta**: `specs/003-niebla-ir-a`
+**Carpeta**: `specs/005-niebla-ir-a`
 
 **Creada**: 2026-11-16
 

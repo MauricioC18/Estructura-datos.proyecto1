@@ -1,4 +1,4 @@
-"""Reutilizar la búsqueda durante el viaje (mejora c del plan, specs/003-niebla-ir-a).
+"""Reutilizar la búsqueda durante el viaje (mejora c del plan, specs/005-niebla-ir-a).
 
 FR-026 exige que cada paso se decida con el conocimiento vigente. Reutilizar
 la búsqueda del paso anterior solo es válido si da exactamente la misma

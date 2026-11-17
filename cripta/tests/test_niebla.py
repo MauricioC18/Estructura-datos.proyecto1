@@ -1,4 +1,4 @@
-"""Niebla de guerra con el motor real (specs/003-niebla-ir-a, T015 a T019 y T029).
+"""Niebla de guerra con el motor real (specs/005-niebla-ir-a, T015 a T019 y T029).
 
 A diferencia de test_mapa_conocido.py y de test_ir_a.py, aquí nadie llama a
 jugador_entro ni a puerta_cambio a mano: el mapa conocido se le pasa a la

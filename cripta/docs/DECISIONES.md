@@ -2319,7 +2319,7 @@ un jugador que camina, que es lo que hace un jugador real.
 
 ## 5.3 El mapa conocido (segunda parte)
 
-Es de Steven, junto con el viaje automático «ir a». Proviene de la especificación [`specs/003-niebla-ir-a/spec.md`](../../specs/003-niebla-ir-a/spec.md) y del plan [`specs/003-niebla-ir-a/plan.md`](../../specs/003-niebla-ir-a/plan.md), que tiene el detalle de cada alternativa y las tablas completas de mediciones.
+Es de Steven, junto con el viaje automático «ir a». Proviene de la especificación [`specs/005-niebla-ir-a/spec.md`](../../specs/005-niebla-ir-a/spec.md) y del plan [`specs/005-niebla-ir-a/plan.md`](../../specs/005-niebla-ir-a/plan.md), que tiene el detalle de cada alternativa y las tablas completas de mediciones.
 
 ### Problema
 

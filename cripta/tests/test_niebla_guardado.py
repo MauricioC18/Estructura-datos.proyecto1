@@ -1,4 +1,4 @@
-"""Guardar y cargar el conocimiento del jugador (specs/003-niebla-ir-a, T040).
+"""Guardar y cargar el conocimiento del jugador (specs/005-niebla-ir-a, T040).
 
 La partida se arma como en test_niebla.py, se guarda con el adaptador de
 Carlos y se vuelve a armar con build_saved_game, que es lo que hace la

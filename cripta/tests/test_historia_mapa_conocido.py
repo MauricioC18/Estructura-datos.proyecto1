@@ -1,4 +1,4 @@
-"""El resumen de «historia» informa el mapa conocido de ese instante (specs/003-niebla-ir-a, FR-016).
+"""El resumen de «historia» informa el mapa conocido de ese instante (specs/005-niebla-ir-a, FR-016).
 
 Usa la partida que arma la aplicación con los datos offline (la primera
 cripta que se lista, sin depender de su id ni de su tamaño) y la consulta que

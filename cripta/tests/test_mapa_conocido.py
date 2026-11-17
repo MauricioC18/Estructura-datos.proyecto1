@@ -1,4 +1,4 @@
-"""Pruebas del mapa conocido (specs/003-niebla-ir-a).
+"""Pruebas del mapa conocido (specs/005-niebla-ir-a).
 
 Prueban la estructura sola, llamando a mano a los avisos que en la partida
 dará el motor (jugador_entro, puerta_cambio). Cada prueba cita en su docstring

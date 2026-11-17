@@ -1,4 +1,4 @@
-"""Pruebas del viaje automático «ir a» de punta a punta (specs/003-niebla-ir-a).
+"""Pruebas del viaje automático «ir a» de punta a punta (specs/005-niebla-ir-a).
 
 Corren el bucle del controlador sobre el motor real. Como el motor todavía no
 avisa al mapa conocido, el conocimiento se arma a mano antes del viaje; por eso

@@ -1,4 +1,4 @@
-"""Equivalencia de la parada anticipada de RutasMasBaratas (specs/003-niebla-ir-a).
+"""Equivalencia de la parada anticipada de RutasMasBaratas (specs/005-niebla-ir-a).
 
 La mejora (b) del plan agrega a la búsqueda un parámetro opcional, parar_en,
 que la detiene al asentar la sala del jugador. Estas pruebas comprueban, sobre

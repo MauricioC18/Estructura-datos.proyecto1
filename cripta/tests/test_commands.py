@@ -101,7 +101,7 @@ class TestGameActions(unittest.TestCase):
 
 
 class TestComandosDeLaNiebla(unittest.TestCase):
-    """Comandos «mapa» e «ir a <sala>» (specs/003-niebla-ir-a)."""
+    """Comandos «mapa» e «ir a <sala>» (specs/005-niebla-ir-a)."""
 
     def test_mapa_sin_argumentos(self):
         """FR-018: el comando para ver el mapa conocido."""
