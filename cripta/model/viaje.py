@@ -69,10 +69,15 @@ def validar_orden(game, mapa, destino):
 
 
 def siguiente_paso(game, mapa, destino):
-    """La salida por la que se da el próximo paso, o None si no hay ruta conocida."""
-    rutas = RutasMasBaratas(mapa.vecinas_conocidas, destino)
+    """La salida por la que se da el próximo paso, o None si no hay ruta conocida.
 
-    return rutas.primer_paso_desde(game.player.room_id)
+    La búsqueda se detiene en cuanto asienta la sala del jugador (mejora b
+    del plan): el primer paso es el mismo que con la búsqueda completa.
+    """
+    sala = game.player.room_id
+    rutas = RutasMasBaratas(mapa.vecinas_conocidas, destino, parar_en=sala)
+
+    return rutas.primer_paso_desde(sala)
 
 
 def hay_enemigos_vivos_en(game, id_sala):
