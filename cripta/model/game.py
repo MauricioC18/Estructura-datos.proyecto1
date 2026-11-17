@@ -20,6 +20,7 @@ from model.event import Event
 from model.item import Item
 from model.room import DIRECTIONS
 from structures.circular_log import CircularLog
+from structures.tabla_hash import TablaHash
 from structures.event_queue import EventQueue
 from structures.history import use_rewind_scroll
 from structures.inventory import is_rewind_scroll
@@ -189,6 +190,7 @@ class Game:
         self.timeline = timeline
         self._snapshot = snapshot
         self.known_map = _NoKnownMap() if known_map is None else known_map
+        self._entrantes_por_sala = None
 
         if start:
             self._begin_new_game()
@@ -827,14 +829,59 @@ class Game:
 
         return neighbours
 
+    def _incoming_exits_of(self, room_id):
+        """Salidas que ENTRAN a una sala: (id_origen, costo, salida).
+
+        Solo las que tienen la puerta abierta en este instante.
+
+        Hace falta porque el contrato del servicio describe cada salida como
+        dirigida y no exige que la sala destino declare la vuelta, asi que el
+        esqueleto puede dar un grafo asimetrico.
+
+        La topologia no cambia durante la partida, asi que el indice de
+        salidas que entran a cada sala se arma una sola vez, en O(V + E). Lo
+        que si cambia es el estado de las puertas, y eso se filtra al
+        consultar.
+        """
+        if self._entrantes_por_sala is None:
+            self._armar_entrantes()
+
+        entrantes = []
+
+        for origen, exit_ in self._entrantes_por_sala.obtener(room_id) or []:
+            if exit_.door.is_open:
+                entrantes.append((origen, exit_.cost, exit_))
+
+        return entrantes
+
+    def _armar_entrantes(self):
+        self._entrantes_por_sala = TablaHash()
+
+        if self.room_map is None:
+            return
+
+        for room_id in self.room_map.room_ids():
+            for exit_ in self.room_map.room(room_id).exits():
+                destino = exit_.destination
+
+                if not self._entrantes_por_sala.contiene(destino):
+                    self._entrantes_por_sala.insertar(destino, [])
+
+                self._entrantes_por_sala.obtener(destino).append((room_id, exit_))
+
     def _routes_towards_player(self):
         """Costos minimos desde la sala del jugador, para los cazadores.
 
         Se busca una sola vez desde la sala del jugador y sirve a todos los
-        cazadores activos: el grafo no tiene direccion, asi que la distancia
-        desde el jugador es la distancia hasta el jugador. El corte es el
-        rango mayor entre los cazadores activos; cada uno compara despues su
-        propia distancia contra su propio rango.
+        cazadores activos. El corte es el rango mayor entre los cazadores
+        activos; cada uno compara despues su propia distancia contra su propio
+        rango.
+
+        La busqueda se expande por las salidas que ENTRAN a cada sala, no por
+        las que salen, porque lo que hace falta es el costo de llegar HASTA el
+        jugador. El primer paso si usa las que salen. En una cripta donde toda
+        salida tiene vuelta las dos cosas coinciden, pero el contrato del
+        servicio describe cada salida como dirigida y no lo garantiza.
         """
         if self._routes is not None and not self.always_recompute_routes:
             return self._routes
@@ -846,7 +893,12 @@ class Game:
                 cut = max(cut, enemy.pursuit_range)
 
         self.route_searches += 1
-        routes = RutasMasBaratas(self._open_exits_of, self.player.room_id, cut)
+        routes = RutasMasBaratas(
+            self._incoming_exits_of,
+            self.player.room_id,
+            cut,
+            salidas_de=self._open_exits_of,
+        )
         self._routes = routes
 
         return routes

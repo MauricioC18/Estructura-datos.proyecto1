@@ -213,6 +213,38 @@ Idéntico, que es SC-008 y FR-019: recortar quita una acción y a lo sumo una co
 
 La línea le cuesta al ciclo un **16 % más**, que es lo que cuesta serializar el estado una vez cada 50 acciones. En términos absolutos son 0.0057 ms y el 0.21 % del límite, así que SC-009 se cumple con dos órdenes de magnitud de margen. El número se reporta tal cual: la línea **no** es gratis, simplemente es baratísima.
 
+### Remedición a escala de la cripta de referencia
+
+El 2026-11-17 se supo que la cripta de referencia es **cripta-06, de 300 salas**. Las mediciones de arriba se hicieron con 40 salas, donde una copia pesa 14 KiB. Se repitieron a 300 salas, donde una copia pesa **66.3 KiB**, 4.7 veces más.
+
+| *K* | Copias | Memoria en copias | Por consulta |
+| ---: | ---: | ---: | ---: |
+| 1 (la alternativa ingenua) | 301 | **19 969.0 KiB (19.5 MiB)** | 3.8696 ms |
+| 10 | 31 | 2 055.5 KiB | 4.0941 ms |
+| **50 (el valor por omisión)** | 7 | **463.9 KiB** | **4.3835 ms** |
+| 200 | 2 | 130.7 KiB | 5.9304 ms |
+
+**Estos números invierten parte del argumento con que se eligió *K*, y hay que decirlo.** A 40 salas se razonó que «con 98 KiB la memoria ya es irrelevante, así que lo que queda por optimizar es la latencia». A 300 salas no es así: la memoria varía **150 veces** entre los extremos (19.5 MiB contra 130 KiB) y el tiempo de consulta varía **1.5 veces** (3.87 contra 5.93 ms). Lo que varía ahora es la memoria, no la latencia.
+
+La razón está en la cifra de 66.3 KiB por copia: **el costo de una consulta pasó a estar dominado por deserializar la copia, no por repetir acciones.** Eso es lo que aplana la curva de latencia y lo que hace que subir *K* compre memoria casi gratis.
+
+**Se mantiene 50, y la justificación cambia.** Ya no es «la memoria no importa»: es que 463.9 KiB es poco en términos absolutos y deja la consulta por debajo de 5 ms, mientras *K* = 200 cambia 1.5 ms de latencia por 3.5 veces menos memoria. Las dos son defendibles; 50 favorece la latencia, y la bandera existe precisamente para subirlo. Lo que **sí** queda cerrado es la alternativa ingenua: una copia por acción cuesta **19.5 MiB** en la cripta de referencia, y eso es exactamente lo que §5.5 prohíbe.
+
+**Y apunta directo a la optimización que no se hizo.** Guardar en la copia solo el estado mutable, sin el esqueleto, mejoraría **las dos** cosas a la vez: menos memoria y consultas más rápidas, porque hay menos que deserializar. A 40 salas parecía un ahorro de bytes; a 300 salas es la mejora evidente de la capacidad. Sigue sin hacerse por la misma razón de antes —reutilizar el serializador ya probado— pero ahora el costo de esa decisión está medido.
+
+**El costo de una consulta sigue sin depender del largo de la partida** (*K* = 50, puntos repartidos): 5.14 ms a 50 acciones, 4.33 ms a 150 y 4.61 ms a 300. No es monótono, así que la dispersión es ruido de medición y no una tendencia; lo que la medición respalda es que no crece con el largo, que es SC-002.
+
+**El recorte por pergamino** sigue en 0.216 µs a 50 acciones y 0.241 µs a 300: constante, como pide SC-008.
+
+**El ciclo de eventos con la línea activa**:
+
+| Escenario | Por ciclo | Del límite de 20 ms |
+| --- | ---: | ---: |
+| 300 salas, sin copias | 0.0340 ms | 0.17 % |
+| 300 salas, con la línea, *K* = 50 | 0.0646 ms | 0.32 % |
+
+La línea le cuesta al ciclo un **90 % más** a esta escala, frente al 16 % que costaba a 40 salas, porque cada copia son 66 KiB que hay que serializar. En términos absolutos son 0.03 ms y el 0.32 % del límite, así que SC-009 se cumple de sobra, pero el número se reporta tal cual: **el costo de la línea sobre el ciclo crece con el tamaño de la cripta**, y es el tercer argumento a favor de guardar solo el estado mutable.
+
 ### La advertencia que hay que decir en la defensa
 
 Estas cifras son de una cripta de 40 salas, donde una copia pesa 14 KiB. **La memoria de las copias crece con el tamaño de la cripta**, porque una copia guarda la cripta entera, incluido el esqueleto, que no cambia nunca. En la cripta de la revisión, más grande, las copias pesarán más y puede convenir subir *K*; por eso es configurable.

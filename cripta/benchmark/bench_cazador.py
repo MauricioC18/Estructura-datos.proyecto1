@@ -246,8 +246,10 @@ def measure_event_cycle_with_hunters(room_count, hunter_count, pursuit_range,
     return time.perf_counter() - start, game
 
 
-ROOMS = 60
-HUNTERS = 50
+# La cripta de referencia publicada es cripta-06: 300 salas y 36 cazadores.
+# Las mediciones usan esa escala, y no la de las criptas de prueba.
+ROOMS = 300
+HUNTERS = 36
 SMALL_RANGE = 300
 WIDE_RANGE = 10 ** 6
 DECISIONS = 300
@@ -261,7 +263,7 @@ def run():
     measurements = []
 
     # 1. El corte por rango frente al tamano de la cripta.
-    for room_count in (60, 240, 600):
+    for room_count in (60, 300, 1200):
         seconds = measure_cut_by_range(room_count, SMALL_RANGE, RANGE_REPETITIONS)
         measurements.append(
             Measurement(
@@ -273,10 +275,10 @@ def run():
         )
 
     # Sin corte, para ver cuanto ahorra el rango.
-    seconds = measure_cut_by_range(600, WIDE_RANGE, RANGE_REPETITIONS)
+    seconds = measure_cut_by_range(1200, WIDE_RANGE, RANGE_REPETITIONS)
     measurements.append(
         Measurement(
-            "Decision sin corte efectivo en cripta de 600 salas",
+            "Decision sin corte efectivo en cripta de 1200 salas",
             seconds,
             f"{RANGE_REPETITIONS} decisiones, "
             f"{seconds / RANGE_REPETITIONS * 1000:.4f} ms por decision",
