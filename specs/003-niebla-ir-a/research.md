@@ -58,4 +58,18 @@ Cada punto sigue el formato Decisión / Motivo / Alternativas. Las tablas comple
 
 - **Decisión**: dos fuentes. (1) Criptas sintéticas deterministas por semilla en tres tamaños crecientes de mapa conocido, generadas por el módulo de mediciones. (2) Los datos reales de cada cripta del paquete sin conexión, cargados con `FuenteOffline` (`cripta/adapters/fuente_offline.py`), lo que incluye la cripta de referencia en cuanto el paquete la contenga. No se escribe ningún tamaño ni id de cripta.
 - **Motivo**: decisión del grupo tras la revisión de consistencia (hallazgos F5 e I1). Las sintéticas muestran la tendencia que piden FR-033 a FR-035 sin depender de datos externos. La cripta de referencia, ya publicada, es la condición literal de §6.1 para FR-036. Recorrer todas las criptas del paquete evita nombrar una en el código.
-- **Alternativas**: (a) Fijar un tamaño a partir de la cripta publicada más grande. Descartada: nombra un dato concreto y no es la condición de §6.1. (b) Medir solo sintéticas. Descartada: no comprueba FR-036 sobre la cripta que el enunciado indica.
+- **Alternativas (medición)**: (a) Fijar un tamaño a partir de la cripta publicada más grande. Descartada: nombra un dato concreto y no es la condición de §6.1. (b) Medir solo sintéticas. Descartada: no comprueba FR-036 sobre la cripta que el enunciado indica.
+
+## 8. Por qué un paso de «ir a» pasa de 5 ms y qué se prueba
+
+- **Decisión**: probar en orden (a) la clave de puerta calculada desde la salida, (b) la parada anticipada de la búsqueda en la sala del jugador y (c) reutilizar la ruta durante el viaje. Detalle en el plan, «Decisión revisada para FR-036».
+- **Motivo**: medido con `--bench` el 2026-11-16 (resultados en el plan). Un experimento aparte separó los dos costos con la misma búsqueda sobre las mismas cuadrículas:
+  - con las vecinas reales: 1.40 ms con 100 salas, 6.64 ms con 400 y 30.72 ms con 1600;
+  - con las vecinas conocidas: 2.40, 11.22 y 51.17 ms;
+  - solo pedir las vecinas conocidas de todas las salas: 1.24, 5.63 y 24.18 ms.
+
+  O sea, la búsqueda misma ya supera los 5 ms en mapas medianos (de ahí la mejora b), y el proveedor de vecinas conocidas le suma un costo parecido, casi todo por buscar la dirección de cada puerta (de ahí la mejora a). Reutilizar la ruta (c) baja el promedio por paso pero no el primer paso, así que va última.
+- **Alternativas**:
+  - Escribir una búsqueda propia de «ir a» con parada. Descartada: duplicaría el desempate. El parámetro opcional deja al cazador igual.
+  - Volver a la clave de texto. Descartada: no es única cuando dos salidas unen las mismas salas.
+  - Cambiar FR-036. Descartada: repite el enunciado (§6.1).

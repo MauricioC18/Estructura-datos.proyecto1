@@ -117,6 +117,8 @@ FR-026 exige recalcular «con el conocimiento vigente». Como la búsqueda va de
 | **Recalcular desde cero antes de cada paso** | Cumple FR-026 literalmente; no hay invalidación que pueda fallar | Una búsqueda por paso | **Elegida**, mientras la medición dé menos de 5 ms |
 | Reutilizar la búsqueda del viaje mientras el conocimiento no cambie (un contador de versión del conocimiento que se incrementa con cada exploración o cambio de puerta recordada) | Una búsqueda por viaje en lugar de una por paso: el jugador solo atraviesa salas ya exploradas, así que el conocimiento casi nunca cambia a mitad del viaje | Una invalidación más que mantener correcta, en una operación que el jugador pide a mano y no ocurre en el ciclo de eventos | Descartada, **se mide** contra la elegida. Si la elegida pasara de 5 ms, se cambia y se documenta |
 
+**Revisión del 2026-11-16, tras medir.** La elegida pasa de 5 ms desde 400 salas, y la regla de arriba («si pasa de 5 ms, reutilizar la búsqueda») **no alcanza**: reutilizar baja el promedio por paso, pero el primer paso de cada viaje sigue pagando la búsqueda completa. La decisión nueva está en la sección «Decisión revisada para FR-036», al final de las mediciones.
+
 ### 8. Dónde viven las reglas del viaje
 
 | Alternativa | A favor | En contra | Decisión |
@@ -311,6 +313,34 @@ Revertir no depende del tamaño del mapa conocido. Confirma la decisión 5.
 - reutilizar la búsqueda durante el viaje, alternativa (a);
 - aligerar la búsqueda compartida con el cazador, que es de Carlos;
 - y medir sobre la cripta de referencia en cuanto el paquete la tenga.
+
+### Decisión revisada para FR-036
+
+**Qué cambia.** La regla «si la medición 5 pasa de 5 ms, reutilizar la ruta durante el viaje» se reemplaza. No alcanza, porque el primer paso de cada viaje paga una búsqueda completa. Se prueban tres mejoras **en este orden**, cada una en su propio commit, con la medición 5 antes y después, en los mismos tamaños y con las mismas semillas.
+
+Para que la comparación mida lo que el programa hace, la medición 5 pasa a medir el paso que da el viaje (`model/viaje.py`) y no la búsqueda suelta. La línea base se toma con esa medición, antes de la primera mejora.
+
+**(a) Calcular la clave de puerta desde la salida que ya se tiene.**
+- El proveedor de vecinas conocidas recorre las salidas de una sala, así que ya sabe la sala y la dirección de cada salida. Hoy calcula la clave buscando por qué dirección sale la puerta de `room_a`, y eso es lo caro (medición 2).
+- El recuerdo de una puerta se guarda bajo la clave de **cada lado**: `id de la sala × 4 + dirección de esa salida`. Una puerta de doble sentido tiene dos entradas con el mismo valor; una de un solo sentido, una.
+- Consultar desde una salida es directo, sin buscar nada. Observar una puerta escribe los dos lados; buscar la salida del otro lado son a lo sumo 4 comparaciones, y observar es raro.
+- La exportación no cambia: sigue entregando un par por puerta, con la clave del lado `room_a`.
+- Toca solo `structures/mapa_conocido.py`.
+- Clave de texto sigue descartada: no es única.
+
+**(b) Detener la búsqueda de «ir a» cuando se asienta la sala del jugador.**
+- Se agrega a `RutasMasBaratas` un parámetro opcional de parada. Sin él, la búsqueda hace exactamente lo de hoy, así que el cazador no cambia. Es de Carlos: va en su propio commit para que él lo revise, sin tocar sus pruebas.
+- **Por qué el desempate de FR-024 sigue siendo correcto.** La búsqueda asienta las salas en orden de distancia no decreciente, desempatando por id. Cuando asienta la sala del jugador *p*, su distancia *d* es definitiva. Para el desempate solo importan las vecinas *v* con `costo(p, v) + dist(v) = d`. Como todo costo es al menos 1 (FR-001 de la capacidad 001), `dist(v) = d − costo(p, v) < d`. La búsqueda saca primero todo lo de distancia menor que *d*, así que cada una de esas *v* ya está asentada y su distancia es definitiva.
+- Una vecina *w* que todavía no está asentada tiene distancia real al menos *d*, y su distancia provisional es mayor o igual que la real. Entonces `costo(p, w) + provisional(w) ≥ 1 + d > d`, y nunca cumple la igualdad: no puede colarse en el desempate.
+- El primer paso es, por lo tanto, idéntico al del cálculo completo. Lo comprueba una prueba que compara las dos decisiones sobre muchos mapas sintéticos deterministas, con empates de costo y salidas paralelas.
+- Con la parada, solo son definitivas las distancias de las salas asentadas. Pedir el primer paso desde una sala no asentada es un error y la búsqueda lo rechaza.
+
+**(c) Reutilizar la ruta durante el viaje.**
+- Es la alternativa de la decisión 7. Se combina con (b): después de parar en *p*, cada sala siguiente de la ruta tiene distancia menor que *d*, así que ya está asentada y su primer paso es válido sin buscar de nuevo.
+- La ruta se reutiliza solo mientras no cambie el conocimiento. El mapa conocido lleva un número de versión que sube con cada exploración, cada cambio de puerta recordada y cada reversión. Si la versión cambió, o la sala del jugador no está asentada en la búsqueda guardada, se busca de nuevo.
+- Así se cumple FR-026: la decisión es la que daría recalcular con el conocimiento vigente. Lo comprueba una prueba que compara viajes con y sin reutilizar.
+
+**Qué no cambia.** FR-036 y la especificación. Si después de las tres mejoras un paso sigue pasando de 5 ms en el tamaño de la cripta de referencia, se documenta el resultado y el límite en el Documento de Decisiones, sin esconderlo.
 
 ## Riesgos
 
