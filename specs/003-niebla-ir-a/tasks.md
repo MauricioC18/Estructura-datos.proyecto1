@@ -60,7 +60,7 @@ Formato: `- [ ] Tnnn [P] [Hn] [AB] [BLOQUEADA: …] Descripción, en archivo —
 
 **Objetivo**: el viaje completo con sus motivos de parada. Las reglas van en el modelo y el bucle en el controlador (plan, decisión 8).
 
-- [X] T020 [AB] Crear `cripta/model/viaje.py` con la validación de la orden (depende de T001). Recibe el estado de la partida y el mapa conocido explícitamente, para no depender de T011. Acepta solo una sala explorada distinta de la actual. Una sala no explorada y un id inexistente se rechazan con **el mismo mensaje**. El rechazo no consume tiempo ni toca nada — FR-022
+- [X] T020 [AB] Crear `cripta/model/viaje.py` con la validación de la orden (depende de T001). Recibe el estado de la partida y el mapa conocido explícitamente, para no depender de T011. Acepta solo una sala explorada distinta de la actual. Una sala no explorada y un id inexistente se rechazan con **el mismo mensaje**. Con la partida terminada, la orden también se rechaza. El rechazo no consume tiempo ni toca nada — FR-022, FR-038
 - [X] T021 [AB] Agregar el siguiente paso en `cripta/model/viaje.py` (depende de T005, T020): construir `RutasMasBaratas(mapa.vecinas_conocidas, origen=destino, corte=None)` desde `cripta/structures/rutas_mas_baratas.py` y devolver `primer_paso_desde(sala_del_jugador)` (una salida), o nada si no hay ruta. Se recalcula en cada llamada, sin reutilizar nada (plan, decisión 7) — FR-023, FR-024, FR-026, FR-027
 - [X] T022 [AB] Agregar los motivos de parada en `cripta/model/viaje.py` (depende de T020) — FR-025, FR-028, FR-029, FR-030. Son dos funciones:
   - (1) **Antes de mover**: «¿hay enemigos vivos en esta sala?», para la sala destino del paso, con su contenido ya cargado. Cuenta los vivos, activos o dormidos (FR-028 (b)); los muertos no.

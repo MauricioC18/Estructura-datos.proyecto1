@@ -1699,3 +1699,21 @@ Corrige primero la spec (specs/003-niebla-ir-a/spec.md y su checklist, nada más
 Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` y su lista de verificación.
 
 Cambios realizados por el estudiante: Al revisar la implementación se notó que el viaje rechazaba la orden con la partida terminada por decisión de la herramienta, siguiendo la regla de la primera parte de que una partida terminada rechaza toda acción, pero sin que la especificación lo dijera. Según §1 del enunciado, un programa que hace algo que ninguna especificación describe es un defecto, así que se corrige primero la especificación, en una confirmación aparte, antes de que el código quede como lo único que lo describe. Se agregó como FR-038 y no como supuesto, porque es una regla del juego que se puede probar, y se numeró después del último requisito para no cambiar los identificadores que ya citan las pruebas y las tareas.
+
+### 2.37 Alinear tareas, plan y prueba con FR-038
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Después de la confirmación de la especificación con FR-038, llevar el requisito nuevo a la tarea, a la trazabilidad del plan y a la prueba que ya lo comprobaba, en una confirmación aparte.
+
+Prompts utilizados:
+
+```text
+Sí, hazlo ahora, en UN commit aparte posterior al de la spec: agrega FR-038 a T020 en tasks.md y a la trazabilidad de plan.md, y cambia el docstring de test_con_la_partida_terminada_se_rechaza en cripta/tests/test_viaje.py para que cite FR-038. No cambies nada más. Corre todas las pruebas, dime cuántas pasan, haz el commit (mensaje: "Alinea tareas, plan y prueba con FR-038") y NO hagas push.
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/tasks.md`, `specs/003-niebla-ir-a/plan.md` y `cripta/tests/test_viaje.py`.
+
+Cambios realizados por el estudiante: Se respetó el orden que exige la constitución: la especificación primero, en su propia confirmación, y después lo que depende de ella. La prueba ya comprobaba el comportamiento; solo citaba el requisito equivocado, que es justo lo que se revisa en la defensa al seguir un requisito hasta su prueba.

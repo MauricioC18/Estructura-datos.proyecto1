@@ -274,6 +274,7 @@ Si la medición 5 da más de 5 ms, se cambia a la alternativa (a), se documenta 
 | FR-018, FR-019 | `controller/commands.py`, `controller/application.py`, `view/console_view.py` | `tests/test_commands.py`, `tests/test_console_view.py` |
 | FR-020, FR-021 | `controller/application.py`, `view/console_view.py` | `tests/test_console_view.py` |
 | FR-022 a FR-030 | `model/viaje.py`, `controller/game_controller.py` | `tests/test_ir_a.py`, que incluye la comprobación de SC-008 a lo largo de un viaje completo |
+| FR-038 | `model/viaje.py` (validación de la orden) | `tests/test_viaje.py` |
 | FR-031 | `controller/game_controller.py`, `replay/replay_log.py` | `tests/test_ir_a.py`, `tests/test_replay_log.py` |
 | FR-032 | ninguno propio: cada paso es una acción del historial | `tests/test_ir_a.py` |
 | FR-033, FR-034, FR-036 | el diseño completo | mediciones 1, 3 y 5 |

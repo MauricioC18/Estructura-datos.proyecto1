@@ -116,7 +116,7 @@ class TestValidarOrden(unittest.TestCase):
         self.assertTrue(validar_orden(self.game, self.mapa, 2).accepted)
 
     def test_con_la_partida_terminada_se_rechaza(self):
-        """FR-022: como cualquier acción, con la partida terminada no hay viaje."""
+        """FR-038: como cualquier acción, con la partida terminada no hay viaje."""
         explorar(self.mapa, 2)
         self.game.result = "derrota"
 
