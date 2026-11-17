@@ -1661,3 +1661,23 @@ Sí, aplica el cambio a la spec tal como lo propusiste [...] Luego ajusta plan.m
 Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` y su lista de verificación, por un lado; `plan.md`, `research.md` y `tasks.md`, por otro.
 
 Cambios realizados por el estudiante: La comparación contra el texto del enunciado mostró que la contradicción no venía del plan sino de la especificación: la primera oración de FR-036 repetía §6.1, pero la segunda, SC-006 y una aclaración agregaban una regla de medición que el enunciado no dice y que había salido de una aclaración anterior del propio grupo. Se quitó esa regla de la especificación. La aclaración original no se borró, para que el registro de lo decidido ese día siga intacto; se marcó como reemplazada y se agregó la nueva. Para no escribir el id de la cripta de referencia en el código, la medición recorre todas las criptas del paquete sin conexión y las reporta con el id que traen sus datos.
+
+### 2.35 Implementación de la niebla de guerra, tramo sin dependencias, con /speckit.implement
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Implementar la parte de `specs/003-niebla-ir-a` que no depende de archivos de otros integrantes: el mapa conocido, la reversión, exportar e importar, las reglas del viaje en el modelo, los comandos y la presentación del mapa.
+
+Prompts utilizados:
+
+```text
+Ejecuta /speckit-implement para specs/003-niebla-ir-a, SOLO el tramo que no depende de otros integrantes.
+
+[El prompt completo enumera el alcance (mapa conocido; exploración, antorcha y observación de puertas con avisos simulados desde las pruebas; reversión con el historial existente, incluidas la antorcha y la sala avistada por dos; exportar e importar; reglas de «ir a» en el modelo reutilizando la búsqueda del cazador; comandos mapa e ir a y la presentación del mapa) y los límites: no tocar model/game.py ni adapters/almacen_partida.py, ni el bucle de pasos del controlador, las banderas, el bench, el README o DECISIONES.md; cada prueba cita sus FR; respetar §6.2 con claves de tabla enteras o de texto; ningún dato de cripta en el código; marcar las tareas; commits pequeños que citen los FR, sin push ni cambio de rama; avisar si la especificación o el plan están mal; buscar un Python real.]
+```
+
+Uso en el proyecto: `cripta/structures/mapa_conocido.py`, `cripta/model/viaje.py`, `cripta/controller/commands.py`, `cripta/replay/replay_log.py`, `cripta/controller/application.py`, `cripta/view/console_view.py` y las pruebas `tests/test_mapa_conocido.py`, `tests/test_viaje.py`, `tests/test_vista_mapa_conocido.py`, `tests/test_commands.py` y `tests/test_replay_log.py`.
+
+Cambios realizados por el estudiante: Se hizo solo lo que no necesitaba los avisos del motor: las pruebas llaman a mano a los avisos que algún día dará el motor, y las reglas del viaje se probaron moviendo al jugador con el motor real y actualizando el mapa conocido a mano. Quedaron sin hacer, y así marcadas, las tareas que necesitan que la partida tenga el mapa conocido, aunque algunas tocaran solo archivos propios, porque conectarlas antes haría fallar el inicio de toda partida. Tres pruebas fallaron al primer intento, y en los tres casos el error era de la prueba y no del código: dos topologías asignaban dos salidas a la misma dirección de una sala, y una prueba suponía un orden de salidas distinto del real, que es N, S, E, O. Las reglas del viaje se escribieron en un módulo aparte del motor en vez de dentro de él, para no tocar el archivo de otro integrante y porque así se prueban sin armar un viaje entero.
