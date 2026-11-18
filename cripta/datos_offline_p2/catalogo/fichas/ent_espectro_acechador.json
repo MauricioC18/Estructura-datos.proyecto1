@@ -1,0 +1,12 @@
+{
+  "id": "ent_espectro_acechador",
+  "nombre": "Espectro acechador",
+  "clase": "enemigo",
+  "vida_max": 10,
+  "ataque": 3,
+  "defensa": 1,
+  "velocidad": 100,
+  "comportamiento": "cazador",
+  "rango": 2400,
+  "suelta": []
+}

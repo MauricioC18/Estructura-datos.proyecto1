@@ -1,0 +1,11 @@
+{
+  "sala": 151,
+  "enemigos": [
+    {
+      "instancia": "e-cripta-06-39",
+      "tipo": "ent_sabueso_oseo"
+    }
+  ],
+  "objetos": [],
+  "trampas": []
+}

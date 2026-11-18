@@ -1,0 +1,11 @@
+{
+  "sala": 35,
+  "enemigos": [
+    {
+      "instancia": "e-cripta-06-46",
+      "tipo": "ent_espectro_acechador"
+    }
+  ],
+  "objetos": [],
+  "trampas": []
+}

@@ -1,0 +1,11 @@
+{
+  "sala": 51,
+  "enemigos": [],
+  "objetos": [],
+  "trampas": [
+    {
+      "instancia": "t-cripta-06-59",
+      "tipo": "trp_dardos"
+    }
+  ]
+}

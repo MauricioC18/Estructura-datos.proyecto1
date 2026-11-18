@@ -1,0 +1,10 @@
+{
+  "id": "ent_guardian_oseo",
+  "nombre": "Guardián óseo",
+  "clase": "enemigo",
+  "vida_max": 16,
+  "ataque": 5,
+  "defensa": 2,
+  "velocidad": 90,
+  "comportamiento": "guardián"
+}

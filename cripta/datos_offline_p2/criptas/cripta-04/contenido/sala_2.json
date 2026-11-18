@@ -1,0 +1,9 @@
+{
+  "sala": 2,
+  "enemigos": [],
+  "objetos": [
+    "itm_daga_oxidada",
+    "itm_llave_bronce"
+  ],
+  "trampas": []
+}

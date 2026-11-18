@@ -1,0 +1,11 @@
+{
+  "sala": 141,
+  "enemigos": [],
+  "objetos": [
+    "itm_antorcha",
+    "itm_daga_oxidada",
+    "itm_coraza_cuero",
+    "itm_pocion_menor"
+  ],
+  "trampas": []
+}

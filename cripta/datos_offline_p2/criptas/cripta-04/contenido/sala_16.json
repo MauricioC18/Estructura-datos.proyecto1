@@ -1,0 +1,11 @@
+{
+  "sala": 16,
+  "enemigos": [
+    {
+      "instancia": "e-cripta-04-8",
+      "tipo": "ent_carcelero_errante"
+    }
+  ],
+  "objetos": [],
+  "trampas": []
+}

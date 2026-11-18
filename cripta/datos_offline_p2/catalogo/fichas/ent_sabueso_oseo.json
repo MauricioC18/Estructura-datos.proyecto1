@@ -1,0 +1,12 @@
+{
+  "id": "ent_sabueso_oseo",
+  "nombre": "Sabueso óseo",
+  "clase": "enemigo",
+  "vida_max": 12,
+  "ataque": 4,
+  "defensa": 1,
+  "velocidad": 110,
+  "comportamiento": "cazador",
+  "rango": 600,
+  "suelta": []
+}

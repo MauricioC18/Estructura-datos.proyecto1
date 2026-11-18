@@ -1,0 +1,18 @@
+{
+  "id": "cripta-06",
+  "version": "f9ed9afa683d",
+  "salas_total": 300,
+  "paginas": 6,
+  "salas_por_pagina": 50,
+  "sala_inicial": 141,
+  "sala_salida": 160,
+  "llave_salida": "itm_llave_negra",
+  "presupuesto_solicitudes": 63,
+  "inventario_max": 10,
+  "jugador": {
+    "vida_max": 30,
+    "ataque": 6,
+    "defensa": 2,
+    "velocidad": 100
+  }
+}

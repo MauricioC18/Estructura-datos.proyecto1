@@ -1,0 +1,16 @@
+{
+  "llaves": [
+    {
+      "id": "itm_llave_bronce",
+      "sala": 2
+    },
+    {
+      "id": "itm_llave_negra",
+      "sala": 23
+    },
+    {
+      "id": "itm_llave_hierro",
+      "sala": 24
+    }
+  ]
+}

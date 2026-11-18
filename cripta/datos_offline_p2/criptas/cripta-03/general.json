@@ -1,0 +1,18 @@
+{
+  "id": "cripta-03",
+  "version": "f9186ac25124",
+  "salas_total": 40,
+  "paginas": 1,
+  "salas_por_pagina": 50,
+  "sala_inicial": 1,
+  "sala_salida": 34,
+  "llave_salida": "itm_llave_negra",
+  "presupuesto_solicitudes": 42,
+  "inventario_max": 10,
+  "jugador": {
+    "vida_max": 30,
+    "ataque": 6,
+    "defensa": 2,
+    "velocidad": 100
+  }
+}
