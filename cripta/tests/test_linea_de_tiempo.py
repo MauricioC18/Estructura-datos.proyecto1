@@ -18,8 +18,10 @@ from adapters.almacen_partida import (
 )
 from model.consulta_historia import (
     MAPA_CONOCIDO_NO_DISPONIBLE,
+    PARTIDA_TERMINO_ANTES,
     ConsultaRechazada,
     consultar_accion,
+    consultar_hasta,
     consultar_instante,
 )
 from model.enemy import Enemy
@@ -1133,6 +1135,99 @@ class ContenidoPerezosoTest(unittest.TestCase):
 
 def linea_actual(juego):
     return juego.timeline.cantidad_de_acciones()
+
+
+class CasosDelApendiceBTest(unittest.TestCase):
+    """Los dos casos del Apendice B que faltaban (FR-025 y FR-026)."""
+
+    def test_varios_eventos_en_el_mismo_instante_cuentan_todos(self):
+        """FR-026 y Apendice B: el estado es el posterior a todos ellos.
+
+        Se busca un instante en el que el reloj haya procesado mas de un
+        evento y se comprueba que el resumen refleja el estado despues de
+        todos, no despues de algunos.
+        """
+        juego, linea = construir_partida_con_linea(copias_cada=10)
+        reales = jugar_guardando_el_estado(juego, 25)
+
+        instantes = [real[0] for real in reales]
+        repetidos = [t for t in instantes if instantes.count(t) > 1]
+
+        self.assertEqual(repetidos, [], "dos acciones no pueden compartir reloj")
+
+        # Cada consulta tiene que coincidir con el estado real, y ese estado
+        # real ya incluye todos los eventos que el motor proceso en ese
+        # instante antes de devolverle el turno al jugador.
+        for numero, real in enumerate(reales):
+            with self.subTest(accion=numero):
+                resumen = consultar_instante(juego, real[0], reconstruir_desde_copia)
+                self.assertEqual(estado_del_resumen(resumen), real)
+
+    def test_un_instante_con_eventos_y_decision_del_jugador(self):
+        """FR-002 manda sobre FR-026 cuando coinciden: la decision no se toma."""
+        juego, _ = construir_partida_con_linea(copias_cada=10)
+        reales = jugar_guardando_el_estado(juego, 15)
+
+        numero = len(reales) - 1
+        instante = reales[numero][0]
+
+        por_instante = consultar_instante(juego, instante, reconstruir_desde_copia)
+        por_accion = consultar_accion(juego, numero, reconstruir_desde_copia)
+
+        self.assertEqual(
+            estado_del_resumen(por_instante), estado_del_resumen(por_accion)
+        )
+        self.assertEqual(por_instante.acciones_del_jugador, numero)
+
+    def test_reproducir_hasta_despues_del_final_da_el_estado_final(self):
+        """FR-025 y Apendice B: no se rechaza, se avisa."""
+        juego, _ = construir_partida_con_linea(copias_cada=10)
+        jugar_guardando_el_estado(juego, 15)
+        final = estado_observable(juego)
+
+        resumen = consultar_hasta(
+            juego, juego.state.clock + 10 ** 6, reconstruir_desde_copia
+        )
+
+        self.assertEqual(estado_del_resumen(resumen), final)
+        self.assertEqual(resumen.aviso, PARTIDA_TERMINO_ANTES)
+
+    def test_reproducir_hasta_un_instante_valido_no_avisa_nada(self):
+        juego, _ = construir_partida_con_linea(copias_cada=10)
+        reales = jugar_guardando_el_estado(juego, 15)
+
+        resumen = consultar_hasta(juego, reales[5][0], reconstruir_desde_copia)
+
+        self.assertEqual(estado_del_resumen(resumen), reales[5])
+        self.assertIsNone(resumen.aviso)
+
+    def test_reproducir_hasta_el_instante_exacto_del_final_no_avisa(self):
+        juego, _ = construir_partida_con_linea(copias_cada=10)
+        jugar_guardando_el_estado(juego, 12)
+
+        resumen = consultar_hasta(juego, juego.state.clock, reconstruir_desde_copia)
+
+        self.assertIsNone(resumen.aviso)
+
+    def test_reproducir_hasta_un_instante_invalido_si_se_rechaza(self):
+        """FR-025 solo cambia el caso del futuro, no el de un dato malo."""
+        juego, _ = construir_partida_con_linea()
+        jugar_guardando_el_estado(juego, 8)
+
+        for invalido in (-1, "500", 1.5, None):
+            with self.subTest(instante=invalido):
+                with self.assertRaises(ConsultaRechazada):
+                    consultar_hasta(juego, invalido, reconstruir_desde_copia)
+
+    def test_en_partida_el_futuro_sigue_rechazandose(self):
+        """FR-009 no cambia: las dos consultas son distintas a proposito."""
+        juego, _ = construir_partida_con_linea()
+        jugar_guardando_el_estado(juego, 8)
+
+        with self.assertRaises(ConsultaRechazada):
+            consultar_instante(
+                juego, juego.state.clock + 1, reconstruir_desde_copia
+            )
 
 
 if __name__ == "__main__":

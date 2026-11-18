@@ -1659,3 +1659,27 @@ El segundo: se había dejado rechazada la combinación de la parada anticipada c
 El tercero es el que más enseña. En una partida real el contenido de cada sala se descarga cuando el jugador va a entrar, y lo carga el controlador justo antes del movimiento. Un punto de control tomado cuando esa sala todavía no estaba cargada hacía que, al reconstruir un instante, el motor rechazara el movimiento y el resumen se quedara en la sala anterior **sin dar ningún error**. La prueba de equivalencia propia no lo detectaba porque su cripta marcaba todas las salas como cargadas desde el inicio: el escenario de prueba era más permisivo que el programa real, que es exactamente la misma forma de error que ya había aparecido dos veces en esta capacidad. Se arregló aplicando el principio que ya estaba establecido —la información que entra desde afuera y que la lista de acciones no puede reproducir obliga a re-anclar con una copia— y se agregó una prueba que camina cargando el contenido como lo hace el controlador. El punto de control tiene que tomarse antes del movimiento y no después, porque uno posterior dejaría el movimiento problemático dentro del tramo anterior.
 
 Se anotó además, para la defensa, que los tres defectos los encontraron otros y que dos de ellos los habría encontrado antes una prueba menos benévola.
+
+### 2.33 Los casos del Apéndice B que faltaban y las dos mediciones
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-17
+
+Objetivo: Cerrar la trazabilidad de la línea de tiempo contra el Apéndice B y completar las mediciones que faltaban, a partir de una revisión de un compañero.
+
+Prompts utilizados:
+
+```text
+[Se le pasó el mensaje de revisión de Steven] ¿Me podrías decir qué podría hacer y si ocuparía terminar algo? Dime si falta algo, para terminar lo mío de modo que cumpla al 100% mi parte con la rúbrica y que no haya incumplido ninguna regla.
+```
+
+Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md` y su lista de verificación, `model/consulta_historia.py`, `benchmark/bench_linea_de_tiempo.py` y `tests/test_linea_de_tiempo.py`.
+
+Cambios realizados por el estudiante: El compañero señaló dos escenarios que faltaban. Al ir a agregarlos se encontró algo peor: la lista de verificación de la capacidad afirmaba que el Apéndice B tenía **dos** casos de línea de tiempo y tiene **seis**. Dos estaban cubiertos por requisitos existentes pero sin mapear, y dos no estaban cubiertos. Es un fallo de trazabilidad del §2.5, que exige que cada caso del Apéndice B aparezca como escenario de aceptación en alguna especificación, y se originó en haber leído el apéndice sin contar los casos.
+
+Uno de los casos que faltaban **contradecía** un requisito ya escrito. FR-009 rechazaba cualquier consulta de un instante posterior al reloj, y el Apéndice B pide que reproducir una bitácora hasta un instante posterior al final muestre el estado final e indique que la partida terminó antes. Se resolvió separando los dos caminos con FR-025, con el motivo escrito: en partida el futuro de verdad no ocurrió, pero reproducir una partida ya terminada no tiene futuro que inventar, solo un final al que llegar, y pedir «hasta el instante 9999» de una partida que duró 3 000 es una forma normal de pedir el final. La corrección fue a la especificación primero y en su propia confirmación.
+
+El otro caso, varios eventos en el mismo instante, resultó ya estar bien implementado: lo que faltaba era el escenario y la prueba. Se agregaron dos, uno sin decisión del jugador en ese instante y otro con ella, porque en ese cruce manda FR-002 y conviene que quede fijado.
+
+Las dos mediciones que el compañero pidió resultaron ser las que mejor defienden el diseño, y no se veían con las partidas cortas que se habían medido. Sin puntos de control, una consulta en una partida de 5 000 acciones cuesta 65.59 ms, más de tres veces el presupuesto completo de 20 ms del ciclo de eventos, y es la única variante cuyo costo crece con el largo de la partida. Con el valor por omisión cuesta 4.24 ms y sigue costando lo mismo que en una partida de 300 acciones. Ese par de números es lo que justifica que los puntos de control existan, y hasta hoy el documento no lo tenía.

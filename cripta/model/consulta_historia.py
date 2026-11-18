@@ -46,6 +46,11 @@ from model.game import (
 MAPA_CONOCIDO_NO_DISPONIBLE = "todavia no implementado"
 
 
+PARTIDA_TERMINO_ANTES = (
+    "La partida termino antes del instante pedido; se muestra el estado final."
+)
+
+
 class ConsultaRechazada(ValueError):
     """El instante o el numero de accion pedidos no se pueden consultar."""
 
@@ -60,6 +65,7 @@ class ResumenDeInstante:
     """
 
     __slots__ = (
+        "aviso",
         "instante",
         "acciones_del_jugador",
         "sala",
@@ -133,6 +139,34 @@ def consultar_accion(juego, numero_de_accion, reconstruir_copia):
     return _reconstruir(
         juego, linea, numero_de_accion, instante, reconstruir_copia
     )
+
+
+def consultar_hasta(juego, instante, reconstruir_copia):
+    """Resumen para una reproduccion sin interaccion (FR-014, FR-025).
+
+    Se diferencia de consultar_instante en un solo punto, y es a proposito: si
+    el instante pedido es POSTERIOR al final de la partida, no se rechaza. Se
+    devuelve el estado final con un aviso de que la partida termino antes.
+
+    El motivo es que reproducir una partida ya terminada no tiene futuro que
+    inventar, solo un final al que llegar: pedir «hasta el instante 9999» de
+    una partida que duro 3 000 es una forma normal de pedir el final. En
+    partida, en cambio, el futuro de verdad no ocurrio y FR-009 lo rechaza.
+    """
+    _exigir_entero(instante, "El instante")
+
+    if instante < 0:
+        raise ConsultaRechazada(
+            f"No existe el instante {instante}: el reloj empieza en 0."
+        )
+
+    if instante <= juego.state.clock:
+        return consultar_instante(juego, instante, reconstruir_copia)
+
+    resumen = consultar_instante(juego, juego.state.clock, reconstruir_copia)
+    resumen.aviso = PARTIDA_TERMINO_ANTES
+
+    return resumen
 
 
 def _reconstruir(juego, linea, numero_de_accion, instante, reconstruir_copia):

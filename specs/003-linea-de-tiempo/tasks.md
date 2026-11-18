@@ -48,6 +48,8 @@ Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porqu
 - [x] T018 No romper nada: la suite completa
 - [x] T019 Dejarle la interfaz lista a la Persona 4 para las dos banderas nuevas
 - [x] T020 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
+- [x] T021 Cubrir los cuatro casos del Apéndice B que faltaban, en `spec.md` y `model/consulta_historia.py`
+- [x] T022 Medir los dos extremos y una partida de 5 000 acciones, en `benchmark/bench_linea_de_tiempo.py`
 
 ---
 
@@ -351,6 +353,40 @@ Las dos banderas nuevas son de la Persona 4: `--checkpoint-cada K` y `--replay .
 Incluir el aviso de que el formato del archivo de partida subió a la versión 3.
 
 **Depende de**: T005
+
+---
+
+## T021 — Los cuatro casos del Apéndice B que faltaban
+
+**Requisitos**: FR-025, FR-026
+
+**Archivos**: `specs/003-linea-de-tiempo/spec.md`, `cripta/model/consulta_historia.py`, `cripta/tests/test_linea_de_tiempo.py`
+
+La lista de verificación decía que el Apéndice B tenía dos casos de línea de tiempo y tiene **seis**. Dos estaban cubiertos y sin mapear; dos no estaban cubiertos, y uno de esos **contradecía** a FR-009.
+
+- `--replay --hasta t` con *t* posterior al final: mostrar el estado final e **indicar** que la partida terminó antes, en vez de rechazar. Es FR-025, y se separa de FR-009 a propósito: en partida el futuro no ocurrió, pero reproducir una partida terminada solo tiene un final al que llegar.
+- Varios eventos en el mismo instante: el estado es el posterior a **todos**, salvo la decisión del jugador que le corresponda a ese instante, que por FR-002 todavía no se toma. Es FR-026.
+
+**Verificable cuando**: reproducir hasta un instante posterior al final devuelve el estado final con su aviso; reproducir hasta un instante válido no avisa nada; en partida el futuro se sigue rechazando; y un instante con varios eventos coincide con el estado real.
+
+**Depende de**: T005
+
+---
+
+## T022 — Los dos extremos y una partida larga
+
+**Requisitos**: FR-016, FR-017
+
+**Archivo**: `cripta/benchmark/bench_linea_de_tiempo.py`
+
+Faltaban las dos mediciones que mejor defienden el diseño, y las pidió Steven al revisar:
+
+- **Sin puntos de control**, solo la copia inicial. Es el extremo opuesto a una copia por acción y lo pide §5.5.
+- Una partida de **5 000 acciones**, veinte veces más larga que lo medido hasta entonces.
+
+**Verificable cuando**: los dos números están en el plan y en el Documento de Decisiones, con la conclusión que se saca de ellos.
+
+**Depende de**: T016
 
 ---
 

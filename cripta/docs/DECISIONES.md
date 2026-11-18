@@ -2470,6 +2470,28 @@ menos memoria. Las dos son defendibles; 50 favorece la latencia, y la bandera
 alternativa ingenua: **19.5 MiB** en la cripta de referencia, que es exactamente lo que
 §5.5 prohíbe.
 
+
+**Los dos extremos y la partida larga.** Steven pidió al revisar dos mediciones que faltaban, y las dos resultaron ser las que mejor defienden el diseño:
+
+| Escenario (300 salas) | Por consulta | Memoria en copias |
+| --- | ---: | ---: |
+| Una copia por acción (*K* = 1) | 4.0594 ms | 19 969.0 KiB |
+| *K* = 50 | 4.5894 ms | 463.9 KiB |
+| **Sin puntos de control**, solo la copia inicial | **7.8789 ms** | 63.6 KiB |
+
+Y en una partida de **5 000 acciones**, que es veinte veces más larga que la medida hasta ahora:
+
+| Escenario | Por consulta | Memoria en copias | Memoria en acciones |
+| --- | ---: | ---: | ---: |
+| *K* = 50 | **4.24 ms** | 6 917.0 KiB | 122.05 KiB |
+| Sin puntos de control | **65.59 ms** | 63.6 KiB | 122.05 KiB |
+
+**Esto es lo que justifica que los puntos de control existan, y no se veía con 300 acciones.** Sin ellos, una consulta cuesta 65.59 ms: **más de tres veces el presupuesto completo de 20 ms del ciclo de eventos**, y para una sola consulta. Con *K* = 50 cuesta 4.24 ms y, lo que importa más, **sigue costando lo mismo que en una partida de 300 acciones**: 4.71 ms allá, 4.24 ms acá.
+
+Sin puntos de control es la única variante cuyo costo **crece con el largo de la partida**, porque una consulta tiene que repetir todas las acciones desde el inicio. De 7.88 ms con 300 acciones a 65.59 ms con 5 000 es casi exactamente proporcional, como era de esperar.
+
+La memoria de las acciones confirma FR-017 en el otro sentido: 7.32 KiB con 300 acciones y 122.05 KiB con 5 000, es decir **lineal con lo que pasó y no con el tamaño del estado**.
+
 **El costo de una consulta no depende del largo de la partida** (*K* = 50, puntos
 repartidos): 5.14 ms a 50 acciones, 4.33 ms a 150 y 4.61 ms a 300. **No es monótono**, así
 que la dispersión es ruido de medición y no una tendencia; lo que la medición respalda es
