@@ -2122,6 +2122,28 @@ Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md` (Historia 6, un caso bor
 
 Cambios realizados por el estudiante: Ninguna historia de la especificación 003 hablaba de consultar sin interacción, y el caso no encajaba en la Historia 2, que es la del rechazo. Por eso se agregó una Historia 6 corta. Hacía falta un requisito nuevo, porque FR-014 no dice qué pasa después del final: FR-025 quedó al final de los requisitos funcionales, sin reenumerar ninguno, y deja dicho que FR-009 (el rechazo en la partida en curso) no cambia. La diferencia se justifica en la historia: la partida en curso todavía puede llegar a ese instante, y la reproducida ya no. El arreglo quedó en `replay()` sin tocar la línea de tiempo: si el instante es posterior al reloj final, avisa y consulta el reloj final, que ya era consultable. La prueba que fijaba el rechazo se reemplazó por tres. Una comprueba el aviso, que viene antes del resumen, y el resumen del instante final, sin la vista. Otra comprueba que el instante final exacto no avisa (el caso borde). La tercera, que un instante negativo se sigue rechazando. Como el resumen final se obtiene con la misma reconstrucción, le alcanza el defecto ya reportado de las copias espaciadas. El README dejó de citar Python 3.14.6 como versión de desarrollo, que no se pudo comprobar, y quedó en 3.11 o superior; las pruebas se corrieron con 3.12.3. Pruebas: 1231 en WSL con Python 3.12.3, con los dos fallos esperados de T052.
 
+### 2.54 Unir main y la rama de datos nuevos, y conectar «ir a» con salidas de un solo sentido (T052)
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Avanzar lo que no dependía de nadie más para terminar el proyecto: traer a la rama los arreglos nuevos de `main`, unir la rama de Mauricio (spec 004) y conectar T052, que el arreglo de Carlos desbloqueó.
+
+Prompts utilizados:
+
+```text
+Erick me envio: De lo mío yo agarré y subí todo, si falta algo supongo que no se ocupa o ya estaba en el repo anterior o puedes verificar que todo el repo este bien con la info agregada por todos y en resumidas cuentas que hace falta?
+```
+
+```text
+Resolvamos lo que podemos hacer en este momento para terminar rapido el proyecto
+```
+
+Uso en el proyecto: dos commits de unión (`origin/main` y `origin/Parte_2-API-cache-persistencia`), `cripta/model/viaje.py`, `cripta/tests/test_ir_a_sentido.py`, `cripta/README.md`, `cripta/docs/DECISIONES.md` §5.3 y `specs/005-niebla-ir-a/tasks.md`.
+
+Cambios realizados por el estudiante: Al revisar lo que dijo Erick se comprobó que `parte-2-Erick` no tiene trabajo propio: son copias de archivos de esta rama. Antes de tocar nada, la unión de las tres partes se simuló en una carpeta temporal: 1279 pruebas pasaron. Hubo dos conflictos. En `PROMPTS_LLM.md` cada lado solo había agregado entradas al final, así que se conservaron todas, en el orden en que llegaron, sin cambiar ninguna; las de Mauricio quedaron después de esta sección. En `repository/traductor.py`, Carlos y Mauricio habían arreglado lo mismo (un costo nulo vale 100) y se dejó la versión de `main`. Con la parada anticipada ya aceptada junto con `salidas_de`, `model/viaje.py` expande por `entrantes_conocidas` y da el primer paso por `vecinas_conocidas`; las pruebas de los escenarios 7 y 8 dejaron de ser fallos esperados. El arreglo de Carlos para la reconstrucción con copias espaciadas se comprobó aparte con `--replay --hasta` y *K* = 50 antes de quitar la nota del README. La medición 5 de §5.3 no se repitió después de conectar T052, y así quedó dicho. Pruebas: 1279 en WSL con Python 3.12.3, sin fallos esperados.
+
 ### 5.30 Arranque de la segunda parte: análisis del enunciado, del contrato 1.1.0 y de las criptas publicadas
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
