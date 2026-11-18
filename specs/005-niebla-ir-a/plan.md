@@ -386,9 +386,27 @@ Con el código final, 100 salas dan entre 1.70 y 1.91 ms en el primer paso y ent
 
 Tomada el 2026-11-17 con Python 3.12.3 en WSL, tres corridas; **no es comparable** con las cifras de arriba, que son de Windows con Python 3.11.3. Armar el índice de salidas entrantes cuesta de 0.31 a 0.39 ms con 100 salas, de 1.47 a 1.64 ms con 400 y de 7.03 a 8.05 ms con 1600, y ocupa 34.1, 131.2 y de 731.8 a 782.1 KiB. En promedio entran entre 3.15 y 3.90 salidas por sala, con un máximo de 4. Expandir la búsqueda completa por las salidas que entran no cuesta más que por las que salen: las diferencias quedan dentro de la variación entre corridas. No se midió el paso del viaje con parada y salidas entrantes, porque la búsqueda compartida todavía no lo acepta (T052). La tabla completa está en `cripta/docs/DECISIONES.md`, §5.3.
 
+### Resultado con la cripta de referencia (2026-11-18, T044)
+
+El paquete `cripta/datos_offline_p2/` (rama de Mauricio, unida el 2026-11-18) trae las criptas 02 a 06; cripta-06, de 300 salas, es la de referencia de §6.1. Medido con el código actual (con T052) en Python 3.12.3 sobre WSL (Linux x86_64): una corrida con `python main.py --bench --offline datos_offline_p2` y dos más de las mismas filas con `mediciones_de_criptas_reales` (la función que usa la suite). Como en el resto de la medición 5, todo el mapa está explorado, cada puerta se recuerda en su estado inicial, y el viaje va de la sala inicial a la última sala del esqueleto o, si no hay ruta, a la más lejana que se alcance.
+
+| Cripta | Salas | Salidas de un solo sentido | Viaje medido | Primer paso (3 corridas) | Promedio por paso del viaje |
+| --- | ---: | ---: | --- | ---: | ---: |
+| cripta-02 | 20 | 0 de 40 | 16 pasos, a la más lejana | 0.116 a 0.125 ms | 0.011 a 0.013 ms |
+| cripta-03 | 40 | 0 de 80 | 32 pasos, a la más lejana | 0.201 a 0.226 ms | 0.010 a 0.012 ms |
+| cripta-04 | 50 | 0 de 100 | 40 pasos, a la más lejana | 0.235 a 0.269 ms | 0.010 a 0.011 ms |
+| cripta-05 | 24 | 0 de 48 | 18 pasos, a la más lejana | 0.116 a 0.132 ms | 0.010 a 0.012 ms |
+| **cripta-06** | **300** | 0 de 760 | 10 pasos, a la más lejana | **0.394 a 0.445 ms** | 0.043 a 0.049 ms |
+
+En las cinco criptas no hay ninguna salida de un solo sentido (contadas con un script temporal, fuera del repositorio: una salida es de un solo sentido si su destino no tiene una salida de vuelta). En ninguna hay ruta de la sala inicial a la última del esqueleto con las puertas en su estado inicial, porque las separan puertas cerradas; por eso el viaje medido es corto.
+
+**Cota superior, fuera de `--bench`.** Como con las puertas cerradas la región alcanzable es chica, se midió aparte, con el mismo `medir_paso_de_ir_a` y un script temporal, el mismo mapa con **todas las puertas abiertas**: en cripta-06 el viaje va de la sala inicial a la última (38 pasos) y el primer paso tarda de **3.00 a 3.19 ms** en tres corridas, con 0.080 a 0.093 ms por paso. Es el peor caso de la cripta de referencia: toda la cripta explorada y abierta, y el destino más lejano.
+
+**FR-036 y SC-006 se cumplen en la cripta de referencia**, con margen en la fila de `--bench` (0.44 ms como máximo) y también en la cota superior (3.19 ms como máximo, debajo de 5 ms). El límite de las cuadrículas sintéticas de 400 salas o más sigue en pie (en esta misma corrida de `--bench`, 5.59 ms con 400 salas y 30.31 ms con 1600), pero esas cuadrículas son más grandes y más densas que la cripta de referencia.
+
 ## Riesgos
 
-- **Pasos de un solo sentido.** ~~Riesgo~~ **Confirmado el 2026-11-17**: el servicio puede publicarlos. La corrección está decidida en la alternativa 9: expandir por las salidas conocidas que **llegan** a cada sala y elegir el primer paso por las que **salen**. Carlos ya la aplicó al cazador. Para «ir a» falta que levante el bloqueo entre `parar_en` y `salidas_de` en `RutasMasBaratas`; mientras tanto, el viaje sigue calculando mal con salidas de un solo sentido.
+- **Pasos de un solo sentido.** ~~Riesgo~~ **Confirmado el 2026-11-17 y resuelto con T052** (alternativa 9): el viaje expande por las salidas conocidas que **llegan** a cada sala y elige el primer paso por las que **salen**. Las criptas del paquete de la segunda parte no tienen ninguna, así que solo lo comprueban las pruebas (`test_ir_a_sentido.py`, `test_equivalencia_sentido.py`).
 - **Una puerta que cambia y no avisa.** Si algún camino del motor cambia `closed` sin pasar por el gancho, el mapa queda desactualizado aunque el jugador esté presente, y FR-006 se rompe en silencio. Hoy solo hay dos lugares que cambian puertas (`open_door` y `_close_door`); el retroceso las cambia también pero no debe observar. La prueba de SC-002 compara, en cada instante, el recuerdo contra la realidad de las puertas de la sala del jugador.
 - **Detectar el daño.** FR-028 (c) se comprueba comparando la vida del jugador antes y después del paso. Durante el ciclo de eventos la vida del jugador solo baja (veneno, ataques, trampas); las curaciones son acciones del jugador y no ocurren a mitad de un paso. Si alguna regla futura curara al jugador dentro del ciclo, un daño y una curación iguales se cancelarían y no se detectarían; entonces habría que pedirle al motor un contador de daño recibido.
 - **La vista cambia y rompe pruebas existentes.** `room_view` hoy muestra el id de todos los destinos. Con FR-020 los destinos avistados dejan de mostrar su id, y las pruebas de la vista que lo fijan cambian. Es una de las dos excepciones que SC-009 admite.
@@ -412,7 +430,8 @@ Tomada el 2026-11-17 con Python 3.12.3 en WSL, tres corridas; **no es comparable
 | FR-038 | `model/viaje.py` (validación de la orden) | `tests/test_viaje.py` |
 | FR-031 | `controller/game_controller.py`, `replay/replay_log.py` | `tests/test_ir_a.py`, `tests/test_replay_log.py` |
 | FR-032 | ninguno propio: cada paso es una acción del historial | `tests/test_ir_a.py` |
-| FR-033, FR-034, FR-036 | el diseño completo | mediciones 1, 3 y 5 |
+| FR-033, FR-034, FR-036 | el diseño completo | mediciones 1, 3 y 5; FR-036 en la cripta de referencia, «Resultado con la cripta de referencia» |
+| 006/FR-016 a 006/FR-020 (conexión) | `main.py`, `controller/application.py` | `tests/test_banderas_resolubilidad.py` |
 
 ## Conexión de la resolubilidad (agregada el 2026-11-18)
 

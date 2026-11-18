@@ -2425,12 +2425,27 @@ Lo que muestran:
 - **Medición 5, contra lo esperado**: recalcular en cada paso no cumplía FR-036 desde 400 salas. Con las mejoras, el promedio por paso queda por debajo de 1 ms en los tres tamaños, pero el primer paso de un viaje entre los extremos sigue pasando de 5 ms con 400 salas o más, en los dos entornos.
 - **Medición 6**: expandir por las salidas que entran no cuesta más que por las que salen; las diferencias están dentro de la variación entre corridas. Armar el índice cuesta entre un cuarto y un tercio de una búsqueda completa y se paga una vez por partida.
 - La reutilización de la ruta y la parada anticipada no cambian ninguna decisión: lo comprueban pruebas de equivalencia, no mediciones (ver Pruebas).
-- **La cripta de referencia de §6.1 no está en el paquete sin conexión.** El grupo supo el 2026-11-17 que es cripta-06, de 300 salas (plan 002, «Remedición»), pero la única cripta real disponible para medir tiene 6 salas. 300 salas queda entre las cuadrículas de 100 y de 400 de la tabla; no se midió una de 300 ni la cripta real, así que no se puede afirmar si FR-036 se cumple en la condición exacta de §6.1.
+- **La cripta de referencia de §6.1 se midió el 2026-11-18** (tabla siguiente) y cumple FR-036 con margen.
+
+**Medición 5 en las criptas del paquete de la segunda parte (WSL, 2026-11-18, tres corridas).** El paquete `datos_offline_p2/` llegó con la rama de datos nuevos del servicio y trae las criptas 02 a 06; cripta-06, de 300 salas, es la de referencia. Una corrida con `python main.py --bench --offline datos_offline_p2` y dos más de las mismas filas con `mediciones_de_criptas_reales`, que es la función de la suite. El código ya tiene T052. Todo el mapa explorado, cada puerta recordada en su estado inicial; el viaje va de la sala inicial a la última del esqueleto o, si no hay ruta, a la más lejana alcanzable.
+
+| Cripta | Salas | Salidas de un solo sentido | Viaje medido | Primer paso | Promedio por paso |
+| --- | ---: | ---: | --- | ---: | ---: |
+| cripta-02 | 20 | 0 de 40 | 16 pasos | 0.116 a 0.125 ms | 0.011 a 0.013 ms |
+| cripta-03 | 40 | 0 de 80 | 32 pasos | 0.201 a 0.226 ms | 0.010 a 0.012 ms |
+| cripta-04 | 50 | 0 de 100 | 40 pasos | 0.235 a 0.269 ms | 0.010 a 0.011 ms |
+| cripta-05 | 24 | 0 de 48 | 18 pasos | 0.116 a 0.132 ms | 0.010 a 0.012 ms |
+| **cripta-06** | **300** | 0 de 760 | 10 pasos | **0.394 a 0.445 ms** | 0.043 a 0.049 ms |
+| cripta-06, todas las puertas abiertas (fuera de `--bench`) | 300 | 0 de 760 | 38 pasos, hasta la última sala | **3.00 a 3.19 ms** | 0.080 a 0.093 ms |
+
+- Con las puertas en su estado inicial ninguna cripta tiene ruta de la sala inicial a la última del esqueleto, así que el viaje medido es hacia la sala más lejana alcanzable y es corto. Por eso se midió aparte, con un script temporal fuera del repositorio que llama al mismo `medir_paso_de_ir_a`, cripta-06 con **todas las puertas abiertas**. Es el peor caso de la cripta de referencia, y también cumple.
+- Las salidas de un solo sentido se contaron con el mismo script temporal: una salida lo es si su destino no tiene una salida de vuelta. **No hay ninguna** en las cinco criptas, así que T052 solo lo ejercitan las pruebas.
+- En la misma corrida de `--bench`, las cuadrículas dieron 0.99 ms (100 salas), 5.59 ms (400) y 30.31 ms (1600) en el primer paso. Es una sola corrida; el límite de abajo sigue en pie para mapas de ese tamaño.
 
 ### Límites conocidos
 
-- **FR-036 no se cumple en el primer paso de un viaje largo en mapas de 400 salas o más.** Los pasos siguientes del mismo viaje sí. La cripta de referencia tiene 300 salas y no se midió (ver Evidencia), así que queda sin comprobar. Lo que queda por probar es aligerar la búsqueda misma, que es compartida con el cazador.
-- **Salidas de un solo sentido: resuelto el 2026-11-17 (T052).** Cuando la búsqueda compartida aceptó la parada anticipada junto con el proveedor de salidas (arreglo de §5.1), `model/viaje.py` pasó a expandir por `entrantes_conocidas` y a dar el primer paso por `vecinas_conocidas`. Las pruebas de los escenarios 7 y 8 de la Historia 4 dejaron de ser fallos esperados. La medición 5 de arriba se tomó antes de este cambio; no se repitió.
+- **En la cripta de referencia FR-036 se cumple; en cuadrículas sintéticas de 400 salas o más, el primer paso de un viaje largo no.** cripta-06 da como máximo 0.445 ms con las puertas en su estado inicial y 3.19 ms con todas abiertas (ver Evidencia). Las cuadrículas de 400 y 1600 salas, todas abiertas y más densas, pasan de 5 ms en el primer paso; los pasos siguientes del mismo viaje no. Si la revisión usa una cripta bastante más grande que la de referencia, lo que queda por probar es aligerar la búsqueda misma, que es compartida con el cazador.
+- **Salidas de un solo sentido: resuelto el 2026-11-17 (T052).** Cuando la búsqueda compartida aceptó la parada anticipada junto con el proveedor de salidas (arreglo de §5.1), `model/viaje.py` pasó a expandir por `entrantes_conocidas` y a dar el primer paso por `vecinas_conocidas`. Las pruebas de los escenarios 7 y 8 de la Historia 4 dejaron de ser fallos esperados. Las tablas de la medición 5 del 2026-11-16 y del 2026-11-17 son de antes de este cambio; la del paquete de la segunda parte (2026-11-18) ya lo incluye.
 - **Resumen de un instante con copias espaciadas: resuelto en la línea de tiempo.** El resumen salía en la sala anterior si entre la copia y el instante el jugador entraba a una sala sin contenido cargado. Lo corrigió la línea de tiempo (§5.5): cargar contenido fuerza una copia. Se comprobó también con `--replay --hasta` y *K* = 50.
 - Explorar, consultar y revertir dependen de que el motor avise de cada entrada y de cada cambio de puerta. Un camino nuevo del motor que cambie una puerta sin avisar dejaría el recuerdo desactualizado sin ningún error. La prueba de SC-002 compara, después de cada acción, el recuerdo contra el estado real de las puertas de la sala del jugador.
 
@@ -2878,6 +2893,17 @@ entre *t* y la siguiente decisión, el resultado es correcto, y varios eventos e
 instante se cuentan todos (FR-026). Contradice FR-002 y el escenario 6 de la Historia 1. La
 prueba que lo muestra está marcada como fallo esperado. Corregirlo es repetir esa última acción
 deteniendo los eventos en *t*, dentro de la línea de tiempo y del motor.
+
+**Estado al 2026-11-18: corregido en parte.** El tope de Carlos, descrito arriba, arregla el
+caso común: con *K* = 10, la prueba ahora falla en 2 de los 12 instantes de ese tipo. Queda
+un caso abierto. El tope se pone solo en la última acción que la reconstrucción **repite**, y
+cuando hay una copia justo en la última acción anterior a *t*, no se repite ninguna: la
+reconstrucción parte de esa copia, que se tomó en la decisión siguiente a esa acción, con
+todos los eventos del tramo ya aplicados. En la partida de la prueba, con *K* = 10 fallan
+los instantes 1300 y 2700, en los que hay 10 y 20 acciones hasta *t*. Con *K* = 1 fallan
+los 12 instantes de ese tipo, y con *K* = 50 ninguno. Por eso
+`test_un_evento_posterior_al_instante_no_cuenta` sigue marcada como fallo esperado. El
+arreglo es de la línea de tiempo (`model/consulta_historia.py`) y quedó reportado a Carlos.
 
 ---
 

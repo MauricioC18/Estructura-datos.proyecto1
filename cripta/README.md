@@ -59,7 +59,7 @@ python -m unittest discover -s tests -t . -v
 
 En Windows también funciona `py` en lugar de `python`.
 
-Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1289 pruebas, todas pasan**, medido con Python 3.12.3. Una se cuenta como *fallo esperado* (ver «Lo que todavía no funciona»). Incluye lo unido de `main` y de la rama de datos nuevos del servicio (`specs/004-datos-nuevos-servicio`).
+Estado al 2026-11-18, en la rama `Parte_2-niebla-ir-a`: **1341 pruebas, todas pasan**, medido con Python 3.12.3 en WSL (no hay un Python de Windows instalado en el equipo donde se corrieron). Una se cuenta como *fallo esperado* (ver «Lo que todavía no funciona»). Incluye lo unido de `main` (con el arreglo de T023 de la línea de tiempo) y de la rama de Mauricio (`specs/004-datos-nuevos-servicio`, `specs/006-resolubilidad` y el paquete `datos_offline_p2/`).
 
 ### Pruebas de aceptación por capacidad
 
@@ -67,6 +67,7 @@ Cada prueba cita en su docstring el requisito (`FR-xxx`) de la especificación q
 
 | Capacidad | Especificación | Comando |
 | --- | --- | --- |
+| Verificación de resolubilidad | `specs/006-resolubilidad/spec.md` | `python -m unittest discover -s tests -t . -p "test_resolubilidad.py"`, y para las banderas `--verificar` y `--forzar` y el reporte al iniciar, `-p "test_banderas_resolubilidad.py"` |
 | Niebla de guerra e «ir a» | `specs/005-niebla-ir-a/spec.md` | `python -m unittest discover -s tests -t . -p "test_mapa_conocido.py"`, y lo mismo con `test_viaje.py`, `test_ir_a.py`, `test_ir_a_sentido.py`, `test_equivalencia_sentido.py`, `test_niebla.py`, `test_niebla_guardado.py`, `test_comando_mapa.py`, `test_vista_mapa_conocido.py`, `test_vista_sala_actual.py`, `test_historia_mapa_conocido.py`, `test_parada_anticipada.py`, `test_reutilizar_ruta.py` y `test_bench_paquete_sin_conexion.py` |
 
 Las mediciones de esta capacidad están en la suite «Mapa conocido y viaje ir a» de `python main.py --bench`. Al final de la suite hay una fila por cada cripta del paquete sin conexión, con el id que traen sus datos y su número de salas. Para medir otro paquete, como el de la segunda parte, se usa `python main.py --bench --offline CARPETA`; sin `--offline` se mide `datos_offline/`. La fila mide «ir a» con todo el mapa conocido explorado y muestra:
@@ -91,7 +92,9 @@ Desde la carpeta `cripta/`:
 | `python main.py --cargar ARCHIVO` | Continúa una partida guardada con el comando `guardar` |
 | `python main.py --replay partidas/ARCHIVO.log` | Reproduce una partida completa, sin interacción y sin la vista interactiva (§4.11). Funciona también con `--offline` |
 | `python main.py --replay partidas/ARCHIVO.log --hasta T` | Reproduce la partida y al final imprime el estado del instante `T`, el mismo resumen que el comando `historia`, sin la vista interactiva. Si `T` es posterior al final de la partida, muestra el estado final y avisa que la partida terminó antes. **Ver la nota sobre la línea de tiempo más abajo** |
-| `python main.py --bench` | Corre las mediciones de todos los subsistemas (§5.3). Tarda alrededor de un minuto |
+| `python main.py --verificar CRIPTA` | Solo verifica si la cripta se puede ganar y muestra el reporte, sin la vista del juego y sin empezar una partida (§3.5). Termina con 0 si es resoluble, 1 si no lo es y 2 si no se pudo verificar porque falta la ubicación de llaves; 3 si la cripta no se pudo leer. Funciona con `--offline CARPETA`, por ejemplo `python main.py --verificar cripta-05 --offline datos_offline_p2` |
+| `python main.py --forzar` | Empieza la partida aunque la cripta no sea resoluble. Sin `--forzar`, una partida nueva de una cripta no resoluble no empieza y se muestra el reporte. Con o sin la bandera, el reporte de resolubilidad se muestra antes de la primera acción. Una partida cargada no se verifica de nuevo, y `--replay` nunca se detiene por la verificación |
+| `python main.py --bench` | Corre las mediciones de todos los subsistemas (§5.3). Tarda uno o dos minutos (2 min 9 s con `--offline datos_offline_p2` en WSL) |
 | `python main.py --bench --offline CARPETA` | Igual, pero la medición de «ir a» en criptas reales usa las criptas del paquete de `CARPETA` en vez de `datos_offline/`. Las demás suites no cambian |
 | `python main.py --puntajes [CRIPTA]` | Muestra la tabla de puntajes, de todas las criptas o de una |
 
@@ -134,9 +137,11 @@ El log de una sesión que empezó cargando un guardado, con `--cargar` o con `ca
 
 ## Lo que todavía no funciona
 
-- **La cripta de referencia de §6.1** (cripta-06, de 300 salas) no está en el paquete sin conexión, así que el límite de 5 ms por paso de «ir a» no está comprobado sobre ella. En las cuadrículas sintéticas, el primer paso de un viaje entre los extremos pasa de 5 ms desde 400 salas (`docs/DECISIONES.md`, §5.3).
-- `--verificar` y `--forzar` (resolubilidad) no están implementadas.
-- **`historia` de un instante entre dos decisiones del jugador.** Si entre ese instante y la siguiente decisión hubo otro evento, el resumen ya lo incluye, aunque sea posterior. Varios eventos en el mismo instante sí se cuentan todos. Está descrito en `docs/DECISIONES.md` §5.5 y su prueba (`tests/test_eventos_mismo_instante.py`) está marcada como fallo esperado hasta corregirlo (tarea T023 de `specs/003-linea-de-tiempo/tasks.md`).
+- **`historia` y `--replay --hasta` de un instante entre dos decisiones del jugador, en un caso.** El arreglo de T023 (`main`) hace que, en general, no se cuenten los eventos posteriores al instante. Pero si hay una copia de la línea de tiempo justo en la última acción anterior al instante, el resumen todavía incluye los eventos posteriores hasta la siguiente decisión. Solo afecta a los tramos que siguen a una acción con copia: con el valor por omisión (*K* = 50), una de cada 50 acciones más las copias forzadas; con `--checkpoint-cada 1`, todos. La prueba `tests/test_eventos_mismo_instante.py` (`test_un_evento_posterior_al_instante_no_cuenta`) sigue marcada como fallo esperado. Está descrito en `docs/DECISIONES.md` §5.5 y reportado a Carlos.
+- **«ir a» en mapas mucho más grandes que la cripta de referencia.** En cripta-06 (300 salas) un paso tarda como máximo 0.45 ms, y 3.19 ms con todas las puertas abiertas, debajo del límite de 5 ms. En las cuadrículas sintéticas de 400 y 1600 salas, el primer paso de un viaje largo pasa de 5 ms (5.59 y 30.31 ms en la última corrida); los pasos siguientes no (`docs/DECISIONES.md`, §5.3).
+- **Salidas de un solo sentido en criptas reales.** «ir a» y la verificación de resolubilidad las respetan, pero ninguna cripta del paquete `datos_offline_p2/` tiene una, así que solo lo comprueban las pruebas con mapas sintéticos.
+- **La verificación de resolubilidad con salidas de un solo sentido** supone que una llave obtenida sirve en toda la región alcanzable, aunque el jugador no siempre pueda volver a la puerta que abre. Es un límite declarado en `specs/006-resolubilidad/spec.md` (Assumptions) y en `docs/DECISIONES.md` §5.4.
+- Todas las pruebas y mediciones de la entrega se corrieron con Python 3.12.3 en WSL; no se repitieron con Python 3.11 ni en Windows.
 
 ## Herramientas del bloque 2
 

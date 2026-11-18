@@ -2230,6 +2230,48 @@ Uso en el proyecto: el commit de unión con `origin/main`, `cripta/controller/ap
 
 Cambios realizados por el estudiante: Unir sin revisar habría dejado la spec 003 con dos FR-025 de texto distinto, dos escenarios para el mismo caso, tareas con el mismo número y dos mediciones iguales. La spec 003, sus tareas y su banco son de Carlos, así que quedaron sus versiones y se descartó lo equivalente de esta rama. Se conservó lo que él no tenía: la bandera `--hasta`, que ahora usa su `consultar_hasta` en vez de una función propia, y la prueba del defecto de los eventos posteriores al instante, que pasó a citar su FR-026 y quedó anotada como T023 en sus tareas. En DECISIONES §5.5 se quitó la tabla de mediciones de esta rama, porque la suya ya las cubre, y se restauró su párrafo original. Quedó solo el párrafo del defecto. Las entradas 2.53 y 2.55 de este registro quedan como estaban, porque cuentan lo que se hizo en su momento. También se corrigió una frase de §5.3 que seguía diciendo que las salidas entrantes no estaban conectadas al viaje. Pruebas: 1289 en WSL con Python 3.12.3, con un fallo esperado (T023).
 
+### 2.57 Auditoría del día de entrega y unión de main y de la rama de Mauricio
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-18
+
+Objetivo: Revisar qué subieron los compañeros desde la última auditoría y traerlo a la rama sin resolver conflictos ajenos.
+
+Prompts utilizados:
+
+```text
+Hoy es la entrega (miércoles 18 de noviembre). Mis compañeros pudieron haber subido cosas desde la última auditoría. Trabaja en dos fases. [...] FASE A (SOLO LECTURA). Haz git fetch --all --prune y dime, con rama y commit: [...] FASE B [...] 1. INTEGRAR LO NUEVO: si origin/main o alguna rama de mis compañeros trae commits que mi rama no tiene, haz git merge de ellos en mi rama (merge, no rebase), uno por uno. En PROMPTS_LLM.md conserva las dos partes completas. Si hay conflictos en cualquier otro archivo, NO los resuelvas [...]
+```
+
+```text
+Autorizo la opción (a), con estos límites exactos. PERMISO EXCEPCIONAL: en specs/003-linea-de-tiempo/tasks.md, en el choque de la línea de T023, quédate con la versión de Carlos (T023 marcada [x]). En PROMPTS_LLM.md conserva las dos partes completas. [...] NO unas parte-2-Erick, Parte-3, arreglos-entrega ni Parte_4-MVC-replay-bench. [...]
+```
+
+Respuestas a las preguntas de Claude: se autorizó resolver el único choque fuera de este registro (`specs/003-linea-de-tiempo/tasks.md`, T023) con la versión de Carlos, y no unir la rama de Erick.
+
+Uso en el proyecto: dos commits de unión (`origin/main` y `origin/Parte_2-API-cache-persistencia`), `cripta/tests/test_eventos_mismo_instante.py` (docstring), `cripta/docs/DECISIONES.md` §5.5 y `cripta/README.md`.
+
+Cambios realizados por el estudiante: La auditoría de solo lectura encontró que T052 ya estaba conectado desde la entrada 2.54, que `parte-2-Erick` sigue sin trabajo propio (cada archivo coincide con una versión que ya está en el historial de esta rama) y que la unión con `main` y con la rama de Mauricio chocaba, además de en este registro, en una línea de las tareas de Carlos. Como las reglas pedían no resolver conflictos ajenos, se detuvo y preguntó antes de seguir. En este registro cada lado solo agregaba entradas al final de su sección: la de Carlos (2.34) quedó al final de la suya y las 5.34 a 5.36 de Mauricio después de su 5.33, sin cambiar ninguna. Se esperaba que el arreglo de T023 de Carlos hiciera pasar la prueba marcada como fallo esperado, y **no la hizo pasar**. Antes de quitar la marca se buscó por qué: el tope de eventos se pone solo en la última acción que la reconstrucción repite, y cuando hay una copia justo en la última acción anterior al instante no se repite ninguna. Se confirmó con tres valores de *K* en la partida de la prueba: con 1 fallan los 12 instantes de ese tipo, con 10 fallan 2 y con 50 ninguno. La marca se dejó, el docstring se corrigió para decir la causa que queda, y el hallazgo quedó en DECISIONES §5.5 para Carlos, sin tocar su código. Pruebas tras cada unión: 1293 y 1327 en WSL con Python 3.12.3, con un fallo esperado.
+
+### 2.58 Conectar --verificar, --forzar y el reporte al iniciar, revisar la resolubilidad y medir con la cripta de referencia
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-18
+
+Objetivo: Conectar las banderas de la especificación 006 con el contrato de Mauricio, revisar con evidencia su verificación contra el Apéndice B, §3.5, §5.4, §6.1 y §6.3, y cerrar T044 con el paquete de la segunda parte.
+
+Prompts utilizados:
+
+```text
+[...] 3. Resolubilidad: lee la spec 006 y el contrato. Conecta --verificar <cripta> (sin instanciar la vista), --forzar y el reporte al iniciar una partida (la partida no inicia si no es resoluble, salvo --forzar). Si aparece algún FR de la spec 006 que no esté claro, pregúntame; NO modifiques la spec 006 ni model/resolubilidad.py. [...] 4. Medición: corre python main.py --bench --offline <ruta a datos_offline_p2>. Por cada cripta reporta primer paso y promedio de «ir a», y cuenta las salidas de un solo sentido. [...] PASO 3B (NUEVO): VERIFICACIÓN DE LA RESOLUBILIDAD DE MAURICIO. [...] NO lo arregles en código ajeno: anota el hallazgo con la descripción exacta para que se lo pase a Mauricio. [...]
+```
+
+Uso en el proyecto: `specs/005-niebla-ir-a/plan.md` («Conexión de la resolubilidad» y «Resultado con la cripta de referencia»), `specs/005-niebla-ir-a/tasks.md` (Fase 9, T054 a T056, y cierre de T044), `cripta/tests/test_banderas_resolubilidad.py`, `cripta/main.py`, `cripta/controller/application.py`, `cripta/docs/DECISIONES.md` §5.3 y `cripta/README.md`.
+
+Cambios realizados por el estudiante: La especificación 005 deja las banderas fuera de su alcance y la 006 deja su conexión a la 005, así que no hubo que cambiar ninguna especificación: el plan y las tareas de la 005 citan los FR de la 006, y se confirmaron en Git antes de las pruebas, y estas, fallando, antes del código. Hubo una decisión que la especificación no cubre: FR-018 reserva los códigos 0, 1 y 2 para los resultados de la verificación, y una cripta que no se puede leer no es ninguno; se usó 3 y quedó escrito en el plan. Las pruebas eligen la cripta por el resultado de su verificación y no por su id. La revisión de la parte de Mauricio encontró los cuatro casos del Apéndice B con escenario y prueba, comprobó con los datos reales que la llave del carcelero errante de cripta-03 se ubica en su sala inicial, y midió la verificación de cripta-06 en 1.27 a 1.43 ms, y de 73 a 78 ms contando leer y traducir el paquete sin caché, ambos debajo de 200 ms. Las observaciones se dejaron para él sin tocar su código. En la medición de «ir a», cripta-06 dio de 0.39 a 0.45 ms en el primer paso. Como las puertas cerradas dejaban un viaje de solo 10 pasos, se midió aparte el mismo mapa con todas las puertas abiertas: de 3.00 a 3.19 ms. FR-036 se cumple en la cripta de referencia. Ninguna cripta del paquete tiene salidas de un solo sentido. Pruebas: 1341 en WSL con Python 3.12.3, con un fallo esperado (T023).
+
 ### 5.30 Arranque de la segunda parte: análisis del enunciado, del contrato 1.1.0 y de las criptas publicadas
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
