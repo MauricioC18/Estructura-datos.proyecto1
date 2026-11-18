@@ -59,7 +59,7 @@ python -m unittest discover -s tests -t . -v
 
 En Windows también funciona `py` en lugar de `python`.
 
-Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1205 pruebas, todas pasan**, medido con Python 3.12.3. Dos de ellas se cuentan como *fallos esperados* (ver «Lo que todavía no funciona»).
+Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1223 pruebas, todas pasan**, medido con Python 3.12.3. Dos de ellas se cuentan como *fallos esperados* (ver «Lo que todavía no funciona»).
 
 ### Pruebas de aceptación por capacidad
 
@@ -67,9 +67,18 @@ Cada prueba cita en su docstring el requisito (`FR-xxx`) de la especificación q
 
 | Capacidad | Especificación | Comando |
 | --- | --- | --- |
-| Niebla de guerra e «ir a» | `specs/005-niebla-ir-a/spec.md` | `python -m unittest discover -s tests -t . -p "test_mapa_conocido.py"`, y lo mismo con `test_viaje.py`, `test_ir_a.py`, `test_ir_a_sentido.py`, `test_equivalencia_sentido.py`, `test_niebla.py`, `test_niebla_guardado.py`, `test_comando_mapa.py`, `test_vista_mapa_conocido.py`, `test_vista_sala_actual.py`, `test_historia_mapa_conocido.py`, `test_parada_anticipada.py` y `test_reutilizar_ruta.py` |
+| Niebla de guerra e «ir a» | `specs/005-niebla-ir-a/spec.md` | `python -m unittest discover -s tests -t . -p "test_mapa_conocido.py"`, y lo mismo con `test_viaje.py`, `test_ir_a.py`, `test_ir_a_sentido.py`, `test_equivalencia_sentido.py`, `test_niebla.py`, `test_niebla_guardado.py`, `test_comando_mapa.py`, `test_vista_mapa_conocido.py`, `test_vista_sala_actual.py`, `test_historia_mapa_conocido.py`, `test_parada_anticipada.py`, `test_reutilizar_ruta.py` y `test_bench_paquete_sin_conexion.py` |
 
-Las mediciones de esta capacidad están en la suite «Mapa conocido y viaje ir a» de `python main.py --bench`.
+Las mediciones de esta capacidad están en la suite «Mapa conocido y viaje ir a» de `python main.py --bench`. Al final de la suite hay una fila por cada cripta del paquete sin conexión, con el id que traen sus datos y su número de salas. Para medir otro paquete, como el de la segunda parte, se usa `python main.py --bench --offline CARPETA`; sin `--offline` se mide `datos_offline/`. La fila mide «ir a» con todo el mapa conocido explorado y muestra:
+
+- hacia dónde fue el viaje: de la primera sala del esqueleto a la última, con su costo mínimo. Si con el mapa conocido no hay ruta entre ellas, la fila lo dice y mide el viaje hacia la sala más lejana que se alcanza desde la primera por costo mínimo (si empatan, la de menor id). Si desde la primera no se alcanza ninguna sala, también lo dice;
+- el primer paso del viaje, como lo calcula el programa;
+- el promedio por paso del viaje entero y cuántos pasos tuvo. Si el viaje no dio ningún paso, la fila lo dice en vez de mostrar un promedio;
+- la búsqueda completa sin mejoras y la búsqueda sin montículo, como referencias.
+
+La búsqueda del cazador en la misma cripta no está en esta fila: está en la suite «Persecucion del cazador».
+
+Para ver solo las filas de las criptas reales, sin las cuadrículas sintéticas: `python -c "from benchmark.bench_mapa_conocido import mediciones_de_criptas_reales as m; [print(x.name, x.detail) for x in m('CARPETA')]"`.
 
 ## Cómo jugar
 
@@ -83,6 +92,7 @@ Desde la carpeta `cripta/`:
 | `python main.py --replay partidas/ARCHIVO.log` | Reproduce una partida completa, sin interacción y sin la vista interactiva (§4.11). Funciona también con `--offline` |
 | `python main.py --replay partidas/ARCHIVO.log --hasta T` | Reproduce la partida y al final imprime el estado del instante `T`, el mismo resumen que el comando `historia`, sin la vista interactiva. **Ver la nota sobre la línea de tiempo más abajo** |
 | `python main.py --bench` | Corre las mediciones de todos los subsistemas (§5.3). Tarda alrededor de un minuto |
+| `python main.py --bench --offline CARPETA` | Igual, pero la medición de «ir a» en criptas reales usa las criptas del paquete de `CARPETA` en vez de `datos_offline/`. Las demás suites no cambian |
 | `python main.py --puntajes [CRIPTA]` | Muestra la tabla de puntajes, de todas las criptas o de una |
 
 Otras opciones:
