@@ -44,6 +44,11 @@ Grafos de un solo sentido
     sala, las que cumplen costo + distancia = d, y de esas la vecina de menor
     id.
 
+    Las dos opciones se pueden combinar con la parada anticipada, y el
+    argumento de abajo no depende de por dónde se expanda: solo usa que
+    Dijkstra asienta en orden no decreciente de distancia y que todo costo es
+    al menos 1.
+
 Estructuras, todas propias
     Cola de prioridad: el montículo binario mínimo de la agenda de eventos
         (structures/event_queue.py). Ordena por el par (time, sequence); se le
@@ -55,7 +60,7 @@ Estructuras, todas propias
     Distancias y salas asentadas: TablaHash. No se usa dict como índice ni
         set, que el proyecto prohíbe (P1 §7).
 
-Parada anticipada (parar_en), de la capacidad 003
+Parada anticipada (parar_en), de la capacidad 005
     Quien solo necesita el primer paso desde una sala puede pedir que la
     busqueda se detenga al asentar esa sala. El resultado es el mismo: las
     vecinas que cumplen costo + distancia = d tienen distancia menor que d,
@@ -124,14 +129,13 @@ class RutasMasBaratas:
         asentadas, y pedir el primer paso desde una sala no asentada es un
         error. Si la sala nunca se alcanza, la búsqueda llega al final como
         sin parar_en y todo es definitivo.
-        """
-        if salidas_de is not None and parar_en is not None:
-            raise ValueError(
-                "parar_en y salidas_de juntos todavia no estan probados: la "
-                "parada anticipada asienta solo una parte del grafo y el "
-                "primer paso desde otra sala podria no ser definitivo."
-            )
 
+        parar_en y salidas_de se pueden usar juntos. El argumento de arriba no
+        depende de por dónde se expanda la búsqueda: solo usa que Dijkstra
+        asienta en orden no decreciente de distancia y que todo costo es al
+        menos 1, que valen igual en un grafo dirigido. Lo comprueban las
+        pruebas de equivalencia sobre mapas asimétricos.
+        """
         if corte is not None and (isinstance(corte, bool) or not isinstance(corte, int)):
             raise ValueError(f"El corte debe ser un entero o None: {corte!r}")
         if corte is not None and corte < 0:

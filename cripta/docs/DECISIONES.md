@@ -2650,6 +2650,27 @@ informaría una historia **falsa**, y el enunciado exige que el estado consultad
 real. Entre correcto y dentro del presupuesto, manda correcto. La cantidad de copias extra
 está acotada por los pergaminos que la cripta contenga, porque cada uso consume uno.
 
+**Cargar el contenido de una sala también fuerza una copia, y esto lo encontró un
+compañero, no yo.** En una partida real el contenido de cada sala se descarga cuando el
+jugador va a entrar, y lo carga el **controlador** justo antes del movimiento. Si un punto
+de control se tomó cuando esa sala todavía no estaba cargada, repetir el movimiento al
+reconstruir lo **rechaza** y el resumen se queda en la sala anterior, **sin dar ningún
+error**.
+
+Es el mismo principio que el pergamino: información que entra desde afuera y que la lista
+de acciones no puede reproducir obliga a re-anclar. Y tiene que ser **antes** del
+movimiento, no después: un punto de control posterior no sirve, porque el tramo que empieza
+en el anterior seguiría conteniendo ese movimiento.
+
+**Mi prueba de equivalencia no lo detectó, y eso es lo que hay que anotar.** Su cripta
+marcaba todas las salas como cargadas desde el inicio, que es más permisivo que la
+realidad. Es la tercera vez en esta capacidad que un hueco de pruebas deja pasar algo, y
+siempre con la misma forma: **el escenario de prueba más benévolo que el programa real**.
+Se agregó una prueba que camina cargando el contenido como lo hace el controlador.
+
+El costo es una copia por sala que el jugador visita por primera vez: acotado por la
+cantidad de salas y no por la de acciones.
+
 **Una copia guarda la cripta entera, incluido el esqueleto, que no cambia nunca.** Es
 desperdicio, y a escala de la cripta de referencia es **la mejora evidente de la
 capacidad**: guardar solo el estado mutable mejoraría **las dos** cosas a la vez, menos

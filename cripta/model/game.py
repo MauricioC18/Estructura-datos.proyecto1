@@ -753,6 +753,28 @@ class Game:
         elif event.event_type == TRAP_REARM:
             self._rearm_trap(event.room_id, event.instance_id)
 
+    def contenido_disponible(self, room):
+        """Avisa que el contenido de una sala acaba de quedar disponible.
+
+        Lo llama quien lo descarga, que es el controlador, JUSTO DESPUES de
+        cargarlo y ANTES del movimiento que lo necesita.
+
+        Fuerza un punto de control por el mismo motivo que un pergamino:
+        es informacion que entra desde afuera y que la lista de acciones del
+        jugador NO puede reproducir. Sin esto, reconstruir un instante
+        posterior repetiria el movimiento hacia esa sala y el motor lo
+        rechazaria por contenido no disponible, dejando el resumen en la sala
+        anterior y sin dar ningun error.
+
+        Tiene que ser antes del movimiento: un punto de control tomado despues
+        no sirve, porque el tramo que empieza en el punto de control anterior
+        seguiria conteniendo ese movimiento.
+        """
+        if self.timeline is None or self._snapshot is None:
+            return
+
+        self.timeline.guardar_copia(self.state.clock, self._snapshot(self))
+
     def _trim_timeline(self):
         """Recorta la linea al usar un pergamino (seccion 3.6).
 

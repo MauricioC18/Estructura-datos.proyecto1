@@ -1630,6 +1630,36 @@ Al revisar la capacidad contra §7.3 se encontró que la vista debía distinguir
 
 También se actualizó el resumen de pruebas del Documento, que fijaba 861 como si fuera definitivo. Ahora reporta 1 029 con el desglose por capacidad y explica que la cifra sube al juntar las ramas, de modo que lo que queda fijo es la regla —que ninguna prueba deje de pasar— y no el número.
 
+### 2.32 Arreglos reportados por los compañeros
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-17
+
+Objetivo: Arreglar los defectos que Steven y Mauricio A. reportaron sobre capacidades propias, antes de llevar la rama a `main`.
+
+Prompts utilizados:
+
+```text
+[Se le pasaron los mensajes del grupo] Dime si esto afecta algo en mi rama y si soluciona algo de lo que teníamos como que chocaba entre nosotros.
+```
+
+```text
+El arreglo del contenido mejor hazlo y la avisamos. Y subámoslo al main.
+```
+
+Uso en el proyecto: `structures/rutas_mas_baratas.py`, `repository/traductor.py`, `model/game.py`, `controller/game_controller.py`, `specs/001-terreno-costo-salidas/spec.md`, y las pruebas de `test_rutas_mas_baratas.py`, `test_traductor.py` y `test_linea_de_tiempo.py`.
+
+Cambios realizados por el estudiante: Los tres defectos reportados resultaron reales y los tres eran de capacidades propias, así que se verificaron uno por uno antes de aceptarlos en vez de creerlos.
+
+El primero: el contrato del servicio declara `costo` como nulable y el traductor lo rechazaba, porque distinguía «campo ausente» de «campo con valor nulo» cuando el contrato les da el mismo significado. Una cripta real con un costo nulo no habría cargado. Se corrigió primero la especificación, en su propia confirmación, y después el traductor. El compañero que lo reportó se ofreció a arreglarlo él; se le pidió que no, porque toca un requisito de una especificación ajena y habrían chocado.
+
+El segundo: se había dejado rechazada la combinación de la parada anticipada con el proveedor de salidas dirigidas, con el argumento de que no estaba probada. Al revisarlo se comprobó que el argumento de corrección no depende de por dónde se expanda la búsqueda: solo usa que Dijkstra asienta en orden no decreciente de distancia y que todo costo es al menos 1, y las dos cosas valen igual en un grafo dirigido. La cautela era excesiva y bloqueaba a un compañero, así que se habilitó con cuatro pruebas sobre grafos dirigidos.
+
+El tercero es el que más enseña. En una partida real el contenido de cada sala se descarga cuando el jugador va a entrar, y lo carga el controlador justo antes del movimiento. Un punto de control tomado cuando esa sala todavía no estaba cargada hacía que, al reconstruir un instante, el motor rechazara el movimiento y el resumen se quedara en la sala anterior **sin dar ningún error**. La prueba de equivalencia propia no lo detectaba porque su cripta marcaba todas las salas como cargadas desde el inicio: el escenario de prueba era más permisivo que el programa real, que es exactamente la misma forma de error que ya había aparecido dos veces en esta capacidad. Se arregló aplicando el principio que ya estaba establecido —la información que entra desde afuera y que la lista de acciones no puede reproducir obliga a re-anclar con una copia— y se agregó una prueba que camina cargando el contenido como lo hace el controlador. El punto de control tiene que tomarse antes del movimiento y no después, porque uno posterior dejaría el movimiento problemático dentro del tramo anterior.
+
+Se anotó además, para la defensa, que los tres defectos los encontraron otros y que dos de ellos los habría encontrado antes una prueba menos benévola.
+
 ### 2.30 Niebla de guerra e «ir a»: análisis del repositorio, /speckit.specify y /speckit.clarify
 
 Herramienta: Claude (Claude Opus 5.5), mediante Claude Code

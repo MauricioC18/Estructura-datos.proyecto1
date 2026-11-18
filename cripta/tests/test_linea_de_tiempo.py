@@ -1047,5 +1047,93 @@ class AvisosDelMotorAlMapaConocidoTest(unittest.TestCase):
         self.assertFalse(vistos["e-2"])
 
 
+class ContenidoPerezosoTest(unittest.TestCase):
+    """El contenido de cada sala se descarga cuando el jugador va a entrar.
+
+    En una partida real lo carga el controlador justo antes del movimiento, no
+    el modelo. Si un punto de control se tomo cuando esa sala todavia no
+    estaba cargada, repetir el movimiento al reconstruir lo rechaza y el
+    resumen se queda en la sala anterior, sin dar ningun error.
+
+    Las demas pruebas de este archivo no lo detectaban porque su cripta marca
+    todas las salas como cargadas desde el inicio, que es mas permisivo que la
+    realidad.
+    """
+
+    def partida_perezosa(self, copias_cada):
+        """Como una partida real: solo la sala inicial viene cargada."""
+        juego, linea = construir_partida_con_linea(copias_cada=copias_cada)
+
+        for room_id in juego.room_map.room_ids():
+            if room_id != juego.player.room_id:
+                juego.room_map.room(room_id).content_loaded = False
+
+        return juego, linea
+
+    def caminar_cargando(self, juego, pasos):
+        """Camina como el controlador: carga el contenido y despues mueve."""
+        reales = []
+        direccion = "N"
+
+        for _ in range(pasos):
+            if juego.is_over:
+                break
+
+            antes = estado_observable(juego)
+            sala = juego.room_map.room(juego.player.room_id)
+            salida = sala.exit_towards(direccion)
+
+            if salida is not None:
+                destino = juego.room_map.room(salida.destination)
+
+                if not destino.content_loaded:
+                    destino.content_loaded = True
+                    juego.contenido_disponible(destino)
+                    antes = estado_observable(juego)
+
+                if juego.move(direccion).accepted:
+                    reales.append((linea_actual(juego) - 1, antes))
+                    continue
+
+            direccion = "S" if direccion == "N" else "N"
+
+            if juego.wait().accepted:
+                reales.append((linea_actual(juego) - 1, antes))
+
+        return reales
+
+    def test_los_instantes_coinciden_con_carga_perezosa(self):
+        """FR-023 con el contenido descargandose durante la partida."""
+        juego, _ = self.partida_perezosa(copias_cada=10)
+        reales = self.caminar_cargando(juego, 20)
+
+        self.assertGreaterEqual(len(reales), 10)
+
+        for numero, real in reales:
+            with self.subTest(accion=numero):
+                resumen = consultar_accion(juego, numero, reconstruir_desde_copia)
+                self.assertEqual(estado_del_resumen(resumen), real)
+
+    def test_cargar_contenido_fuerza_un_punto_de_control(self):
+        """Es informacion nueva que la lista de acciones no puede reproducir."""
+        juego, linea = self.partida_perezosa(copias_cada=10 ** 6)
+
+        self.assertEqual(linea.cantidad_de_copias(), 1)
+
+        self.caminar_cargando(juego, 6)
+
+        self.assertGreater(linea.cantidad_de_copias(), 1)
+
+    def test_avisar_sin_linea_de_tiempo_no_falla(self):
+        juego, _ = construir_partida_con_linea()
+        juego.timeline = None
+
+        juego.contenido_disponible(juego.room_map.room(2))
+
+
+def linea_actual(juego):
+    return juego.timeline.cantidad_de_acciones()
+
+
 if __name__ == "__main__":
     unittest.main()
