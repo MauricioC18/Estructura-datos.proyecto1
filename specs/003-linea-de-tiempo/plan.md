@@ -292,7 +292,7 @@ un requisito al azar y hay que mostrar su escenario, su tarea, su código y su p
 | Requisito | Tarea | Dónde se implementa | Prueba |
 | --- | --- | --- | --- |
 | FR-001 | T005 | `model/consulta_historia.py` | `test_todos_los_instantes_coinciden_con_el_estado_real` |
-| FR-002 | T001, T005 | `structures/linea_de_tiempo.py`, `accion_en_instante` | `test_un_instante_que_cae_sobre_una_accion_queda_justo_antes` |
+| FR-002 | T001, T005, T023 | `structures/linea_de_tiempo.py`, `accion_en_instante`, y el tope de eventos de `model/game.py` | `test_un_instante_que_cae_sobre_una_accion_queda_justo_antes` y `test_un_instante_en_medio_no_trae_los_eventos_posteriores` |
 | FR-003 | T005 | `consultar_instante` y `consultar_accion` | `test_consultar_por_instante_del_reloj_da_lo_mismo` |
 | FR-004 | T005 | `_resumir` | `test_el_resumen_trae_todo_lo_que_exige_el_enunciado` |
 | FR-005 | T007 | por construcción: objetos nuevos | `test_consultar_no_consume_tiempo_virtual` |

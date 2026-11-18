@@ -50,6 +50,7 @@ Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porqu
 - [x] T020 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
 - [x] T021 Cubrir los cuatro casos del Apéndice B que faltaban, en `spec.md` y `model/consulta_historia.py`
 - [x] T022 Medir los dos extremos y una partida de 5 000 acciones, en `benchmark/bench_linea_de_tiempo.py`
+- [x] T023 Un instante entre dos decisiones no debe traer los eventos posteriores, en `model/game.py`
 
 ---
 
@@ -387,6 +388,26 @@ Faltaban las dos mediciones que mejor defienden el diseño, y las pidió Steven 
 **Verificable cuando**: los dos números están en el plan y en el Documento de Decisiones, con la conclusión que se saca de ellos.
 
 **Depende de**: T016
+
+---
+
+## T023 — Un instante entre dos decisiones no trae el futuro
+
+**Requisitos**: FR-002
+
+**Archivos**: `cripta/model/game.py`, `cripta/model/consulta_historia.py`, `cripta/tests/test_linea_de_tiempo.py`
+
+Lo reportó Steven. Consultar un instante que cae **en medio** de un tramo entre dos decisiones del jugador devolvía el estado de la **siguiente** decisión: el ciclo de eventos seguía corriendo hasta ahí y procesaba eventos posteriores al instante pedido. Consultar el instante 300 traía los ataques del 400.
+
+El escenario 6 de la Historia 1 ya lo exigía; lo que faltaba era que el motor pudiera parar a mitad de tramo.
+
+- Dar al ciclo de eventos un **tope** opcional: procesar hasta ese instante y detenerse, en vez de seguir hasta la siguiente decisión.
+- La reconstrucción pone el tope **solo en la última acción que repite**, que es la que puede pasarse del instante pedido, y lo quita al terminar.
+- En una partida normal el tope queda siempre sin poner.
+
+**Verificable cuando**: en una partida donde el enemigo golpea entre dos decisiones, consultar un instante anterior al golpe da la vida de la decisión anterior y no la de la siguiente; recorrer el tramo de diez en diez nunca devuelve una vida que suba; y consultar el instante exacto de una decisión sigue dando lo de siempre.
+
+**Depende de**: T005
 
 ---
 

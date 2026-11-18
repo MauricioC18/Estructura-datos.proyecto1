@@ -191,6 +191,7 @@ class Game:
         self._snapshot = snapshot
         self.known_map = _NoKnownMap() if known_map is None else known_map
         self._entrantes_por_sala = None
+        self._event_limit = None
 
         if start:
             self._begin_new_game()
@@ -707,7 +708,24 @@ class Game:
         return ActionResult(True, message)
 
     def _advance_to_player_turn(self):
+        """Procesa eventos hasta que le toque decidir al jugador.
+
+        Si hay un limite de eventos puesto, para ahi en vez de seguir hasta la
+        siguiente decision. Lo usa la linea de tiempo para reconstruir un
+        instante que cae EN MEDIO de un tramo: el tramo entre dos decisiones
+        no es indivisible, y consultar el instante 300 no puede traer lo que
+        paso en el 400.
+        """
         while self.result == IN_PROGRESS:
+            siguiente = self.events.peek()
+
+            if siguiente is None:
+                return
+
+            if self._event_limit is not None and siguiente.time > self._event_limit:
+                self.state.advance_clock_to(self._event_limit)
+                return
+
             event = self.events.pop()
 
             if event is None:
@@ -752,6 +770,14 @@ class Game:
             self._close_door(event.room_id, event.direction)
         elif event.event_type == TRAP_REARM:
             self._rearm_trap(event.room_id, event.instance_id)
+
+    def detener_eventos_en(self, instante):
+        """Pone un tope a los eventos que el ciclo procesa, o lo quita.
+
+        Solo lo usa la reconstruccion de la linea de tiempo, sobre un motor
+        reconstruido. En una partida normal queda siempre en None.
+        """
+        self._event_limit = instante
 
     def contenido_disponible(self, room):
         """Avisa que el contenido de una sala acaba de quedar disponible.

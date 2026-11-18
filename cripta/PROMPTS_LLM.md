@@ -1683,3 +1683,27 @@ Uno de los casos que faltaban **contradecía** un requisito ya escrito. FR-009 r
 El otro caso, varios eventos en el mismo instante, resultó ya estar bien implementado: lo que faltaba era el escenario y la prueba. Se agregaron dos, uno sin decisión del jugador en ese instante y otro con ella, porque en ese cruce manda FR-002 y conviene que quede fijado.
 
 Las dos mediciones que el compañero pidió resultaron ser las que mejor defienden el diseño, y no se veían con las partidas cortas que se habían medido. Sin puntos de control, una consulta en una partida de 5 000 acciones cuesta 65.59 ms, más de tres veces el presupuesto completo de 20 ms del ciclo de eventos, y es la única variante cuyo costo crece con el largo de la partida. Con el valor por omisión cuesta 4.24 ms y sigue costando lo mismo que en una partida de 300 acciones. Ese par de números es lo que justifica que los puntos de control existan, y hasta hoy el documento no lo tenía.
+
+### 2.34 T023: el instante en medio de un tramo
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-17
+
+Objetivo: Arreglar el defecto que Steven dejó anotado como T023 y corregir la numeración repetida de escenarios en la especificación.
+
+Prompts utilizados:
+
+```text
+[Mensaje de Steven sobre T023 y los numeros repetidos] Si prepara el msj para el grupo y remediemos con cripta-06
+```
+
+Uso en el proyecto: `model/game.py`, `model/consulta_historia.py`, `specs/003-linea-de-tiempo/spec.md`, `tasks.md`, `plan.md` y `tests/test_linea_de_tiempo.py`.
+
+Cambios realizados por el estudiante: El defecto era real. El ciclo de eventos del motor corre hasta la siguiente decisión del jugador, así que reconstruir un instante que cae en medio de un tramo procesaba eventos posteriores al pedido. El escenario 6 de la especificación ya lo exigía; lo que faltaba era que el motor pudiera parar a mitad de tramo, así que se le dio un tope opcional al ciclo, que la reconstrucción pone solo en la última acción que repite y quita al terminar.
+
+Lo que más enseñó fue la prueba. La primera versión que se escribió **pasaba también sin el arreglo**, porque comparaba el instante pedido contra sí mismo en vez de contra el estado real: una aserción vacía. Se detectó anulando el arreglo a propósito y volviendo a correrla, y se rehízo comparando la vida del jugador contra la que tenía en la decisión anterior, con una comprobación previa de que entre las dos decisiones el enemigo de verdad golpea, para que la prueba no pueda pasar por falta de eventos. Con eso sí falla sin el arreglo y pasa con él.
+
+Es la cuarta vez en esta capacidad que un hueco de pruebas deja pasar algo, y la segunda con la misma causa concreta: el caso que se prueba es más fácil que el real. Acá las pruebas consultaban instantes que coinciden con una decisión del jugador, y el tramo entre dos decisiones no es indivisible.
+
+También se corrigieron los números de escenario 7 y 8, que habían quedado repetidos en la Historia 1 al agregar los casos del Apéndice B, y se dejó anotado que la cripta de referencia todavía no está disponible en ninguna rama, así que las mediciones siguen siendo con criptas sintéticas a su escala.
