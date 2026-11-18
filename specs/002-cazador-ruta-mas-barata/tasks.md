@@ -45,6 +45,7 @@ Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porqu
 - [x] T015 Correr las cuatro mediciones y anotarlas en `specs/002-cazador-ruta-mas-barata/plan.md`
 - [x] T016 No romper nada: la suite completa
 - [x] T017 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
+- [x] T018 La vista marca al cazador, en `cripta/view/console_view.py`
 
 ---
 
@@ -304,6 +305,24 @@ Correr los cuatro escenarios y anotar los números en el plan, con la máquina, 
 **Si el resultado contradice lo que el plan esperaba, se escribe tal cual.** Si recalcular siempre resulta competitivo en la escala de estas criptas, eso es el hallazgo y hay que decirlo, no esconderlo.
 
 **Depende de**: T014
+
+---
+
+## T018 — La vista marca al cazador
+
+**Requisitos**: FR-019
+
+**Archivos**: `cripta/view/console_view.py`, `cripta/tests/test_console_view.py`
+
+§7.3 del enunciado exige que la vista distinga a los cazadores de los demás enemigos, y ninguna especificación lo cubría: el dato ya estaba en la vista de enemigo del motor, pero la vista no lo pintaba distinto. El requisito se agregó a la especificación **antes** de este cambio, en su propia confirmación.
+
+- Marcar al cazador en la lista de enemigos de la sala.
+- **No quitar nada**: el nombre, el identificador y la vida se siguen mostrando igual.
+- No agregar ruido donde no hay ningún cazador.
+
+**Verificable cuando**: en una sala con un cazador y un enemigo de otro comportamiento, la línea del cazador se distingue y la del otro no; un cazador sigue mostrando nombre, id y vida; una sala sin cazadores se ve como antes.
+
+**Depende de**: T003
 
 ---
 

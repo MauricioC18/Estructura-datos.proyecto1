@@ -18,8 +18,10 @@ from adapters.almacen_partida import (
 )
 from model.consulta_historia import (
     MAPA_CONOCIDO_NO_DISPONIBLE,
+    PARTIDA_TERMINO_ANTES,
     ConsultaRechazada,
     consultar_accion,
+    consultar_hasta,
     consultar_instante,
 )
 from model.enemy import Enemy
@@ -298,6 +300,31 @@ def construir_partida_con_linea(copias_cada=10, semilla=2026, salas=4,
     return juego, linea
 
 
+class MapaConocidoDoble:
+    """Doble del mapa conocido, con el contrato acordado con Steven.
+
+    Recibe los avisos del motor (jugador_entro, puerta_cambio) y responde
+    salas_exploradas(). Sirve para probar que el motor avisa y que el resumen
+    lee, sin depender del modulo real, que vive en otra rama.
+    """
+
+    disponible = True
+
+    def __init__(self):
+        self._exploradas = []
+        self.puertas_observadas = 0
+
+    def jugador_entro(self, room_id, torch_lit):
+        if room_id not in self._exploradas:
+            self._exploradas.append(room_id)
+
+    def puerta_cambio(self, door, player_room_id):
+        self.puertas_observadas += 1
+
+    def salas_exploradas(self):
+        return list(self._exploradas)
+
+
 def estado_observable(juego):
     """Lo que un resumen debe poder reproducir."""
     sala = juego.player.room_id
@@ -443,21 +470,32 @@ class ReconstruirUnInstanteTest(unittest.TestCase):
         self.assertEqual(resumen.mapa_conocido, MAPA_CONOCIDO_NO_DISPONIBLE)
 
     def test_el_mapa_conocido_se_lee_de_quien_lo_tenga(self):
-        """El dato es de la niebla de guerra, que todavia no existe.
+        """El dato es de la niebla de guerra, que la implementa otro.
 
-        Se lee por duck typing para que conectarlo sea agregar una lectura.
+        Se usa un doble que cumple el contrato acordado: recibe los avisos del
+        motor y responde salas_exploradas(). Asi la prueba vale aunque el
+        modulo real todavia no este en esta rama.
         """
-        juego, _ = construir_partida_con_linea()
+        juego, _ = construir_partida_con_linea(objetos_extra=())
         jugar_guardando_el_estado(juego, 12)
 
         def reconstruir_con_mapa(bloque):
             reconstruido = reconstruir_desde_copia(bloque)
-            reconstruido.known_map = "mapa de prueba"
+            reconstruido.known_map = MapaConocidoDoble()
             return reconstruido
 
-        resumen = consultar_accion(juego, 3, reconstruir_con_mapa)
+        resumen = consultar_accion(juego, 6, reconstruir_con_mapa)
 
-        self.assertEqual(resumen.mapa_conocido, "mapa de prueba")
+        self.assertIsInstance(resumen.mapa_conocido, tuple)
+        self.assertIn(1, resumen.mapa_conocido)
+
+    def test_sin_niebla_de_guerra_el_resumen_lo_dice_en_vez_de_fallar(self):
+        juego, _ = construir_partida_con_linea()
+        jugar_guardando_el_estado(juego, 8)
+
+        resumen = consultar_accion(juego, 3, reconstruir_desde_copia)
+
+        self.assertEqual(resumen.mapa_conocido, MAPA_CONOCIDO_NO_DISPONIBLE)
 
 
 class ConsultarNoAlteraNadaTest(unittest.TestCase):
@@ -959,6 +997,363 @@ class ComandoYVistaTest(unittest.TestCase):
         self.assertIn("Inventario", texto)
         self.assertIn("Efectos", texto)
         self.assertIn("Mapa conocido", texto)
+
+
+class AvisosDelMotorAlMapaConocidoTest(unittest.TestCase):
+    """Los avisos que la niebla de guerra necesita del motor.
+
+    El modulo real es de Steven y vive en otra rama; aca se comprueba que el
+    motor avisa en los momentos acordados, con un doble.
+    """
+
+    def _partida_con_mapa(self):
+        doble = MapaConocidoDoble()
+        juego, linea = construir_partida_con_linea()
+        juego.known_map = doble
+        doble.jugador_entro(juego.player.room_id, juego.torch_lit)
+
+        return juego, doble
+
+    def test_el_motor_avisa_cuando_el_jugador_entra_a_una_sala(self):
+        juego, doble = self._partida_con_mapa()
+
+        self.assertEqual(doble.salas_exploradas(), [1])
+
+        self.assertTrue(juego.move("N").accepted)
+
+        self.assertEqual(doble.salas_exploradas(), [1, 2])
+
+    def test_una_partida_sin_niebla_no_falla_con_los_avisos(self):
+        """El objeto nulo ignora los avisos, igual que _NoHistory."""
+        juego, _ = construir_partida_con_linea()
+
+        self.assertFalse(juego.known_map.disponible)
+        self.assertTrue(juego.move("N").accepted)
+
+    def test_la_vista_de_enemigos_dice_si_es_cazador(self):
+        """Lo que Steven pidio para pintar el cazador distinto."""
+        from model.enemy import Enemy
+
+        juego, _ = construir_partida_con_linea()
+        juego.enemies[0].behavior = Enemy.HUNTER
+        juego.enemies[0].pursuit_range = 600
+        juego.enemies[0].room_id = juego.player.room_id
+        juego.enemies[1].room_id = juego.player.room_id
+
+        vistos = {
+            enemigo.actor_id: enemigo.is_hunter
+            for enemigo in juego.visible_state().enemies
+        }
+
+        self.assertTrue(vistos["e-1"])
+        self.assertFalse(vistos["e-2"])
+
+
+class ContenidoPerezosoTest(unittest.TestCase):
+    """El contenido de cada sala se descarga cuando el jugador va a entrar.
+
+    En una partida real lo carga el controlador justo antes del movimiento, no
+    el modelo. Si un punto de control se tomo cuando esa sala todavia no
+    estaba cargada, repetir el movimiento al reconstruir lo rechaza y el
+    resumen se queda en la sala anterior, sin dar ningun error.
+
+    Las demas pruebas de este archivo no lo detectaban porque su cripta marca
+    todas las salas como cargadas desde el inicio, que es mas permisivo que la
+    realidad.
+    """
+
+    def partida_perezosa(self, copias_cada):
+        """Como una partida real: solo la sala inicial viene cargada."""
+        juego, linea = construir_partida_con_linea(copias_cada=copias_cada)
+
+        for room_id in juego.room_map.room_ids():
+            if room_id != juego.player.room_id:
+                juego.room_map.room(room_id).content_loaded = False
+
+        return juego, linea
+
+    def caminar_cargando(self, juego, pasos):
+        """Camina como el controlador: carga el contenido y despues mueve."""
+        reales = []
+        direccion = "N"
+
+        for _ in range(pasos):
+            if juego.is_over:
+                break
+
+            antes = estado_observable(juego)
+            sala = juego.room_map.room(juego.player.room_id)
+            salida = sala.exit_towards(direccion)
+
+            if salida is not None:
+                destino = juego.room_map.room(salida.destination)
+
+                if not destino.content_loaded:
+                    destino.content_loaded = True
+                    juego.contenido_disponible(destino)
+                    antes = estado_observable(juego)
+
+                if juego.move(direccion).accepted:
+                    reales.append((linea_actual(juego) - 1, antes))
+                    continue
+
+            direccion = "S" if direccion == "N" else "N"
+
+            if juego.wait().accepted:
+                reales.append((linea_actual(juego) - 1, antes))
+
+        return reales
+
+    def test_los_instantes_coinciden_con_carga_perezosa(self):
+        """FR-023 con el contenido descargandose durante la partida."""
+        juego, _ = self.partida_perezosa(copias_cada=10)
+        reales = self.caminar_cargando(juego, 20)
+
+        self.assertGreaterEqual(len(reales), 10)
+
+        for numero, real in reales:
+            with self.subTest(accion=numero):
+                resumen = consultar_accion(juego, numero, reconstruir_desde_copia)
+                self.assertEqual(estado_del_resumen(resumen), real)
+
+    def test_cargar_contenido_fuerza_un_punto_de_control(self):
+        """Es informacion nueva que la lista de acciones no puede reproducir."""
+        juego, linea = self.partida_perezosa(copias_cada=10 ** 6)
+
+        self.assertEqual(linea.cantidad_de_copias(), 1)
+
+        self.caminar_cargando(juego, 6)
+
+        self.assertGreater(linea.cantidad_de_copias(), 1)
+
+    def test_avisar_sin_linea_de_tiempo_no_falla(self):
+        juego, _ = construir_partida_con_linea()
+        juego.timeline = None
+
+        juego.contenido_disponible(juego.room_map.room(2))
+
+
+def linea_actual(juego):
+    return juego.timeline.cantidad_de_acciones()
+
+
+class CasosDelApendiceBTest(unittest.TestCase):
+    """Los dos casos del Apendice B que faltaban (FR-025 y FR-026)."""
+
+    def test_varios_eventos_en_el_mismo_instante_cuentan_todos(self):
+        """FR-026 y Apendice B: el estado es el posterior a todos ellos.
+
+        Se busca un instante en el que el reloj haya procesado mas de un
+        evento y se comprueba que el resumen refleja el estado despues de
+        todos, no despues de algunos.
+        """
+        juego, linea = construir_partida_con_linea(copias_cada=10)
+        reales = jugar_guardando_el_estado(juego, 25)
+
+        instantes = [real[0] for real in reales]
+        repetidos = [t for t in instantes if instantes.count(t) > 1]
+
+        self.assertEqual(repetidos, [], "dos acciones no pueden compartir reloj")
+
+        # Cada consulta tiene que coincidir con el estado real, y ese estado
+        # real ya incluye todos los eventos que el motor proceso en ese
+        # instante antes de devolverle el turno al jugador.
+        for numero, real in enumerate(reales):
+            with self.subTest(accion=numero):
+                resumen = consultar_instante(juego, real[0], reconstruir_desde_copia)
+                self.assertEqual(estado_del_resumen(resumen), real)
+
+    def test_un_instante_con_eventos_y_decision_del_jugador(self):
+        """FR-002 manda sobre FR-026 cuando coinciden: la decision no se toma."""
+        juego, _ = construir_partida_con_linea(copias_cada=10)
+        reales = jugar_guardando_el_estado(juego, 15)
+
+        numero = len(reales) - 1
+        instante = reales[numero][0]
+
+        por_instante = consultar_instante(juego, instante, reconstruir_desde_copia)
+        por_accion = consultar_accion(juego, numero, reconstruir_desde_copia)
+
+        self.assertEqual(
+            estado_del_resumen(por_instante), estado_del_resumen(por_accion)
+        )
+        self.assertEqual(por_instante.acciones_del_jugador, numero)
+
+    def test_reproducir_hasta_despues_del_final_da_el_estado_final(self):
+        """FR-025 y Apendice B: no se rechaza, se avisa."""
+        juego, _ = construir_partida_con_linea(copias_cada=10)
+        jugar_guardando_el_estado(juego, 15)
+        final = estado_observable(juego)
+
+        resumen = consultar_hasta(
+            juego, juego.state.clock + 10 ** 6, reconstruir_desde_copia
+        )
+
+        self.assertEqual(estado_del_resumen(resumen), final)
+        self.assertEqual(resumen.aviso, PARTIDA_TERMINO_ANTES)
+
+    def test_reproducir_hasta_un_instante_valido_no_avisa_nada(self):
+        juego, _ = construir_partida_con_linea(copias_cada=10)
+        reales = jugar_guardando_el_estado(juego, 15)
+
+        resumen = consultar_hasta(juego, reales[5][0], reconstruir_desde_copia)
+
+        self.assertEqual(estado_del_resumen(resumen), reales[5])
+        self.assertIsNone(resumen.aviso)
+
+    def test_reproducir_hasta_el_instante_exacto_del_final_no_avisa(self):
+        juego, _ = construir_partida_con_linea(copias_cada=10)
+        jugar_guardando_el_estado(juego, 12)
+
+        resumen = consultar_hasta(juego, juego.state.clock, reconstruir_desde_copia)
+
+        self.assertIsNone(resumen.aviso)
+
+    def test_reproducir_hasta_un_instante_invalido_si_se_rechaza(self):
+        """FR-025 solo cambia el caso del futuro, no el de un dato malo."""
+        juego, _ = construir_partida_con_linea()
+        jugar_guardando_el_estado(juego, 8)
+
+        for invalido in (-1, "500", 1.5, None):
+            with self.subTest(instante=invalido):
+                with self.assertRaises(ConsultaRechazada):
+                    consultar_hasta(juego, invalido, reconstruir_desde_copia)
+
+    def test_en_partida_el_futuro_sigue_rechazandose(self):
+        """FR-009 no cambia: las dos consultas son distintas a proposito."""
+        juego, _ = construir_partida_con_linea()
+        jugar_guardando_el_estado(juego, 8)
+
+        with self.assertRaises(ConsultaRechazada):
+            consultar_instante(
+                juego, juego.state.clock + 1, reconstruir_desde_copia
+            )
+
+
+class InstanteEnMedioDeUnTramoTest(unittest.TestCase):
+    """T023: un instante entre dos decisiones no puede traer el futuro.
+
+    Lo reporto Steven. El tramo entre dos decisiones del jugador NO es
+    indivisible: se puede consultar por la mitad, y los eventos que ocurren
+    despues del instante pedido no deben aparecer.
+
+    Las demas pruebas no lo detectaban porque consultaban instantes que
+    coinciden con una decision del jugador, que es el caso facil.
+    """
+
+    def partida_con_enemigo_lento(self):
+        """El enemigo ataca entre dos decisiones del jugador, no en ellas."""
+        cuartos = []
+
+        for numero in (1, 2):
+            cuarto = Room(numero, f"Sala {numero}")
+            cuarto.content_loaded = True
+            cuartos.append(cuarto)
+
+        puerta = Door(1, 2, closed=False, cost=100)
+        cuartos[0].add_exit(Exit("N", 2, puerta))
+        cuartos[1].add_exit(Exit("S", 1, puerta))
+
+        mapa = RoomMap()
+
+        for cuarto in cuartos:
+            mapa.add(cuarto)
+
+        estado = GameState(seed=2026)
+        historial = History(estado)
+        jugador = Player("p-1", "Heroe", 10 ** 6, 6, 0, 100, 1)
+        jugador.inventory = Inventory(10, history=historial)
+
+        # Velocidad 150: actua cada 66 unidades, asi que casi siempre golpea
+        # en medio de un tramo del jugador y no en sus limites.
+        enemigo = Enemy("e-1", "Rata", 500, 5, 1, 150, 1, Enemy.GUARDIAN)
+        linea = LineaDeTiempo(copias_cada=5)
+
+        juego = Game(
+            estado,
+            jugador,
+            [enemigo],
+            room_map=mapa,
+            trail=PlayerTrail(historial),
+            history=historial,
+            event_queue=ReversibleEventQueue(historial),
+            timeline=linea,
+            snapshot=tomar_copia_del_estado,
+        )
+
+        return juego, linea
+
+    def decisiones(self, juego, cuantas):
+        """(reloj, vida) en cada decision del jugador."""
+        tomadas = []
+
+        for _ in range(cuantas):
+            tomadas.append((juego.state.clock, juego.player.health))
+            juego.wait()
+
+        return tomadas
+
+    def test_un_instante_en_medio_no_trae_los_eventos_posteriores(self):
+        """El caso exacto que reporto Steven.
+
+        El jugador decide cada 100 y el enemigo pega cada 66, asi que entre
+        dos decisiones hay golpes. Un instante anterior al primer golpe del
+        tramo tiene que dar la vida de la decision, no la de la siguiente.
+        """
+        juego, _ = self.partida_con_enemigo_lento()
+        tomadas = self.decisiones(juego, 6)
+
+        reloj, vida = tomadas[0]
+        reloj_siguiente, vida_siguiente = tomadas[1]
+
+        self.assertNotEqual(
+            vida, vida_siguiente,
+            "sin golpes entre las dos decisiones la prueba no compara nada",
+        )
+
+        a_la_mitad = reloj + (reloj_siguiente - reloj) // 3
+        resumen = consultar_instante(juego, a_la_mitad, reconstruir_desde_copia)
+
+        self.assertEqual(resumen.vida, vida)
+
+    def test_cada_instante_intermedio_da_una_vida_que_no_decrece(self):
+        """Recorre el tramo completo: la vida solo puede bajar al avanzar."""
+        juego, _ = self.partida_con_enemigo_lento()
+        tomadas = self.decisiones(juego, 6)
+
+        anterior = None
+
+        for instante in range(0, tomadas[-1][0] + 1, 10):
+            resumen = consultar_instante(juego, instante, reconstruir_desde_copia)
+
+            if anterior is not None:
+                self.assertLessEqual(
+                    resumen.vida, anterior,
+                    f"la vida subio al avanzar hasta el instante {instante}",
+                )
+
+            anterior = resumen.vida
+
+    def test_el_instante_de_una_decision_coincide_con_esa_decision(self):
+        """Lo que ya funcionaba tiene que seguir funcionando."""
+        juego, _ = self.partida_con_enemigo_lento()
+
+        for reloj, vida in self.decisiones(juego, 6):
+            with self.subTest(reloj=reloj):
+                resumen = consultar_instante(juego, reloj, reconstruir_desde_copia)
+                self.assertEqual(resumen.vida, vida)
+
+    def test_el_tope_se_quita_despues_de_consultar(self):
+        """El motor reconstruido es de usar y tirar, pero el tope no puede
+        quedar puesto en el que se devuelve."""
+        juego, _ = self.partida_con_enemigo_lento()
+
+        for _ in range(8):
+            juego.wait()
+
+        consultar_instante(juego, 150, reconstruir_desde_copia)
+
+        self.assertIsNone(juego._event_limit)
 
 
 if __name__ == "__main__":

@@ -41,7 +41,10 @@ from structures.trail import PlayerTrail
 
 
 SEED = 2026
-ROOMS = 40
+# La cripta de referencia publicada es cripta-06: 300 salas. El tamano de una
+# copia completa crece con la cripta, asi que la memoria de la linea se mide a
+# esa escala y no a la de las criptas de prueba.
+ROOMS = 300
 ENEMIES = 6
 
 
@@ -210,7 +213,35 @@ def run():
             )
         )
 
-    for decisiones in (50, 150, 300):
+    # Sin puntos de control mas alla del inicial: la consulta tiene que
+    # repetir TODAS las acciones. Es el otro extremo de K=1 y lo pide §5.5.
+    seconds, cuantas, copias, acciones, cantidad = measure_k(
+        10 ** 9, DECISIONES, CONSULTAS
+    )
+    measurements.append(
+        Measurement(
+            "Consulta SIN puntos de control (solo la copia inicial)",
+            seconds,
+            f"{cuantas} consultas, {seconds / cuantas * 1000:.4f} ms por "
+            f"consulta; {cantidad} copia, {copias / 1024:.1f} KiB en copias",
+        )
+    )
+
+    # Una partida larga: lo que pidio Steven al revisar.
+    seconds, cuantas, copias, acciones, cantidad = measure_k(
+        50, 5000, CONSULTAS
+    )
+    measurements.append(
+        Measurement(
+            "Consulta con K=50 en una partida de 5000 acciones",
+            seconds,
+            f"{cuantas} consultas, {seconds / cuantas * 1000:.4f} ms por "
+            f"consulta; {cantidad} copias, {copias / 1024:.1f} KiB en copias y "
+            f"{acciones / 1024:.2f} KiB en acciones",
+        )
+    )
+
+    for decisiones in (50, 150, 300, 5000):
         seconds, cuantas = measure_query_against_length(50, decisiones, CONSULTAS)
         measurements.append(
             Measurement(

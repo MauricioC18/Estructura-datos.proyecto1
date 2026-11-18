@@ -31,10 +31,16 @@
 
 ## Casos obligatorios del Apéndice B cubiertos
 
-Los dos casos del Apéndice B bajo «Línea de tiempo».
+Los **seis** casos del Apéndice B bajo «Línea de tiempo».
 
-- [x] Consultar un instante mayor que el reloj actual se rechaza → Historia 2, escenario 1, FR-009 y SC-004
-- [x] Consultar después de usar un pergamino no muestra las acciones revertidas → Historia 3, escenario 1, FR-011 y SC-005
+- [x] `historia <t>` con t mayor que el reloj actual: se rechaza → Historia 2, escenario 1, FR-009 y SC-004
+- [x] `historia` después de usar un pergamino: no muestra las acciones revertidas → Historia 3, escenario 1, FR-011 y SC-005
+- [x] Varios eventos en el mismo instante: muestra el estado después de todos ellos → Historia 1, escenarios 8 y 9, y FR-026
+- [x] `historia` no consume tiempo, no se registra en `partida.log` y no toca el historial de retroceso → Historia 1, escenario 10, y FR-005 a FR-008, SC-003
+- [x] `--replay --hasta t` con t posterior al final: muestra el estado final e indica que terminó antes → Historia 2, escenario 6, FR-025 y SC-011
+- [x] Se carga un archivo de la primera parte: se reporta la incompatibilidad, nunca en silencio → Historia 5, escenario 3, y FR-021
+
+**Corrección.** La primera versión de esta lista decía «los dos casos» y solo mapeaba dos. Son seis, y faltaban cuatro: dos ya estaban cubiertos por requisitos existentes y no estaban mapeados, y dos no estaban cubiertos. Uno de esos dos, el de `--hasta` más allá del final, **contradecía** a FR-009, que rechazaba cualquier instante posterior al reloj; se separó el caso en partida del caso sin interacción, con FR-025. Lo detectó Steven al revisar la especificación, y es un fallo de trazabilidad del §2.5, no un detalle.
 
 ## Problema de estructuras de datos §5.5 cubierto
 

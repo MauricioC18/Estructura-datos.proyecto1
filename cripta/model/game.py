@@ -20,6 +20,7 @@ from model.event import Event
 from model.item import Item
 from model.room import DIRECTIONS
 from structures.circular_log import CircularLog
+from structures.tabla_hash import TablaHash
 from structures.event_queue import EventQueue
 from structures.history import use_rewind_scroll
 from structures.inventory import is_rewind_scroll
@@ -86,11 +87,31 @@ class ActionResult:
 
 
 @dataclass
+class _NoKnownMap:
+    """Objeto nulo del mapa conocido, para una partida sin niebla de guerra.
+
+    El motor avisa de lo que pasa sin preguntar si alguien escucha, igual que
+    hace con el historial reversible y su _NoHistory. El atributo disponible
+    permite a quien consulte el mapa distinguir «no hay niebla de guerra» de
+    «el jugador no ha explorado nada».
+    """
+
+    disponible = False
+
+    def jugador_entro(self, room_id, torch_lit):
+        pass
+
+    def puerta_cambio(self, door, player_room_id):
+        pass
+
+
+@dataclass
 class EnemyView:
     actor_id: str
     name: str
     health: int
     max_health: int
+    is_hunter: bool = False
 
 
 @dataclass
@@ -146,6 +167,7 @@ class Game:
         always_recompute_routes=False,
         timeline=None,
         snapshot=None,
+        known_map=None,
     ):
         self.state = state
         self.player = player
@@ -167,6 +189,9 @@ class Game:
         self._routes = None
         self.timeline = timeline
         self._snapshot = snapshot
+        self.known_map = _NoKnownMap() if known_map is None else known_map
+        self._entrantes_por_sala = None
+        self._event_limit = None
 
         if start:
             self._begin_new_game()
@@ -182,6 +207,7 @@ class Game:
         archivo, sus enemigos ya tienen su estado y el reloj no esta en cero.
         """
         self._mark_trail()
+        self.known_map.jugador_entro(self.player.room_id, self.torch_lit)
         self._schedule(self.player, self.state.clock)
         self._activate_enemies_in(self.player.room_id)
         self._advance_to_player_turn()
@@ -207,6 +233,7 @@ class Game:
         enemies_defeated=0,
         timeline=None,
         snapshot=None,
+        known_map=None,
     ):
         """Arma una partida guardada en disco, para el guardado de §4.10.
 
@@ -242,6 +269,7 @@ class Game:
             start=False,
             timeline=timeline,
             snapshot=snapshot,
+            known_map=known_map,
         )
 
         for event in events:
@@ -325,6 +353,7 @@ class Game:
         self.history.begin_action()
         self.history.assign(self.player, "room_id", destination.room_id)
         self._invalidate_routes()
+        self.known_map.jugador_entro(destination.room_id, self.torch_lit)
         self._activate_enemies_in(destination.room_id)
         message = f"Entras a {destination.name}."
         self._log(message)
@@ -374,6 +403,7 @@ class Game:
         self.history.begin_action()
         self.history.assign(door, "closed", False)
         self._invalidate_routes()
+        self.known_map.puerta_cambio(door, self.player.room_id)
         message = f"Abres la puerta hacia {direction}."
 
         if door.auto_close is not None:
@@ -614,6 +644,7 @@ class Game:
                 enemy.name,
                 enemy.health,
                 enemy.max_health,
+                enemy.behavior == Enemy.HUNTER,
             )
             for enemy in self.enemies
             if enemy.is_alive and enemy.room_id == self.player.room_id
@@ -677,7 +708,24 @@ class Game:
         return ActionResult(True, message)
 
     def _advance_to_player_turn(self):
+        """Procesa eventos hasta que le toque decidir al jugador.
+
+        Si hay un limite de eventos puesto, para ahi en vez de seguir hasta la
+        siguiente decision. Lo usa la linea de tiempo para reconstruir un
+        instante que cae EN MEDIO de un tramo: el tramo entre dos decisiones
+        no es indivisible, y consultar el instante 300 no puede traer lo que
+        paso en el 400.
+        """
         while self.result == IN_PROGRESS:
+            siguiente = self.events.peek()
+
+            if siguiente is None:
+                return
+
+            if self._event_limit is not None and siguiente.time > self._event_limit:
+                self.state.advance_clock_to(self._event_limit)
+                return
+
             event = self.events.pop()
 
             if event is None:
@@ -722,6 +770,36 @@ class Game:
             self._close_door(event.room_id, event.direction)
         elif event.event_type == TRAP_REARM:
             self._rearm_trap(event.room_id, event.instance_id)
+
+    def detener_eventos_en(self, instante):
+        """Pone un tope a los eventos que el ciclo procesa, o lo quita.
+
+        Solo lo usa la reconstruccion de la linea de tiempo, sobre un motor
+        reconstruido. En una partida normal queda siempre en None.
+        """
+        self._event_limit = instante
+
+    def contenido_disponible(self, room):
+        """Avisa que el contenido de una sala acaba de quedar disponible.
+
+        Lo llama quien lo descarga, que es el controlador, JUSTO DESPUES de
+        cargarlo y ANTES del movimiento que lo necesita.
+
+        Fuerza un punto de control por el mismo motivo que un pergamino:
+        es informacion que entra desde afuera y que la lista de acciones del
+        jugador NO puede reproducir. Sin esto, reconstruir un instante
+        posterior repetiria el movimiento hacia esa sala y el motor lo
+        rechazaria por contenido no disponible, dejando el resumen en la sala
+        anterior y sin dar ningun error.
+
+        Tiene que ser antes del movimiento: un punto de control tomado despues
+        no sirve, porque el tramo que empieza en el punto de control anterior
+        seguiria conteniendo ese movimiento.
+        """
+        if self.timeline is None or self._snapshot is None:
+            return
+
+        self.timeline.guardar_copia(self.state.clock, self._snapshot(self))
 
     def _trim_timeline(self):
         """Recorta la linea al usar un pergamino (seccion 3.6).
@@ -799,14 +877,59 @@ class Game:
 
         return neighbours
 
+    def _incoming_exits_of(self, room_id):
+        """Salidas que ENTRAN a una sala: (id_origen, costo, salida).
+
+        Solo las que tienen la puerta abierta en este instante.
+
+        Hace falta porque el contrato del servicio describe cada salida como
+        dirigida y no exige que la sala destino declare la vuelta, asi que el
+        esqueleto puede dar un grafo asimetrico.
+
+        La topologia no cambia durante la partida, asi que el indice de
+        salidas que entran a cada sala se arma una sola vez, en O(V + E). Lo
+        que si cambia es el estado de las puertas, y eso se filtra al
+        consultar.
+        """
+        if self._entrantes_por_sala is None:
+            self._armar_entrantes()
+
+        entrantes = []
+
+        for origen, exit_ in self._entrantes_por_sala.obtener(room_id) or []:
+            if exit_.door.is_open:
+                entrantes.append((origen, exit_.cost, exit_))
+
+        return entrantes
+
+    def _armar_entrantes(self):
+        self._entrantes_por_sala = TablaHash()
+
+        if self.room_map is None:
+            return
+
+        for room_id in self.room_map.room_ids():
+            for exit_ in self.room_map.room(room_id).exits():
+                destino = exit_.destination
+
+                if not self._entrantes_por_sala.contiene(destino):
+                    self._entrantes_por_sala.insertar(destino, [])
+
+                self._entrantes_por_sala.obtener(destino).append((room_id, exit_))
+
     def _routes_towards_player(self):
         """Costos minimos desde la sala del jugador, para los cazadores.
 
         Se busca una sola vez desde la sala del jugador y sirve a todos los
-        cazadores activos: el grafo no tiene direccion, asi que la distancia
-        desde el jugador es la distancia hasta el jugador. El corte es el
-        rango mayor entre los cazadores activos; cada uno compara despues su
-        propia distancia contra su propio rango.
+        cazadores activos. El corte es el rango mayor entre los cazadores
+        activos; cada uno compara despues su propia distancia contra su propio
+        rango.
+
+        La busqueda se expande por las salidas que ENTRAN a cada sala, no por
+        las que salen, porque lo que hace falta es el costo de llegar HASTA el
+        jugador. El primer paso si usa las que salen. En una cripta donde toda
+        salida tiene vuelta las dos cosas coinciden, pero el contrato del
+        servicio describe cada salida como dirigida y no lo garantiza.
         """
         if self._routes is not None and not self.always_recompute_routes:
             return self._routes
@@ -818,7 +941,12 @@ class Game:
                 cut = max(cut, enemy.pursuit_range)
 
         self.route_searches += 1
-        routes = RutasMasBaratas(self._open_exits_of, self.player.room_id, cut)
+        routes = RutasMasBaratas(
+            self._incoming_exits_of,
+            self.player.room_id,
+            cut,
+            salidas_de=self._open_exits_of,
+        )
         self._routes = routes
 
         return routes
@@ -1129,6 +1257,7 @@ class Game:
 
         self.history.assign(exit_.door, "closed", True)
         self._invalidate_routes()
+        self.known_map.puerta_cambio(exit_.door, self.player.room_id)
         self._log(f"La puerta hacia {direction} se cierra sola.")
 
     def _rearm_trap(self, room_id, instance_id):

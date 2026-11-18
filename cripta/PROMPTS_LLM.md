@@ -1600,6 +1600,114 @@ Se corrigieron además tres errores propios en las pruebas, todos detectados al 
 
 El valor por omisión de K quedó en 50, elegido con las mediciones como exige el enunciado. La alternativa ingenua de una copia por acción cuesta 43 veces más memoria para ganar menos de 0.6 ms por consulta. Entre los valores razonables el argumento resultó ser de latencia y no de memoria: con 98 KiB la memoria ya es irrelevante en términos absolutos, así que lo que queda por optimizar es cuánto tarda una consulta, y K de 200 ahorra 71 KiB que nadie nota y duplica el tiempo. También quedó anotado que esas cifras son de una cripta de 40 salas y que la memoria de las copias crece con el tamaño de la cripta, más la optimización evidente que no se hizo a propósito: guardar en la copia solo el estado mutable y no el esqueleto, que no cambia nunca. Se prefirió reutilizar el serializador ya probado antes que escribir un segundo serializador, y el costo está medido.
 
+### 2.31 Cierre: el Documento de Decisiones y la vista del cazador
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-17
+
+Objetivo: Escribir las secciones de la segunda parte del Documento de Decisiones de Diseño (§7.1) y cerrar el último pendiente propio.
+
+Prompts utilizados:
+
+```text
+hacé el documento de decisiones
+```
+
+```text
+Ok, sí, perfecto. Termina con lo mío
+```
+
+Uso en el proyecto: las secciones 5.1, 5.2, 5.5 y 5.6 de `docs/DECISIONES.md`; el requisito FR-019 y la Historia 6 de `specs/002-cazador-ruta-mas-barata/spec.md`; `view/console_view.py` y `tests/test_console_view.py`.
+
+Cambios realizados por el estudiante: Antes de escribir se revisó cómo había titulado su sección el compañero que escribe la 5.3, para usar la misma convención y que al juntar las ramas el conflicto fuera trivial de resolver. Las secciones 5.3 y 5.4 quedaron con una nota de a quién pertenecen y qué les falta, siguiendo la convención que el documento ya usaba para las secciones de la primera parte sin escribir.
+
+Lo que §7.1 pide y más suma es indicar si la decisión final coincide con la del plan original. Dos no coinciden y las dos quedaron escritas con lo que motivó el cambio. En §5.2 la decisión se mantiene pero la justificación cambió: el plan esperaba que el ahorro viniera de reutilizar el cálculo cuando las puertas están quietas, y la medición mostró 252 búsquedas en 300 decisiones, porque el jugador se mueve y moverse invalida; el ahorro real es compartir una búsqueda entre los cazadores del mismo instante. En §5.5 la idea de anotar solo el estado del generador en cada pergamino la tumbó la prueba de equivalencia, porque el pergamino también consume un pergamino del inventario.
+
+Para la §5.6 se repitieron las mediciones de la primera parte con la carga nueva, como exige el enunciado. El montículo de la agenda sigue siendo 6.5 veces más rápido que la lista sin ordenar que se había descartado, así que esa decisión no cambia; se anotó además que los cazadores no agregan eventos a la agenda, solo cambian a dónde se mueven, de modo que la carga sobre la agenda crece con los actores y no con el terreno.
+
+Al revisar la capacidad contra §7.3 se encontró que la vista debía distinguir a los cazadores de los demás enemigos y que ninguna especificación lo cubría: el dato ya estaba en la vista de enemigo del motor, pero la vista no lo pintaba distinto. Se agregó el requisito a la especificación del cazador, con su historia, sus escenarios, un caso borde y un criterio de éxito, en una confirmación aparte y antes de tocar el código. Ese orden se eligió a propósito porque es el ejercicio que §7.4 anuncia para la defensa: pedir un cambio pequeño a una regla y mostrar primero la modificación de la especificación y luego la del código.
+
+También se actualizó el resumen de pruebas del Documento, que fijaba 861 como si fuera definitivo. Ahora reporta 1 029 con el desglose por capacidad y explica que la cifra sube al juntar las ramas, de modo que lo que queda fijo es la regla —que ninguna prueba deje de pasar— y no el número.
+
+### 2.32 Arreglos reportados por los compañeros
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-17
+
+Objetivo: Arreglar los defectos que Steven y Mauricio A. reportaron sobre capacidades propias, antes de llevar la rama a `main`.
+
+Prompts utilizados:
+
+```text
+[Se le pasaron los mensajes del grupo] Dime si esto afecta algo en mi rama y si soluciona algo de lo que teníamos como que chocaba entre nosotros.
+```
+
+```text
+El arreglo del contenido mejor hazlo y la avisamos. Y subámoslo al main.
+```
+
+Uso en el proyecto: `structures/rutas_mas_baratas.py`, `repository/traductor.py`, `model/game.py`, `controller/game_controller.py`, `specs/001-terreno-costo-salidas/spec.md`, y las pruebas de `test_rutas_mas_baratas.py`, `test_traductor.py` y `test_linea_de_tiempo.py`.
+
+Cambios realizados por el estudiante: Los tres defectos reportados resultaron reales y los tres eran de capacidades propias, así que se verificaron uno por uno antes de aceptarlos en vez de creerlos.
+
+El primero: el contrato del servicio declara `costo` como nulable y el traductor lo rechazaba, porque distinguía «campo ausente» de «campo con valor nulo» cuando el contrato les da el mismo significado. Una cripta real con un costo nulo no habría cargado. Se corrigió primero la especificación, en su propia confirmación, y después el traductor. El compañero que lo reportó se ofreció a arreglarlo él; se le pidió que no, porque toca un requisito de una especificación ajena y habrían chocado.
+
+El segundo: se había dejado rechazada la combinación de la parada anticipada con el proveedor de salidas dirigidas, con el argumento de que no estaba probada. Al revisarlo se comprobó que el argumento de corrección no depende de por dónde se expanda la búsqueda: solo usa que Dijkstra asienta en orden no decreciente de distancia y que todo costo es al menos 1, y las dos cosas valen igual en un grafo dirigido. La cautela era excesiva y bloqueaba a un compañero, así que se habilitó con cuatro pruebas sobre grafos dirigidos.
+
+El tercero es el que más enseña. En una partida real el contenido de cada sala se descarga cuando el jugador va a entrar, y lo carga el controlador justo antes del movimiento. Un punto de control tomado cuando esa sala todavía no estaba cargada hacía que, al reconstruir un instante, el motor rechazara el movimiento y el resumen se quedara en la sala anterior **sin dar ningún error**. La prueba de equivalencia propia no lo detectaba porque su cripta marcaba todas las salas como cargadas desde el inicio: el escenario de prueba era más permisivo que el programa real, que es exactamente la misma forma de error que ya había aparecido dos veces en esta capacidad. Se arregló aplicando el principio que ya estaba establecido —la información que entra desde afuera y que la lista de acciones no puede reproducir obliga a re-anclar con una copia— y se agregó una prueba que camina cargando el contenido como lo hace el controlador. El punto de control tiene que tomarse antes del movimiento y no después, porque uno posterior dejaría el movimiento problemático dentro del tramo anterior.
+
+Se anotó además, para la defensa, que los tres defectos los encontraron otros y que dos de ellos los habría encontrado antes una prueba menos benévola.
+
+### 2.33 Los casos del Apéndice B que faltaban y las dos mediciones
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-17
+
+Objetivo: Cerrar la trazabilidad de la línea de tiempo contra el Apéndice B y completar las mediciones que faltaban, a partir de una revisión de un compañero.
+
+Prompts utilizados:
+
+```text
+[Se le pasó el mensaje de revisión de Steven] ¿Me podrías decir qué podría hacer y si ocuparía terminar algo? Dime si falta algo, para terminar lo mío de modo que cumpla al 100% mi parte con la rúbrica y que no haya incumplido ninguna regla.
+```
+
+Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md` y su lista de verificación, `model/consulta_historia.py`, `benchmark/bench_linea_de_tiempo.py` y `tests/test_linea_de_tiempo.py`.
+
+Cambios realizados por el estudiante: El compañero señaló dos escenarios que faltaban. Al ir a agregarlos se encontró algo peor: la lista de verificación de la capacidad afirmaba que el Apéndice B tenía **dos** casos de línea de tiempo y tiene **seis**. Dos estaban cubiertos por requisitos existentes pero sin mapear, y dos no estaban cubiertos. Es un fallo de trazabilidad del §2.5, que exige que cada caso del Apéndice B aparezca como escenario de aceptación en alguna especificación, y se originó en haber leído el apéndice sin contar los casos.
+
+Uno de los casos que faltaban **contradecía** un requisito ya escrito. FR-009 rechazaba cualquier consulta de un instante posterior al reloj, y el Apéndice B pide que reproducir una bitácora hasta un instante posterior al final muestre el estado final e indique que la partida terminó antes. Se resolvió separando los dos caminos con FR-025, con el motivo escrito: en partida el futuro de verdad no ocurrió, pero reproducir una partida ya terminada no tiene futuro que inventar, solo un final al que llegar, y pedir «hasta el instante 9999» de una partida que duró 3 000 es una forma normal de pedir el final. La corrección fue a la especificación primero y en su propia confirmación.
+
+El otro caso, varios eventos en el mismo instante, resultó ya estar bien implementado: lo que faltaba era el escenario y la prueba. Se agregaron dos, uno sin decisión del jugador en ese instante y otro con ella, porque en ese cruce manda FR-002 y conviene que quede fijado.
+
+Las dos mediciones que el compañero pidió resultaron ser las que mejor defienden el diseño, y no se veían con las partidas cortas que se habían medido. Sin puntos de control, una consulta en una partida de 5 000 acciones cuesta 65.59 ms, más de tres veces el presupuesto completo de 20 ms del ciclo de eventos, y es la única variante cuyo costo crece con el largo de la partida. Con el valor por omisión cuesta 4.24 ms y sigue costando lo mismo que en una partida de 300 acciones. Ese par de números es lo que justifica que los puntos de control existan, y hasta hoy el documento no lo tenía.
+
+### 2.34 T023: el instante en medio de un tramo
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-17
+
+Objetivo: Arreglar el defecto que Steven dejó anotado como T023 y corregir la numeración repetida de escenarios en la especificación.
+
+Prompts utilizados:
+
+```text
+[Mensaje de Steven sobre T023 y los numeros repetidos] Si prepara el msj para el grupo y remediemos con cripta-06
+```
+
+Uso en el proyecto: `model/game.py`, `model/consulta_historia.py`, `specs/003-linea-de-tiempo/spec.md`, `tasks.md`, `plan.md` y `tests/test_linea_de_tiempo.py`.
+
+Cambios realizados por el estudiante: El defecto era real. El ciclo de eventos del motor corre hasta la siguiente decisión del jugador, así que reconstruir un instante que cae en medio de un tramo procesaba eventos posteriores al pedido. El escenario 6 de la especificación ya lo exigía; lo que faltaba era que el motor pudiera parar a mitad de tramo, así que se le dio un tope opcional al ciclo, que la reconstrucción pone solo en la última acción que repite y quita al terminar.
+
+Lo que más enseñó fue la prueba. La primera versión que se escribió **pasaba también sin el arreglo**, porque comparaba el instante pedido contra sí mismo en vez de contra el estado real: una aserción vacía. Se detectó anulando el arreglo a propósito y volviendo a correrla, y se rehízo comparando la vida del jugador contra la que tenía en la decisión anterior, con una comprobación previa de que entre las dos decisiones el enemigo de verdad golpea, para que la prueba no pueda pasar por falta de eventos. Con eso sí falla sin el arreglo y pasa con él.
+
+Es la cuarta vez en esta capacidad que un hueco de pruebas deja pasar algo, y la segunda con la misma causa concreta: el caso que se prueba es más fácil que el real. Acá las pruebas consultaban instantes que coinciden con una decisión del jugador, y el tramo entre dos decisiones no es indivisible.
+
+También se corrigieron los números de escenario 7 y 8, que habían quedado repetidos en la Historia 1 al agregar los casos del Apéndice B, y se dejó anotado que la cripta de referencia todavía no está disponible en ninguna rama, así que las mediciones siguen siendo con criptas sintéticas a su escala.
+
 ### 5.30 Arranque de la segunda parte: análisis del enunciado, del contrato 1.1.0 y de las criptas publicadas
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai

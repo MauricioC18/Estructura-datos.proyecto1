@@ -673,5 +673,90 @@ class PruebasRangoDeCazador(unittest.TestCase):
         self.assertIn("rango", campos_conocidos_de_la_clase(CLASE_ENEMIGO))
 
 
+class PruebasSalidaDeUnSoloSentido(unittest.TestCase):
+    """El contrato describe cada salida como dirigida y no exige la vuelta.
+
+    El programa lo soporta, pero las busquedas de rutas de costo minimo
+    suponen simetria, asi que tiene que avisar en vez de callar.
+    """
+
+    def armar(self, salas):
+        traductor = nuevo_traductor()
+        return traductor, traductor.crear_mapa(salas)
+
+    def test_una_salida_sin_vuelta_produce_un_mapa_de_un_solo_sentido(self):
+        traductor, mapa = self.armar([
+            {"id": 1, "nombre": "Una", "salidas": {"N": {"sala": 2}}},
+            {"id": 2, "nombre": "Dos", "salidas": {}},
+        ])
+
+        self.assertEqual(len(mapa.room(1).exits()), 1)
+        self.assertEqual(len(mapa.room(2).exits()), 0)
+
+    def test_una_salida_sin_vuelta_se_avisa(self):
+        traductor, _ = self.armar([
+            {"id": 1, "nombre": "Una", "salidas": {"N": {"sala": 2}}},
+            {"id": 2, "nombre": "Dos", "salidas": {}},
+        ])
+
+        avisos = [a for a in traductor.avisos if "un solo sentido" in a]
+        self.assertEqual(len(avisos), 1)
+        self.assertIn("1", avisos[0])
+        self.assertIn("2", avisos[0])
+
+    def test_un_mapa_simetrico_no_produce_ningun_aviso(self):
+        traductor, mapa = self.armar([
+            {"id": 1, "nombre": "Una", "salidas": {"N": {"sala": 2}}},
+            {"id": 2, "nombre": "Dos", "salidas": {"S": {"sala": 1}}},
+        ])
+
+        self.assertEqual(
+            [a for a in traductor.avisos if "un solo sentido" in a], []
+        )
+        self.assertIs(mapa.room(1).exits()[0].door, mapa.room(2).exits()[0].door)
+
+
+class PruebasCostoVacio(unittest.TestCase):
+    """El contrato 1.1.0 admite "costo": null y significa sin costo propio."""
+
+    def armar(self, salidas_de_1):
+        traductor = nuevo_traductor()
+        mapa = traductor.crear_mapa([
+            {"id": 1, "nombre": "Una", "salidas": salidas_de_1},
+            {"id": 2, "nombre": "Dos", "salidas": {"S": {"sala": 1}}},
+        ])
+        return traductor, mapa
+
+    def test_un_costo_vacio_vale_cien(self):
+        _, mapa = self.armar({"N": {"sala": 2, "costo": None}})
+
+        self.assertEqual(mapa.room(1).exits()[0].cost, 100)
+
+    def test_un_costo_vacio_no_es_un_error_de_datos(self):
+        traductor, _ = self.armar({"N": {"sala": 2, "costo": None}})
+
+        self.assertEqual(
+            [aviso for aviso in traductor.avisos if "costo" in aviso], []
+        )
+
+    def test_un_costo_vacio_de_un_lado_no_pisa_al_del_otro(self):
+        traductor = nuevo_traductor()
+        mapa = traductor.crear_mapa([
+            {"id": 1, "nombre": "Una", "salidas": {"N": {"sala": 2, "costo": None}}},
+            {"id": 2, "nombre": "Dos", "salidas": {"S": {"sala": 1, "costo": 250}}},
+        ])
+
+        self.assertEqual(mapa.room(1).exits()[0].cost, 250)
+        self.assertEqual(
+            [aviso for aviso in traductor.avisos if "costo" in aviso], []
+        )
+
+    def test_un_costo_invalido_sigue_siendo_un_error(self):
+        for invalido in (0, -1, "250", 1.5, True):
+            with self.subTest(costo=invalido):
+                with self.assertRaises(ErrorDatosCripta):
+                    self.armar({"N": {"sala": 2, "costo": invalido}})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -46,6 +46,11 @@ from model.game import (
 MAPA_CONOCIDO_NO_DISPONIBLE = "todavia no implementado"
 
 
+PARTIDA_TERMINO_ANTES = (
+    "La partida termino antes del instante pedido; se muestra el estado final."
+)
+
+
 class ConsultaRechazada(ValueError):
     """El instante o el numero de accion pedidos no se pueden consultar."""
 
@@ -60,6 +65,7 @@ class ResumenDeInstante:
     """
 
     __slots__ = (
+        "aviso",
         "instante",
         "acciones_del_jugador",
         "sala",
@@ -135,6 +141,34 @@ def consultar_accion(juego, numero_de_accion, reconstruir_copia):
     )
 
 
+def consultar_hasta(juego, instante, reconstruir_copia):
+    """Resumen para una reproduccion sin interaccion (FR-014, FR-025).
+
+    Se diferencia de consultar_instante en un solo punto, y es a proposito: si
+    el instante pedido es POSTERIOR al final de la partida, no se rechaza. Se
+    devuelve el estado final con un aviso de que la partida termino antes.
+
+    El motivo es que reproducir una partida ya terminada no tiene futuro que
+    inventar, solo un final al que llegar: pedir «hasta el instante 9999» de
+    una partida que duro 3 000 es una forma normal de pedir el final. En
+    partida, en cambio, el futuro de verdad no ocurrio y FR-009 lo rechaza.
+    """
+    _exigir_entero(instante, "El instante")
+
+    if instante < 0:
+        raise ConsultaRechazada(
+            f"No existe el instante {instante}: el reloj empieza en 0."
+        )
+
+    if instante <= juego.state.clock:
+        return consultar_instante(juego, instante, reconstruir_copia)
+
+    resumen = consultar_instante(juego, juego.state.clock, reconstruir_copia)
+    resumen.aviso = PARTIDA_TERMINO_ANTES
+
+    return resumen
+
+
 def _reconstruir(juego, linea, numero_de_accion, instante, reconstruir_copia):
     copia = linea.copia_para_accion(numero_de_accion)
 
@@ -145,10 +179,19 @@ def _reconstruir(juego, linea, numero_de_accion, instante, reconstruir_copia):
 
     reconstruido = reconstruir_copia(copia.bloque)
     repetidas = 0
+    ultima = numero_de_accion - 1
 
     for posicion in range(copia.acciones, numero_de_accion):
+        if posicion == ultima:
+            # El tope solo se pone en la ultima accion que se repite. Sin el,
+            # el ciclo seguiria hasta la siguiente decision del jugador y
+            # traeria eventos POSTERIORES al instante pedido.
+            reconstruido.detener_eventos_en(instante)
+
         _repetir(reconstruido, linea.acciones()[posicion])
         repetidas += 1
+
+    reconstruido.detener_eventos_en(None)
 
     return _resumir(reconstruido, instante, numero_de_accion, repetidas)
 
@@ -271,17 +314,23 @@ def _enemigos_en_la_sala_de(reconstruido, room_id):
 
 
 def _mapa_conocido_de(reconstruido):
-    """El mapa conocido es de la niebla de guerra, que todavia no existe.
+    """Las salas que el jugador tenia exploradas en ese instante.
 
-    Se lee de quien lo tenga, por duck typing, para que conectarlo cuando
-    exista sea agregar una lectura y no rediseniar nada.
+    Se lee por duck typing del colaborador de niebla de guerra. Una partida
+    sin niebla lleva el objeto nulo del motor, que se declara no disponible, y
+    el resumen lo informa asi en vez de fallar.
     """
     conocido = getattr(reconstruido, "known_map", None)
 
-    if conocido is None:
+    if conocido is None or not getattr(conocido, "disponible", True):
         return MAPA_CONOCIDO_NO_DISPONIBLE
 
-    return conocido
+    exploradas = getattr(conocido, "salas_exploradas", None)
+
+    if exploradas is None:
+        return MAPA_CONOCIDO_NO_DISPONIBLE
+
+    return tuple(exploradas())
 
 
 def _exigir_linea(juego):

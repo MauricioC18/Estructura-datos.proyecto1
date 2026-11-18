@@ -14,18 +14,40 @@ Se busca desde la sala del jugador, no desde la del cazador
     dist(v, jugador) para todas las vecinas de golpe, que es justo lo que esa
     fórmula pide; buscando desde el cazador habría que reconstruir rutas para
     recuperar ese número.
-    Además el grafo no tiene dirección: el costo de una salida es el mismo en
-    ambos sentidos y una puerta abierta lo está para los dos lados, así que la
-    distancia desde el jugador es la distancia hasta el jugador. Eso permite
-    que una sola búsqueda sirva a todos los cazadores activos.
+    Eso permite además que una sola búsqueda sirva a todos los cazadores
+    activos, en vez de una por cazador.
+    Buscar desde el jugador exige cuidado con el sentido de las salidas: ver
+    «Grafos de un solo sentido».
 
 Quién provee las vecinas
     La búsqueda no conoce el modelo. Recibe desde afuera una función que, dada
     una sala, devuelve tripletas (id_vecina, costo, referencia) contando solo
     las salidas abiertas en ese instante. La referencia es opaca: la búsqueda
     la devuelve tal cual en el primer paso y nunca la mira. Así el motor le
-    pasa salidas reales y el viaje automático «ir a» (§3.4) podría pasarle el
+    pasa salidas reales y el viaje automático «ir a» (§3.4) puede pasarle el
     mapa que el jugador conoce, sin que la estructura cambie.
+
+Grafos de un solo sentido
+    El contrato del servicio describe cada salida como dirigida («One directed
+    exit from a room») y no exige que la sala destino declare la vuelta, así
+    que el esqueleto puede producir un grafo asimétrico. Con un grafo así hay
+    que distinguir dos cosas que en uno simétrico coinciden:
+      - para EXPANDIR la búsqueda desde el origen, y obtener así el costo de
+        llegar DESDE cada sala HASTA el origen, hacen falta las salidas que
+        ENTRAN a cada sala. Ese es el primer parámetro.
+      - para dar el PRIMER PASO desde una sala hay que atravesar una salida
+        que SALGA de ella. Ese es salidas_de.
+    Si no se pasa salidas_de, se usa el mismo proveedor para las dos cosas,
+    que es exactamente lo correcto en un grafo simétrico y es como quedan
+    todas las llamadas que ya existían.
+    El desempate sigue siendo el de FR-008: entre las salidas que salen de la
+    sala, las que cumplen costo + distancia = d, y de esas la vecina de menor
+    id.
+
+    Las dos opciones se pueden combinar con la parada anticipada, y el
+    argumento de abajo no depende de por dónde se expanda: solo usa que
+    Dijkstra asienta en orden no decreciente de distancia y que todo costo es
+    al menos 1.
 
 Estructuras, todas propias
     Cola de prioridad: el montículo binario mínimo de la agenda de eventos
@@ -37,6 +59,16 @@ Estructuras, todas propias
         que la agenda ya usa.
     Distancias y salas asentadas: TablaHash. No se usa dict como índice ni
         set, que el proyecto prohíbe (P1 §7).
+
+Parada anticipada (parar_en), de la capacidad 005
+    Quien solo necesita el primer paso desde una sala puede pedir que la
+    busqueda se detenga al asentar esa sala. El resultado es el mismo: las
+    vecinas que cumplen costo + distancia = d tienen distancia menor que d,
+    porque todo costo es al menos 1, asi que ya estan asentadas; y una no
+    asentada tiene distancia de al menos d, asi que nunca cumple la igualdad.
+    Detenida la busqueda, solo las salas asentadas tienen distancia
+    definitiva, y preguntar por cualquier otra es un error en vez de una
+    respuesta a medias.
 
 Corte por rango
     Se deja de expandir en cuanto la distancia pasa del corte, así que el
@@ -81,16 +113,42 @@ class _Candidata:
 class RutasMasBaratas:
     """Costos mínimos desde una sala, cortados en un presupuesto de costo."""
 
-    def __init__(self, vecinas_abiertas, origen, corte=None):
+    def __init__(self, vecinas_abiertas, origen, corte=None, *, parar_en=None,
+                 salidas_de=None):
+        """parar_en es opcional y solo se pasa por nombre. Sin él, la búsqueda
+        es exactamente la de siempre (la que usa el cazador).
+
+        Con parar_en, la búsqueda se detiene en cuanto asienta esa sala. Lo
+        usa el viaje «ir a», que solo necesita el primer paso desde la sala
+        del jugador. El primer paso sigue siendo el mismo que con la búsqueda
+        completa: las vecinas que cumplen costo + distancia = d tienen
+        distancia menor que d, porque todo costo es al menos 1, así que ya
+        están asentadas cuando se asienta la sala; y una vecina no asentada
+        tiene distancia de al menos d, así que nunca cumple la igualdad. Si la
+        búsqueda se detuvo, solo son definitivas las distancias de las salas
+        asentadas, y pedir el primer paso desde una sala no asentada es un
+        error. Si la sala nunca se alcanza, la búsqueda llega al final como
+        sin parar_en y todo es definitivo.
+
+        parar_en y salidas_de se pueden usar juntos. El argumento de arriba no
+        depende de por dónde se expanda la búsqueda: solo usa que Dijkstra
+        asienta en orden no decreciente de distancia y que todo costo es al
+        menos 1, que valen igual en un grafo dirigido. Lo comprueban las
+        pruebas de equivalencia sobre mapas asimétricos.
+        """
         if corte is not None and (isinstance(corte, bool) or not isinstance(corte, int)):
             raise ValueError(f"El corte debe ser un entero o None: {corte!r}")
         if corte is not None and corte < 0:
             raise ValueError(f"El corte no puede ser negativo: {corte!r}")
 
         self._vecinas_abiertas = vecinas_abiertas
+        self._salidas_de = vecinas_abiertas if salidas_de is None else salidas_de
         self._origen = origen
         self._corte = corte
+        self._parar_en = parar_en
         self._distancias = TablaHash()
+        self._asentadas = TablaHash()
+        self._se_detuvo = False
         self._calcular()
 
     @property
@@ -102,11 +160,37 @@ class RutasMasBaratas:
         return self._corte
 
     def distancia_a(self, id_sala):
-        """Costo mínimo desde el origen, o None si quedó fuera del corte."""
+        """Costo mínimo desde el origen, o None si quedó fuera del corte.
+
+        Con una búsqueda detenida por parar_en, solo las salas asentadas
+        tienen distancia definitiva: las demás pueden tener una tentativa, que
+        es mayor o igual que la verdadera. Pedirla es un error, igual que
+        pedir el primer paso, para que esta clase nunca devuelva una
+        distancia que no sea definitiva.
+        """
+        self._exigir_definitiva(id_sala)
+
         return self._distancias.obtener(id_sala)
 
     def alcanza(self, id_sala):
+        self._exigir_definitiva(id_sala)
+
         return self._distancias.contiene(id_sala)
+
+    def se_detuvo(self):
+        """True si la búsqueda paró por parar_en antes de agotar la región."""
+        return self._se_detuvo
+
+    def esta_asentada(self, id_sala):
+        """True si la distancia de esa sala es definitiva."""
+        return self._asentadas.contiene(id_sala)
+
+    def _exigir_definitiva(self, id_sala):
+        if self._se_detuvo and not self._asentadas.contiene(id_sala):
+            raise ValueError(
+                f"La búsqueda se detuvo en la sala {self._parar_en} y la sala "
+                f"{id_sala} no quedó asentada: su distancia no es definitiva."
+            )
 
     def primer_paso_desde(self, id_sala):
         """Primera salida de la ruta más barata de id_sala hacia el origen.
@@ -118,6 +202,8 @@ class RutasMasBaratas:
         costo mínimo, gana la de menor id; entre dos salidas abiertas hacia
         esa misma vecina, la más barata.
         """
+        self._exigir_definitiva(id_sala)
+
         distancia = self._distancias.obtener(id_sala)
 
         if distancia is None or distancia == 0:
@@ -127,7 +213,7 @@ class RutasMasBaratas:
         mejor_costo = None
         mejor_referencia = None
 
-        for id_vecina, costo, referencia in self._vecinas_abiertas(id_sala):
+        for id_vecina, costo, referencia in self._salidas_de(id_sala):
             distancia_vecina = self._distancias.obtener(id_vecina)
 
             if distancia_vecina is None or costo + distancia_vecina != distancia:
@@ -146,7 +232,7 @@ class RutasMasBaratas:
         self._distancias.insertar(self._origen, 0)
         pendientes = EventQueue()
         pendientes.push(_Candidata(0, self._origen))
-        asentadas = TablaHash()
+        asentadas = self._asentadas
 
         while True:
             candidata = pendientes.pop()
@@ -160,6 +246,10 @@ class RutasMasBaratas:
                 continue
 
             asentadas.insertar(id_sala, True)
+
+            if id_sala == self._parar_en:
+                self._se_detuvo = True
+                return
 
             for id_vecina, costo, _ in self._vecinas_abiertas(id_sala):
                 if asentadas.contiene(id_vecina):

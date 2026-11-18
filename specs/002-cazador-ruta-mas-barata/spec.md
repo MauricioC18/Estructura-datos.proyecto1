@@ -103,6 +103,33 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 
 ---
 
+### Historia 6 — El jugador reconoce al cazador antes de que lo persiga (Prioridad: P2)
+
+Para el jugador, un cazador y un guardián se ven igual: un nombre y una vida. Pero la
+decisión táctica que le conviene tomar es opuesta. De un guardián puede alejarse y
+olvidarlo; de un cazador no, porque lo va a seguir por la cripta entera mientras esté
+dentro de su rango.
+
+Si la vista no los distingue, el jugador tiene que aprender a los golpes cuál lo
+persigue, y eso no es una decisión informada: es prueba y error.
+
+**Por qué esta prioridad**: no cambia ninguna regla del juego, pero sin esto la regla que
+esta capacidad agrega es invisible para quien juega. Y el enunciado la exige en §7.3.
+
+**Prueba independiente**: se entra a una sala con un cazador y un guardián y se comprueba
+que lo que la vista muestra permite decir cuál es cuál.
+
+**Escenarios de aceptación**:
+
+1. **Dado** una sala con un cazador y un enemigo de otro comportamiento, **cuando** el
+   jugador mira la sala, **entonces** puede distinguir cuál de los dos es el cazador.
+2. **Dado** una sala donde ningún enemigo es cazador, **cuando** el jugador la mira,
+   **entonces** la lista de enemigos se ve como antes de esta capacidad.
+3. **Dado** un cazador, **cuando** el jugador lo ve, **entonces** sigue viendo su nombre,
+   su identificador y su vida, como de cualquier otro enemigo.
+
+---
+
 ### Casos borde
 
 - **Un cazador y el jugador en regiones incomunicadas** de la cripta: no existe ruta, así que espera, por grande que sea su rango.
@@ -114,6 +141,7 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 - **El cazador llega a la sala del jugador en su movimiento**: ese turno fue un movimiento; atacar es decisión del turno siguiente, cuando ya comparte sala.
 - **El jugador muere o la partida termina** mientras un cazador tiene turno programado: se aplica lo mismo que a cualquier enemigo con turno programado, sin regla nueva.
 - **Dos salidas abiertas distintas que llevan a la misma sala vecina con costos distintos**: cuenta la más barata, tanto para el costo mínimo como para el paso que el cazador atraviesa. La vecina es la misma, así que el desempate por identificador no decide nada aquí.
+- **Un cazador que el jugador ve pero que todavía no se ha activado**: se distingue igual, porque lo que la vista informa es su comportamiento y no si ya despertó.
 - **Una salida de costo muy alto como único camino**: la ruta existe y cuesta mucho; si ese costo supera el rango, el cazador espera aunque el jugador esté en la sala de al lado.
 
 ## Requisitos
@@ -136,6 +164,7 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 - **FR-014**: Una ficha de cazador sin rango, o con un rango que no sea un entero mayor o igual que 1, DEBE reportarse como dato inválido de la cripta, sin sustituirlo por un valor por omisión.
 - **FR-015**: Un cazador DEBE activarse con las mismas reglas que cualquier otro enemigo, y mientras no esté activo NO DEBE perseguir ni consumir turnos.
 - **FR-016**: La misma cripta, la misma semilla y la misma secuencia de acciones DEBEN producir las mismas decisiones del cazador en los mismos instantes.
+- **FR-019**: La vista DEBE distinguir a los cazadores de los demás enemigos de la sala, de modo que el jugador sepa cuál de los enemigos que ve lo va a perseguir por la cripta y cuáles no. Lo exige §7.3 del enunciado.
 
 ### Requisitos de rendimiento
 
@@ -157,6 +186,7 @@ Todo lo que valía para los enemigos de la primera parte vale para el cazador: d
 - **SC-006**: Con al menos 50 cazadores activos persiguiendo al mismo jugador, el ciclo completo de eventos entre dos decisiones del jugador sigue resolviéndose en menos de 20 ms.
 - **SC-007**: Está medido, con una cripta donde las puertas cambian con frecuencia y otra donde casi nunca cambian, cuánto trabajo ahorra reutilizar cálculos frente a calcular siempre desde cero, y en qué condiciones deja de convenir.
 - **SC-008**: Está medido si conviene un cálculo por cazador o un cálculo compartido entre todos los cazadores activos, y está documentada la condición que hace cambiar la respuesta.
+- **SC-010**: Un jugador que entra a una sala con enemigos de comportamientos distintos puede decir, solo con lo que la vista le muestra, cuál de ellos lo va a perseguir por la cripta.
 - **SC-009**: Las 882 pruebas anteriores a esta capacidad siguen pasando sin modificarlas, con una sola excepción prevista: las que fijan la versión del formato del archivo de partida, porque guardar el rango de un cazador cambia ese formato. Cualquier otra prueba que falle es un defecto, no una prueba desactualizada.
 
 ## Supuestos

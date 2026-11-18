@@ -213,6 +213,60 @@ Idéntico, que es SC-008 y FR-019: recortar quita una acción y a lo sumo una co
 
 La línea le cuesta al ciclo un **16 % más**, que es lo que cuesta serializar el estado una vez cada 50 acciones. En términos absolutos son 0.0057 ms y el 0.21 % del límite, así que SC-009 se cumple con dos órdenes de magnitud de margen. El número se reporta tal cual: la línea **no** es gratis, simplemente es baratísima.
 
+### Remedición a escala de la cripta de referencia
+
+El 2026-11-17 se supo que la cripta de referencia es **cripta-06, de 300 salas**. Las mediciones de arriba se hicieron con 40 salas, donde una copia pesa 14 KiB. Se repitieron a 300 salas, donde una copia pesa **66.3 KiB**, 4.7 veces más.
+
+| *K* | Copias | Memoria en copias | Por consulta |
+| ---: | ---: | ---: | ---: |
+| 1 (la alternativa ingenua) | 301 | **19 969.0 KiB (19.5 MiB)** | 3.8696 ms |
+| 10 | 31 | 2 055.5 KiB | 4.0941 ms |
+| **50 (el valor por omisión)** | 7 | **463.9 KiB** | **4.3835 ms** |
+| 200 | 2 | 130.7 KiB | 5.9304 ms |
+
+**Estos números invierten parte del argumento con que se eligió *K*, y hay que decirlo.** A 40 salas se razonó que «con 98 KiB la memoria ya es irrelevante, así que lo que queda por optimizar es la latencia». A 300 salas no es así: la memoria varía **150 veces** entre los extremos (19.5 MiB contra 130 KiB) y el tiempo de consulta varía **1.5 veces** (3.87 contra 5.93 ms). Lo que varía ahora es la memoria, no la latencia.
+
+La razón está en la cifra de 66.3 KiB por copia: **el costo de una consulta pasó a estar dominado por deserializar la copia, no por repetir acciones.** Eso es lo que aplana la curva de latencia y lo que hace que subir *K* compre memoria casi gratis.
+
+**Se mantiene 50, y la justificación cambia.** Ya no es «la memoria no importa»: es que 463.9 KiB es poco en términos absolutos y deja la consulta por debajo de 5 ms, mientras *K* = 200 cambia 1.5 ms de latencia por 3.5 veces menos memoria. Las dos son defendibles; 50 favorece la latencia, y la bandera existe precisamente para subirlo. Lo que **sí** queda cerrado es la alternativa ingenua: una copia por acción cuesta **19.5 MiB** en la cripta de referencia, y eso es exactamente lo que §5.5 prohíbe.
+
+**Y apunta directo a la optimización que no se hizo.** Guardar en la copia solo el estado mutable, sin el esqueleto, mejoraría **las dos** cosas a la vez: menos memoria y consultas más rápidas, porque hay menos que deserializar. A 40 salas parecía un ahorro de bytes; a 300 salas es la mejora evidente de la capacidad. Sigue sin hacerse por la misma razón de antes —reutilizar el serializador ya probado— pero ahora el costo de esa decisión está medido.
+
+
+**Los dos extremos y la partida larga.** Steven pidió al revisar dos mediciones que faltaban, y las dos resultaron ser las que mejor defienden el diseño:
+
+| Escenario (300 salas) | Por consulta | Memoria en copias |
+| --- | ---: | ---: |
+| Una copia por acción (*K* = 1) | 4.0594 ms | 19 969.0 KiB |
+| *K* = 50 | 4.5894 ms | 463.9 KiB |
+| **Sin puntos de control**, solo la copia inicial | **7.8789 ms** | 63.6 KiB |
+
+Y en una partida de **5 000 acciones**, que es veinte veces más larga que la medida hasta ahora:
+
+| Escenario | Por consulta | Memoria en copias | Memoria en acciones |
+| --- | ---: | ---: | ---: |
+| *K* = 50 | **4.24 ms** | 6 917.0 KiB | 122.05 KiB |
+| Sin puntos de control | **65.59 ms** | 63.6 KiB | 122.05 KiB |
+
+**Esto es lo que justifica que los puntos de control existan, y no se veía con 300 acciones.** Sin ellos, una consulta cuesta 65.59 ms: **más de tres veces el presupuesto completo de 20 ms del ciclo de eventos**, y para una sola consulta. Con *K* = 50 cuesta 4.24 ms y, lo que importa más, **sigue costando lo mismo que en una partida de 300 acciones**: 4.71 ms allá, 4.24 ms acá.
+
+Sin puntos de control es la única variante cuyo costo **crece con el largo de la partida**, porque una consulta tiene que repetir todas las acciones desde el inicio. De 7.88 ms con 300 acciones a 65.59 ms con 5 000 es casi exactamente proporcional, como era de esperar.
+
+La memoria de las acciones confirma FR-017 en el otro sentido: 7.32 KiB con 300 acciones y 122.05 KiB con 5 000, es decir **lineal con lo que pasó y no con el tamaño del estado**.
+
+**El costo de una consulta sigue sin depender del largo de la partida** (*K* = 50, puntos repartidos): 5.14 ms a 50 acciones, 4.33 ms a 150 y 4.61 ms a 300. No es monótono, así que la dispersión es ruido de medición y no una tendencia; lo que la medición respalda es que no crece con el largo, que es SC-002.
+
+**El recorte por pergamino** sigue en 0.216 µs a 50 acciones y 0.241 µs a 300: constante, como pide SC-008.
+
+**El ciclo de eventos con la línea activa**:
+
+| Escenario | Por ciclo | Del límite de 20 ms |
+| --- | ---: | ---: |
+| 300 salas, sin copias | 0.0340 ms | 0.17 % |
+| 300 salas, con la línea, *K* = 50 | 0.0646 ms | 0.32 % |
+
+La línea le cuesta al ciclo un **90 % más** a esta escala, frente al 16 % que costaba a 40 salas, porque cada copia son 66 KiB que hay que serializar. En términos absolutos son 0.03 ms y el 0.32 % del límite, así que SC-009 se cumple de sobra, pero el número se reporta tal cual: **el costo de la línea sobre el ciclo crece con el tamaño de la cripta**, y es el tercer argumento a favor de guardar solo el estado mutable.
+
 ### La advertencia que hay que decir en la defensa
 
 Estas cifras son de una cripta de 40 salas, donde una copia pesa 14 KiB. **La memoria de las copias crece con el tamaño de la cripta**, porque una copia guarda la cripta entera, incluido el esqueleto, que no cambia nunca. En la cripta de la revisión, más grande, las copias pesarán más y puede convenir subir *K*; por eso es configurable.
@@ -224,28 +278,49 @@ La optimización evidente está identificada y **no** se hizo: guardar en la cop
 - **La divergencia por el generador aleatorio es el riesgo grande.** Ya está identificada y resuelta con los anclajes, pero cualquier otra fuente de no determinismo produciría resúmenes falsos sin que nada se vea raro. Por eso la prueba central no compara contra valores escritos a mano: juega una partida larga guardando el estado real en cada acción, y después consulta **todos** los instantes y exige que cada resumen coincida con lo que de verdad hubo. Es la técnica que en la capacidad del cazador destapó dos errores propios.
 - **Las acciones que actúan sobre «el objeto que se está viendo»** son el caso fácil de arruinar, porque el cursor lo mueven comandos que no son acciones. Se registra el identificador del objeto, no la posición, y hay prueba de soltar, usar y equipar después de mover el cursor.
 - **Repetir una acción podría tener efectos que no deberían repetirse**, por ejemplo escribir en la bitácora de reproducción o contar solicitudes al servicio. La reconstrucción trabaja sobre un motor armado sin bitácora y sin repositorio, de modo que repetir no puede escribir nada ni pedir nada.
+- **Cargar el contenido de una sala también fuerza una copia, y lo encontró un compañero.** En una partida real el contenido de cada sala se descarga cuando el jugador va a entrar, y lo carga el **controlador** justo antes del movimiento. Si un punto de control se tomó cuando esa sala todavía no estaba cargada, repetir el movimiento al reconstruir lo **rechaza** y el resumen se queda en la sala anterior, **sin dar ningún error**. Es el mismo principio que el pergamino, y tiene que ser **antes** del movimiento: un punto de control posterior no sirve, porque el tramo que empieza en el anterior seguiría conteniendo ese movimiento. **La prueba de equivalencia no lo detectó** porque su cripta marcaba todas las salas como cargadas desde el inicio, que es más permisivo que la realidad; se agregó una que camina cargando el contenido como lo hace el controlador. El costo es una copia por sala visitada por primera vez, acotado por salas y no por acciones.
 - **Una copia completa guarda la cripta entera**, incluido el esqueleto, que no cambia nunca. Es desperdicio: lo que de verdad hace falta es el estado mutable. Se mide cuánto pesa y se deja anotado como la optimización evidente; no se hace ahora porque reutilizar el serializador completo, que ya está probado, vale más que ahorrar bytes en una cripta de este tamaño.
 - **El cambio de versión del formato a 3** invalida los guardados de la capacidad anterior, no solo los de la primera parte. Hay que decirlo al grupo.
 - **Defecto encontrado al implementar, ajeno a esta capacidad.** La prueba de equivalencia destapó que el archivo de partida **nunca guardó el costo de las salidas**: la capacidad 001 lo agregó al modelo y no al guardado, así que guardar y cargar devolvía todas las salidas a costo 100 en silencio. No había prueba que lo cubriera porque el costo se agregó después del guardado. Se corrigió aquí, y es el argumento más fuerte a favor de esta capacidad: reconstruir el pasado obliga a que el estado se serialice **completo**, y eso delata cualquier campo que falte.
 
 ## Trazabilidad
 
-| Requisito | Dónde se implementa | Dónde se prueba |
-| --- | --- | --- |
-| FR-001, FR-002, FR-023 | `model/consulta_historia.py` | `tests/test_linea_de_tiempo.py`, prueba de todos los instantes |
-| FR-003 | `structures/linea_de_tiempo.py`, `model/consulta_historia.py` | `tests/test_linea_de_tiempo.py` |
-| FR-004 | `model/consulta_historia.py` | `tests/test_linea_de_tiempo.py` |
-| FR-005 a FR-008 | se cumplen por construcción: la consulta trabaja sobre objetos nuevos | `tests/test_linea_de_tiempo.py` |
-| FR-009, FR-010 | `model/consulta_historia.py` | `tests/test_linea_de_tiempo.py` |
-| FR-011, FR-019 | `structures/linea_de_tiempo.py`, `model/game.py` | `tests/test_linea_de_tiempo.py` |
-| FR-012, FR-013 | ninguno: el pergamino no se toca | `tests/test_linea_de_tiempo.py`, y las pruebas del pergamino que ya existen |
-| FR-014 | `model/consulta_historia.py` (no instancia la vista) | `tests/test_linea_de_tiempo.py` |
-| FR-015, FR-016 | `model/game.py`, `structures/linea_de_tiempo.py` | `tests/test_linea_de_tiempo.py` |
-| FR-017 | `structures/linea_de_tiempo.py` | medición 1 |
-| FR-018 | `structures/linea_de_tiempo.py` (búsqueda binaria propia) | `tests/test_linea_de_tiempo.py` |
-| FR-020, FR-021 | `adapters/almacen_partida.py` | `tests/test_almacen_partida.py` |
-| FR-022 | consecuencia de II | `tests/test_linea_de_tiempo.py` |
-| FR-024 | el diseño completo | medición 4 |
+Una fila por requisito, sin rangos y con el nombre de la prueba. En la defensa se escoge
+un requisito al azar y hay que mostrar su escenario, su tarea, su código y su prueba
+(§7.4), así que una tabla con rangos no sirve.
+
+| Requisito | Tarea | Dónde se implementa | Prueba |
+| --- | --- | --- | --- |
+| FR-001 | T005 | `model/consulta_historia.py` | `test_todos_los_instantes_coinciden_con_el_estado_real` |
+| FR-002 | T001, T005, T023 | `structures/linea_de_tiempo.py`, `accion_en_instante`, y el tope de eventos de `model/game.py` | `test_un_instante_que_cae_sobre_una_accion_queda_justo_antes` y `test_un_instante_en_medio_no_trae_los_eventos_posteriores` |
+| FR-003 | T005 | `consultar_instante` y `consultar_accion` | `test_consultar_por_instante_del_reloj_da_lo_mismo` |
+| FR-004 | T005 | `_resumir` | `test_el_resumen_trae_todo_lo_que_exige_el_enunciado` |
+| FR-005 | T007 | por construcción: objetos nuevos | `test_consultar_no_consume_tiempo_virtual` |
+| FR-006 | T007 | por construcción: motor sin bitácora | `test_consultar_no_cuenta_como_accion` |
+| FR-007 | T007 | por construcción: objetos nuevos | `test_cien_consultas_no_cambian_la_partida` |
+| FR-008 | T007 | por construcción | `test_consultar_no_toca_el_historial_del_pergamino` |
+| FR-009 | T009 | `consultar_instante` | `test_un_instante_posterior_al_reloj_se_rechaza` |
+| FR-010 | T009 | `consultar_accion` | `test_una_accion_que_no_se_ha_tomado_se_rechaza` |
+| FR-011 | T010 | `Game._trim_timeline` | `test_la_accion_revertida_deja_de_estar_en_la_linea` |
+| FR-012 | T011 | ninguno: el pergamino no se toca | `test_la_linea_llega_mas_atras_que_el_pergamino` |
+| FR-013 | T011 | ninguno: la línea lleva su propia lista | `test_la_linea_llega_mas_atras_que_el_pergamino` |
+| FR-014 | T005 | `consultar_hasta`, sin vista | `test_reproducir_hasta_un_instante_valido_no_avisa_nada` |
+| FR-015 | T001, T004 | `LineaDeTiempo(copias_cada=...)` | `test_con_k_de_diez_y_treinta_y_cinco_acciones_hay_cuatro_copias` |
+| FR-016 | T012 | `copia_para_accion` | `test_ninguna_consulta_repite_mas_de_k_acciones` |
+| FR-017 | T001 | `memoria_en_bytes` | medición 1, y `test_bajar_k_sube_la_memoria_de_las_copias` |
+| FR-018 | T001 | búsqueda binaria propia | `test_un_numero_de_accion_entre_dos_copias` |
+| FR-019 | T001, T010 | `recortar_ultima_accion` | `test_recortar_quita_la_copia_que_quedo_en_el_futuro` |
+| FR-020 | T013 | `adapters/almacen_partida.py` | `test_la_linea_viaja_completa` |
+| FR-021 | T013 | versión del formato | `test_un_archivo_de_una_version_anterior_se_rechaza` |
+| FR-022 | T006 | consecuencia del principio II | `test_dos_consultas_del_mismo_instante_dan_lo_mismo` |
+| FR-023 | T006 | el diseño completo | `test_todos_los_instantes_coinciden_con_el_estado_real` |
+| FR-024 | T016 | el diseño completo | medición 4 |
+| FR-025 | T021 | `consultar_hasta` | `test_reproducir_hasta_despues_del_final_da_el_estado_final` |
+| FR-026 | T021 | el ciclo de eventos del motor, sin cambios | `test_varios_eventos_en_el_mismo_instante_cuentan_todos` |
+
+Los requisitos que dicen «por construcción» son los que más conviene poder explicar: no
+hay código que los haga cumplir, los cumple la decisión de reconstruir sobre objetos
+nuevos. Si esa decisión cambiara, los cuatro se caen a la vez.
 
 ## Fases
 
