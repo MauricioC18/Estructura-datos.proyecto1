@@ -645,11 +645,34 @@ def _consultar_historia(game, argumento):
     El parser devuelve un entero para un instante del reloj y un texto que
     empieza con # para un numero de accion, asi que no hay que volver a
     interpretar el texto aca.
+
+    El jugador numera sus acciones desde 1 (FR-003 de specs/003-linea-de-tiempo):
+    #1 es el estado justo antes de la primera accion, igual que historia 0.
+    El modelo cuenta las acciones ya tomadas, desde 0, asi que aca se resta 1.
+    #0 y un numero mayor que las acciones tomadas se rechazan (FR-010).
     """
     if isinstance(argumento, str) and argumento.startswith("#"):
-        return consultar_accion(game, int(argumento[1:]), reconstruir_con_mapa_conocido)
+        numero = int(argumento[1:])
+        _exigir_accion_tomada(game, numero)
+        return consultar_accion(game, numero - 1, reconstruir_con_mapa_conocido)
 
     return consultar_instante(game, argumento, reconstruir_con_mapa_conocido)
+
+
+def _exigir_accion_tomada(game, numero):
+    """Rechaza #k si la accion k no existe: las acciones van de 1 a las tomadas."""
+    if numero < 1:
+        raise ConsultaRechazada(
+            f"No existe la accion numero {numero}: las acciones se cuentan desde 1."
+        )
+
+    tomadas = game.timeline.cantidad_de_acciones() if game.timeline is not None else None
+
+    if tomadas is not None and numero > tomadas:
+        raise ConsultaRechazada(
+            f"No se puede consultar la accion numero {numero}: el jugador ha "
+            f"tomado {tomadas}."
+        )
 
 
 def reconstruir_con_mapa_conocido(bloque):
