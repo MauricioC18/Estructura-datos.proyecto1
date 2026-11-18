@@ -6,7 +6,7 @@
 
 **Estado**: Borrador
 
-**Origen**: §3.6 del enunciado de la segunda parte (`cripta/docs/SegundoProyecto-EDII-2026.md`), el problema de estructuras de datos §5.5, y tres casos del Apéndice B bajo «Línea de tiempo». Se apoya en el pergamino de retroceso de P1 §2.11 y en el guardado binario de P1 §4.10, y no modifica ninguno de los dos.
+**Origen**: §3.6 del enunciado de la segunda parte (`cripta/docs/SegundoProyecto-EDII-2026.md`), el problema de estructuras de datos §5.5, y cuatro casos del Apéndice B bajo «Línea de tiempo». Se apoya en el pergamino de retroceso de P1 §2.11 y en el guardado binario de P1 §4.10, y no modifica ninguno de los dos.
 
 **Qué la distingue del pergamino**: el pergamino **cambia** la partida y solo alcanza cinco acciones atrás. La línea de tiempo **no cambia nada** y alcanza hasta el instante 0. Son capacidades independientes: la primera es una jugada, la segunda es una consulta.
 
@@ -34,6 +34,7 @@ Puede preguntar de dos formas: por un instante del reloj, o por el número de un
 6. **Dado** un instante que cae entre dos eventos, **cuando** se consulta, **entonces** el estado incluye todos los eventos de tiempo menor o igual que el pedido y ninguno posterior.
 7. **Dado** una consulta cualquiera, **cuando** termina, **entonces** el reloj, la vida, el inventario, la agenda de eventos y las acciones que quedan por revertir están exactamente como antes de consultar.
 8. **Dado** el mismo instante, **cuando** se consulta dos veces, **entonces** el resumen es idéntico.
+9. **Dado** varios eventos que ocurren en el mismo instante t, por ejemplo dos enemigos que atacan a la vez, **cuando** se consulta t, **entonces** el estado es el de después de todos ellos. *(Apéndice B)*
 
 ---
 
