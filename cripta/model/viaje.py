@@ -16,11 +16,17 @@ nada.
 
 Siguiente paso
     Se reutiliza la búsqueda de costo mínimo del cazador
-    (structures/rutas_mas_baratas.py), pasándole las vecinas del mapa
-    conocido en lugar de las salidas abiertas reales. Se busca desde el
-    destino y se pide el primer paso desde la sala del jugador: la búsqueda
-    aplica sola el desempate de §3.2 (vecina de menor id; entre dos salidas a
-    la misma vecina, la más barata). Se recalcula en cada llamada.
+    (structures/rutas_mas_baratas.py), pasándole el mapa conocido en lugar
+    de las salidas abiertas reales. Se busca desde el destino y se pide el
+    primer paso desde la sala del jugador: la búsqueda aplica sola el
+    desempate de §3.2 (vecina de menor id; entre dos salidas a la misma
+    vecina, la más barata).
+
+    Salidas de un solo sentido (FR-023, FR-024; plan, alternativa 9): como
+    la búsqueda va desde el destino, se expande por las salidas conocidas
+    que ENTRAN a cada sala (entrantes_conocidas), y el primer paso se toma
+    por una salida que SALE de la sala del jugador (vecinas_conocidas). Así
+    una salida sin vuelta solo se recorre en su sentido.
 
 Enemigos al entrar
     FR-028 (b) habla de la sala a la que el jugador entra. Por eso la
@@ -104,7 +110,9 @@ def siguiente_paso(game, mapa, destino, ruta_del_viaje=None):
             except ValueError:
                 pass  # la sala no quedó asentada en la búsqueda guardada
 
-    rutas = RutasMasBaratas(mapa.vecinas_conocidas, destino, parar_en=sala)
+    rutas = RutasMasBaratas(
+        mapa.entrantes_conocidas, destino, parar_en=sala, salidas_de=mapa.vecinas_conocidas
+    )
 
     if ruta_del_viaje is not None:
         ruta_del_viaje.destino = destino
