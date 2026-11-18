@@ -6,6 +6,8 @@
 
 **Status**: Draft
 
+**Renumbered**: 2026-11-17, de `001-datos-nuevos-servicio` a `004-datos-nuevos-servicio`, por acuerdo del grupo sobre la numeración de las especificaciones.
+
 **Input**: User description: "Datos nuevos del servicio para la segunda parte de CRIPTA (§4.1, §4.2, §4.3 y Apéndice A de cripta/docs/SegundoProyecto-EDII-2026.md). El contrato del API ya está publicado en su versión 1.1.0 (copia en cripta/docs/contrato/openapi-1.1.0.json): agrega solo el campo costo en las salidas, el campo rango y el comportamiento cazador en las fichas de enemigo, y la consulta GET /criptas/<id>/llaves. Son la base de tres capacidades: el terreno y el cazador usan el costo de las salidas y el rango, y la verificación de resolubilidad usa la ubicación de las llaves. Esta especificación cubre solo obtener, validar y conservar esos datos; las reglas que los usan (lo que cuesta moverse, el turno del cazador y la verificación) van en sus propias especificaciones. Lo que necesito: 1. Costo de las salidas: cada salida del esqueleto puede traer "costo", un entero mayor o igual que 1. Si no lo trae o viene en null, vale 100. Es el mismo en los dos sentidos del paso, aunque el contrato describe cada salida por separado. 2. Cazador: una ficha de enemigo puede tener comportamiento "cazador" y un campo "rango", entero mayor o igual que 1 en unidades de costo. El contrato no obliga a que venga el rango, así que hay que definir qué pasa con un cazador sin rango. Un rango en un enemigo que no es cazador no tiene efecto. Hoy el programa detiene la partida cuando encuentra un comportamiento que no conoce; con las criptas nuevas eso no puede pasar. 3. Ubicación de llaves: GET /criptas/<id>/llaves devuelve cada llave con la sala donde está. Si trae "enemigo", la llave está en lo que suelta esa instancia y la sala es donde el enemigo inicia. Se consulta al iniciar la partida y cuenta dentro de presupuesto_solicitudes. Se guarda en disco junto con el resto de la cripta y vale mientras coincida la versión de la cripta; si ya está guardada para esa versión no se vuelve a pedir. En modo --offline se lee de disco y no cuenta. 4. Lo guardado por la primera parte se invalida con la validación de versión que ya existe, no borrando archivos a mano. 5. Los campos nuevos no deben producir el aviso de "campo desconocido" que el programa da cuando el contrato del API cambia; un campo que siga sin conocerse debe seguir avisándose. Cada caso debe quedar como escenario de aceptación con requisitos numerados. Carpeta de la especificación: specs/001-datos-nuevos-servicio."
 
 ## Clarifications
@@ -26,11 +28,28 @@ Preguntas resueltas durante `/speckit.clarify`:
 - Q: ¿El reporte final dice de dónde salió la ubicación de llaves? → A: Sí, en una línea propia: descargada, recuperada de disco, leída del paquete offline o no disponible (FR-025).
 - Q: ¿Se comprueba al iniciar que el id de cada llave sea una ficha de clase llave en el catálogo? → A: No; el id se acepta tal como viene (FR-017).
 
+### Session 2026-11-17
+
+Correcciones al integrar `main`, donde las especificaciones 001 y 002 ya implementaron el costo, el cazador y el rango:
+
+- Q: ¿Qué pasa con un rango declarado en la ficha de un enemigo que no es cazador? → A: Se ignora y se agrega un aviso de datos de que se ignora, como ya hace el traductor de `main` (FR-009).
+- Q: ¿Qué informa el reporte final cuando la partida empezó cargando una partida guardada? → A: Que la ubicación de llaves no se obtuvo en esa partida (FR-025).
+- Q: ¿Una reproducción con `--replay` obtiene la ubicación de llaves si la partida original empezó cargando una partida guardada? → A: No; la reproducción la obtiene solo si la partida original la obtuvo, para que las dos hagan las mismas solicitudes (FR-011).
+
+## Relación con otras especificaciones
+
+- **Costo de las salidas** (Historia 2: FR-001 a FR-005 y la parte de costo de FR-023): lo implementó `specs/001-terreno-costo-salidas` (sus FR-001, FR-002, FR-003 y FR-011), con las mismas reglas que esta especificación. Queda pendiente aquí un solo caso: una salida con `costo` en null vale 100 (FR-001), que esa implementación hoy rechaza como dato inválido aunque el contrato 1.1.0 lo permite.
+- **Cazador y rango** (Historia 1: FR-006 a FR-010 y la parte de rango de FR-023): lo implementó `specs/002-cazador-ruta-mas-barata` (sus FR-001, FR-002 y FR-014). En el modelo, el rango se llama `pursuit_range`.
+- Los escenarios de esas dos historias los verifican las pruebas de esas especificaciones, en `tests/test_traductor.py` y `tests/test_cazador.py`. Esta especificación solo agrega la prueba del costo en null (escenario US2.2).
+- Lo propio de esta especificación es la ubicación de llaves (Historia 3: FR-011 a FR-021 y FR-025) y la invalidación por versión y los avisos (Historia 4: FR-022 a FR-024).
+
 ## User Scenarios & Testing *(mandatory)*
 
 Esta especificación no agrega reglas de juego. Garantiza que los datos nuevos que publica el servicio lleguen completos, validados y conservados, para que las capacidades que los usan puedan apoyarse en ellos: el terreno y el cazador (costo y rango), la niebla de guerra y «ir a» (costo), y la verificación de resolubilidad (ubicación de llaves).
 
 ### User Story 1 - Jugar una cripta nueva que tiene cazadores (Priority: P1)
+
+**Implementada por**: `specs/002-cazador-ruta-mas-barata`.
 
 Como jugador, quiero iniciar y jugar las criptas de la segunda parte aunque tengan enemigos con comportamiento cazador, sin que la partida se detenga por un dato que el programa no reconoce. Cada cazador debe llegar a la partida con su rango.
 
@@ -42,13 +61,15 @@ Como jugador, quiero iniciar y jugar las criptas de la segunda parte aunque teng
 
 1. **Dado** una cripta con un enemigo cuya ficha declara comportamiento cazador y rango 600, **Cuando** el jugador entra a la sala de ese enemigo, **Entonces** la partida continúa y ese enemigo es un cazador con rango 600.
 2. **Dado** una ficha de guardián, de errante o de rastreador, **Cuando** se carga un enemigo de ese tipo, **Entonces** conserva el comportamiento que tenía en la primera parte.
-3. **Dado** una ficha de enemigo que no es cazador y declara un rango, **Cuando** se carga un enemigo de ese tipo, **Entonces** el rango no tiene ningún efecto y no aparece ningún aviso.
+3. **Dado** una ficha de enemigo que no es cazador y declara un rango, **Cuando** se carga un enemigo de ese tipo, **Entonces** el rango no tiene ningún efecto y aparece un aviso de datos de que se ignora.
 4. **Dado** una ficha de cazador sin rango (ausente o en null), **Cuando** se carga un enemigo de ese tipo, **Entonces** se informa como dato inválido de la ficha, con su id, y no se usa ningún rango en su lugar.
 5. **Dado** una ficha con un comportamiento distinto de los cuatro conocidos, **Cuando** se carga un enemigo de ese tipo, **Entonces** se informa como dato inválido de la cripta, nombrando la ficha y el valor recibido.
 
 ---
 
 ### User Story 2 - Cada salida tiene su costo de movimiento (Priority: P1)
+
+**Implementada por**: `specs/001-terreno-costo-salidas`, salvo el costo en null del escenario 2, que se implementa aquí.
 
 Como jugador, quiero que cada salida tenga el costo que declara la cripta, igual en los dos sentidos, para que moverse, la persecución del cazador y los viajes automáticos usen el terreno real.
 
@@ -88,7 +109,7 @@ Como jugador, quiero que antes de la primera acción el programa conozca dónde 
 8. **Dado** una respuesta con una entrada sin llave o sin sala, o con una sala que no existe en el esqueleto, **Cuando** se obtiene la ubicación de llaves, **Entonces** se informa como dato inválido de la cripta y la partida no inicia.
 9. **Dado** que la consulta de ubicación de llaves falla o ya no queda presupuesto, **Cuando** se inicia la partida, **Entonces** se informa el error con la operación que falló y la partida no inicia.
 10. **Dado** una partida guardada de una cripta, **Cuando** se carga, **Entonces** no se obtiene la ubicación de llaves y no se gasta ninguna solicitud en ella.
-11. **Dado** una reproducción con `--replay`, **Cuando** se inicia, **Entonces** la ubicación de llaves se obtiene igual que en la partida original, de modo que las solicitudes de la reproducción coinciden con las de la original.
+11. **Dado** una reproducción con `--replay`, **Cuando** se inicia, **Entonces** la ubicación de llaves se obtiene solo si la partida original la obtuvo (es decir, si no empezó cargando una partida guardada), de modo que las solicitudes de la reproducción coinciden con las de la original.
 
 ---
 
@@ -138,12 +159,12 @@ Como grupo, queremos que los datos guardados en disco durante la primera parte d
 - **FR-006**: El programa MUST reconocer el comportamiento `cazador` en una ficha de enemigo, además de guardián, errante y rastreador. Una cripta con cazadores MUST poder iniciarse y jugarse sin detenerse por ese comportamiento.
 - **FR-007**: Cada cazador MUST tener el rango de su ficha, un entero mayor o igual que 1 expresado en unidades de costo. Un rango presente con otro valor MUST tratarse como dato inválido de la ficha, informando su id y el valor recibido.
 - **FR-008**: Cuando la ficha de un cazador no trae rango, o lo trae en null, MUST tratarse como dato inválido de la ficha, informando su id. No se usa ningún rango en su lugar.
-- **FR-009**: Un rango presente en la ficha de un enemigo que no es cazador MUST ignorarse: no cambia su comportamiento ni produce avisos.
+- **FR-009**: Un rango presente en la ficha de un enemigo que no es cazador MUST ignorarse: no cambia su comportamiento, y se agrega a la lista de avisos de datos del reporte final un aviso de que se ignora.
 - **FR-010**: Un comportamiento distinto de los cuatro conocidos MUST seguir informándose como dato inválido, nombrando la ficha y el valor recibido.
 
 **Ubicación de llaves**
 
-- **FR-011**: Al iniciar una partida nueva, al ejecutar `--verificar` y al iniciar una reproducción con `--replay`, el programa MUST obtener la ubicación de llaves de la cripta: por cada entrada, el id de la llave, la sala y, si la trae, la instancia de enemigo. Se obtiene justo después de cargar el esqueleto, antes de pedir contenido de salas o fichas del catálogo. Al cargar una partida guardada no se obtiene.
+- **FR-011**: Al iniciar una partida nueva, al ejecutar `--verificar` y al iniciar una reproducción con `--replay` de una partida que obtuvo la ubicación de llaves, el programa MUST obtener la ubicación de llaves de la cripta: por cada entrada, el id de la llave, la sala y, si la trae, la instancia de enemigo. Se obtiene justo después de cargar el esqueleto, antes de pedir contenido de salas o fichas del catálogo. Al cargar una partida guardada no se obtiene.
 - **FR-012**: Una entrada con instancia de enemigo MUST interpretarse como una llave que está en lo que suelta esa instancia, con la sala igual a la sala donde esa instancia inicia. Una entrada sin enemigo MUST interpretarse como una llave en el suelo de esa sala.
 - **FR-013**: La consulta de ubicación de llaves MUST contar como una solicitud dentro de `presupuesto_solicitudes`, igual que sus reintentos después de un HTTP 429, y MUST aparecer en el reporte de solicitudes de la partida.
 - **FR-014**: La ubicación de llaves MUST guardarse en disco junto con los demás datos de la cripta, asociada a su versión. Mientras la versión coincida, una partida nueva MUST usar la copia guardada sin consultar al servicio.
@@ -160,7 +181,7 @@ Como grupo, queremos que los datos guardados en disco durante la primera parte d
 - **FR-022**: Los datos guardados en disco para una versión de cripta distinta de la vigente (esqueleto, contenido y ubicación de llaves) MUST invalidarse mediante la validación de versión que ya usa el programa al iniciar una partida, sin borrar archivos a mano. Las fichas guardadas MUST usarse solo mientras coincida la versión global del catálogo.
 - **FR-023**: Los campos `costo` de las salidas y `rango` de las fichas de enemigo MUST considerarse parte del contrato conocido: su presencia no produce el aviso de campo desconocido.
 - **FR-024**: Cualquier otro campo que no declare el contrato de una salida, una ficha o una colocación MUST seguir produciendo el aviso de campo desconocido en la lista de avisos de datos del reporte final, una sola vez por campo y por tipo de dato. Los campos adicionales en las entradas de ubicación de llaves no producen aviso, porque el contrato los permite.
-- **FR-025**: El reporte final MUST indicar, en una línea propia, de dónde salió la ubicación de llaves de la partida: descargada del servicio, recuperada de disco, leída del paquete offline o no disponible.
+- **FR-025**: El reporte final MUST indicar, en una línea propia, de dónde salió la ubicación de llaves de la partida: descargada del servicio, recuperada de disco, leída del paquete offline o no disponible; o, si la partida empezó cargando una partida guardada, que no se obtuvo.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -185,5 +206,6 @@ Como grupo, queremos que los datos guardados en disco durante la primera parte d
 - Las reglas que usan estos datos se especifican en otras capacidades: lo que cuesta moverse y el turno del cazador (§3.1 y §3.2), la niebla de guerra, «ir a» y mostrar los costos en la vista (§3.3, §3.4 y §7.3), y la verificación de resolubilidad (§3.5).
 - Un dato inválido se trata igual que en la primera parte: se informa con un mensaje que identifica el dato. Si se detecta al iniciar la partida, la partida no inicia; si se detecta durante la partida (por ejemplo, la ficha de un cazador, que se obtiene cuando hace falta), la acción que lo necesitaba no se realiza. No se adivinan valores que la cripta no declara, salvo el costo 100 que fija el enunciado.
 - No se comprueba al iniciar que la instancia de enemigo de una ubicación de llave exista en el contenido de su sala, porque el contenido se descarga por partes durante el juego y exigirlo gastaría solicitudes.
+- El costo, el cazador y el rango ya están implementados en `main` por las especificaciones 001 y 002; esta especificación no los vuelve a implementar, salvo el costo en null.
 - Las reglas de puertas de la primera parte no cambian: estado inicial, llave requerida y cierre automático se combinan como hasta ahora.
 - Las criptas publicadas al 16 de noviembre de 2026 declaran el costo en ambos lados de cada paso, siempre con el mismo valor, y solo los cazadores declaran rango. La especificación cubre también los casos que esas criptas no presentan, porque la revisión usará una cripta nueva.

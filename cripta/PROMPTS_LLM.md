@@ -1734,3 +1734,22 @@ Prompts utilizados:
 Uso en el proyecto: `specs/001-datos-nuevos-servicio/spec.md` (cinco respuestas nuevas en Clarifications, requisito nuevo FR-025, escenarios US3.10 y US3.11, y SC-002 y SC-005 ajustados), `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, `contracts/ubicacion-de-llaves.md` y `tasks.md`.
 
 Cambios realizados por el estudiante: Las cinco preguntas de `/speckit.clarify` se presentaron juntas, cada una con una opción recomendada, en lugar de una por una. El estudiante aceptó las cinco recomendaciones: la ubicación de llaves se pide justo después del esqueleto y antes de cualquier contenido; se obtiene en partida nueva, `--verificar` y `--replay`, pero no al cargar una partida guardada; los avisos van a la lista de avisos de datos del reporte final; el reporte final muestra de dónde salió la ubicación de llaves; y el id de cada llave no se comprueba contra el catálogo. `/speckit.analyze` cubrió los 25 requisitos con tareas y no encontró conflictos con la constitución. Sí encontró una contradicción: SC-005 decía que todas las pruebas de la primera parte seguían pasando sin cambios, pero FR-013 agrega una solicitud a cada inicio de partida y cambia las pruebas que cuentan solicitudes exactas. Se corrigió SC-005 antes del commit de documentación. Las dependencias con otros integrantes quedaron anotadas en el plan: el nombre del cazador y de su rango en el modelo de enemigos, la llamada de carga de partida en el controlador, y el guardado binario, que hoy no guarda el costo de las puertas ni el rango de los enemigos.
+
+### 5.33 Corrección de la especificación 001, renumerada a 004, e implementación de lo pendiente
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai. La corrección de la especificación se hizo a mano sobre los archivos de spec-kit. Después, el modelo ejecutó `/speckit.implement` de spec-kit v1.4.1 siguiendo las instrucciones del repositorio (`.claude/skills/speckit-implement/SKILL.md`), con las tareas de `specs/004-datos-nuevos-servicio/tasks.md`. Los scripts de PowerShell del comando no se pudieron correr en ese entorno, que es Linux sin PowerShell; la carpeta de la especificación se tomó de `.specify/feature.json`.
+
+Fecha: 2026-11-17
+
+Objetivo: Ajustar la especificación de datos nuevos a lo que ya estaba en `main` después de integrar las especificaciones 001 a 003, con la numeración acordada por el grupo, e implementar lo que quedaba pendiente.
+
+Prompts utilizados:
+
+```text
+Ajustá la spec 001: renumerala a 004-datos-nuevos-servicio, marcá como cubierto por las specs 001 y 002 de Carlos lo que ya está en main (costo, cazador y rango), alineá FR-009 con el aviso que ya da el traductor, y dejá en el plan y las tareas solo lo pendiente: la ubicación de llaves y el costo en null.
+/speckit.implement
+```
+
+Uso en el proyecto: Primer commit: la carpeta `specs/001-datos-nuevos-servicio` pasa a `specs/004-datos-nuevos-servicio`; la especificación agrega la sección «Relación con otras especificaciones» y tres respuestas fechadas el 2026-11-17 en Clarifications (FR-009, FR-011 y FR-025); el plan, la investigación, el modelo de datos y las tareas quedan solo con lo pendiente. Segundo commit: el código y las pruebas de esas tareas.
+
+Cambios realizados por el estudiante: Al traer `main` a su rama se vio que el costo de las salidas, el cazador y el rango ya estaban implementados por las especificaciones 001 y 002 de otro integrante, con las mismas reglas que había decidido en su especificación. El estudiante aceptó la numeración propuesta en el grupo (004 para esta especificación) y decidió no repetir ese trabajo: lo marcó como cubierto por esas especificaciones. Ajustó FR-009 para que coincida con el aviso que ya da el traductor cuando un enemigo que no es cazador trae rango, y conservó como pendiente el costo en null, porque el contrato 1.1.0 lo permite y la implementación de `main` lo rechazaba. La corrección de la especificación se confirmó en Git en un commit propio, antes del código.

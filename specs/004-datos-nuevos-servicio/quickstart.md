@@ -8,7 +8,7 @@ Todos los comandos se corren desde la carpeta `cripta/`.
 python -m unittest tests.test_datos_nuevos_servicio -v
 ```
 
-Cada prueba nombra en su docstring el requisito que cubre (FR-001 a FR-025). Resultado esperado: todas pasan.
+El nombre de cada prueba empieza con el requisito que cubre (por ejemplo `test_fr013_...`). Resultado esperado: todas pasan.
 
 ## 2. Pruebas de la primera parte
 
@@ -16,7 +16,7 @@ Cada prueba nombra en su docstring el requisito que cubre (FR-001 a FR-025). Res
 python -m unittest discover -s tests -t .
 ```
 
-Resultado esperado: todas pasan (SC-005). Las únicas pruebas que cambian son las que cuentan las solicitudes exactas de un inicio de partida, que ahora suman la consulta de llaves (FR-013).
+Resultado esperado: todas pasan (SC-005); en `main` eran 1010 antes de esta especificación. Las únicas pruebas que cambian son las que cuentan las solicitudes exactas de un inicio de partida, que ahora suman la consulta de llaves (FR-013).
 
 ## 3. Datos reales de la segunda parte, sin tocar `datos_offline/`
 

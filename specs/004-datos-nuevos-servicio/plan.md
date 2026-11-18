@@ -2,13 +2,13 @@
 
 **Branch**: `Parte_2-API-cache-persistencia` | **Date**: 2026-11-16 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `/specs/001-datos-nuevos-servicio/spec.md`
+**Input**: Feature specification from `/specs/004-datos-nuevos-servicio/spec.md`
 
 **Note**: This template is filled in by the `/speckit-plan` command; its definition describes the execution workflow.
 
 ## Summary
 
-El programa debe leer los tres datos nuevos del contrato 1.1.0 del servicio: el costo de cada salida, el comportamiento cazador con su rango, y la ubicación de llaves. Los dos primeros entran por el traductor, que ya es el único lugar que conoce los nombres de los campos del API. El costo se guarda en la puerta que el traductor ya comparte entre las dos salas de un paso, así que la simetría sale de la construcción y no de una sincronización. La ubicación de llaves se agrega como una operación más del contrato de fuentes de datos (HTTP y offline), se guarda en la copia en disco de la cripta junto al esqueleto y se valida en el traductor, de modo que dé lo mismo de dónde venga. Se obtiene dentro del inicio de la partida, justo después del esqueleto y antes de cualquier contenido.
+El programa debe leer los tres datos nuevos del contrato 1.1.0 del servicio: el costo de cada salida, el comportamiento cazador con su rango, y la ubicación de llaves. Los dos primeros ya están en `main`: los implementaron las especificaciones 001 y 002, con el costo en la puerta compartida por las dos salas y el rango en `Enemy.pursuit_range`. Este plan cubre lo que falta: el costo en null, que el contrato permite y hoy se rechaza, y la ubicación de llaves. La ubicación de llaves se agrega como una operación más del contrato de fuentes de datos (HTTP y offline), se guarda en la copia en disco de la cripta junto al esqueleto y se valida en el traductor, de modo que dé lo mismo de dónde venga. Se obtiene dentro del inicio de la partida, justo después del esqueleto y antes de cualquier contenido.
 
 ## Technical Context
 
@@ -38,7 +38,7 @@ El programa debe leer los tres datos nuevos del contrato 1.1.0 del servicio: el 
 | --- | --- | --- |
 | I. Estructuras a mano | Se reutiliza la `TablaHash` propia que ya empareja las salidas en el traductor. La ubicación de llaves se guarda en una `list` en el orden recibido, que la constitución permite como almacenamiento contiguo. No se usa `dict` ni `set` como índice. Los diccionarios de `respuesta.json()` solo se leen. | Cumple |
 | II. Determinismo | No hay azar. La ubicación de llaves conserva el orden en que llega, y el combinado de costos usa una regla fija (sala de menor id). | Cumple |
-| III. MVC | El modelo recibe objetos (`Door.cost`, `Enemy.hunt_range`, `KeyLocation`) y no sabe de HTTP ni de archivos. La red y el disco siguen detrás de las fuentes y del almacén. No se toca la vista. | Cumple |
+| III. MVC | El modelo recibe objetos (`KeyLocation`; `Door.cost` y `Enemy.pursuit_range` ya existen) y no sabe de HTTP ni de archivos. La red y el disco siguen detrás de las fuentes y del almacén. No se toca la vista. | Cumple |
 | IV. Sin datos de una cripta | El 100 por defecto es una regla del enunciado (§3.1), no un dato de cripta. No se escribe ningún rango, id ni sala. | Cumple |
 | V. Presupuesto | La consulta pasa por `_consumir_solicitud`, igual que las demás, incluidos los reintentos por HTTP 429. La copia en disco y el modo offline no gastan solicitudes. | Cumple |
 | VI. Mediciones | El plan no afirma ninguna mejora de rendimiento. Lo único medible es el número de solicitudes, que se comprueba en las pruebas y en la línea nueva del reporte final. | Cumple |
@@ -51,7 +51,7 @@ Revisión después del diseño (Phase 1): sin cambios. Ninguna decisión de `res
 ### Documentation (this feature)
 
 ```text
-specs/001-datos-nuevos-servicio/
+specs/004-datos-nuevos-servicio/
 ├── plan.md
 ├── research.md
 ├── data-model.md
@@ -68,11 +68,9 @@ specs/001-datos-nuevos-servicio/
 ```text
 cripta/
 ├── model/
-│   ├── room.py                  Door.cost, Exit.cost y DEFAULT_EXIT_COST
-│   ├── enemy.py                 Enemy.HUNTER y Enemy.hunt_range (se coordina con el dueño del motor)
 │   └── key_location.py          nuevo: KeyLocation
 ├── repository/
-│   ├── traductor.py             costo, cazador, rango y ubicación de llaves; tablas de campos conocidos
+│   ├── traductor.py             costo en null y ubicación de llaves
 │   └── repositorio_cripta.py    obtiene la ubicación de llaves al iniciar; línea nueva del reporte final
 ├── adapters/
 │   ├── fuente_datos.py          operación ubicacion_de_llaves y UbicacionDeLlavesNoDisponible
@@ -80,7 +78,7 @@ cripta/
 │   ├── fuente_offline.py        <carpeta>/criptas/<id>/llaves.json
 │   └── almacen_cripta.py        copia en disco <id_cripta>/llaves.json
 ├── controller/
-│   └── application.py           al cargar una partida guardada no se pide la ubicación de llaves (se coordina con el dueño del controlador)
+│   └── application.py           al cargar una partida guardada, y al reproducir una que empezó así, no se pide la ubicación de llaves
 ├── tools/
 │   └── descargar_datos_offline.py   descarga también la ubicación de llaves
 ├── benchmark/                   los dobles de fuente de datos implementan la operación nueva
@@ -100,9 +98,10 @@ Esta especificación no resuelve ninguno de los problemas evaluados de §5, así
 
 ## Dependencias y coordinación
 
-- **Dueño del motor**: el nombre `Enemy.HUNTER` y el atributo `hunt_range` son la interfaz que va a usar el comportamiento del cazador (§3.2). Se agregan como cambio mínimo y aditivo; el comportamiento lo implementa su especificación.
-- **Dueño del controlador**: un argumento en la llamada de carga de partida para no pedir la ubicación de llaves (FR-011).
-- **Responsable del guardado binario (§4.10)**: el formato actual guarda cada puerta sin costo y cada enemigo sin rango. Una partida de la segunda parte cargada desde archivo perdería esos datos. No es parte de esta especificación, pero hay que avisarlo para que lo cubra la especificación que corresponda (el Apéndice B ya pide un resultado definido al cargar una partida de la primera parte).
+- **Especificaciones 001 y 002**: ya implementaron el costo, el cazador y el rango (`Enemy.HUNTER`, `Enemy.pursuit_range`). Este plan solo toca `_costo_de_salida` del traductor para aceptar el null.
+- **Guardado binario**: ya guarda el costo de las puertas y el rango de los enemigos (formato versión 3, en `main`).
+- **Especificación 005 (niebla e «ir a»)**: su rama cambia `controller/application.py` y `main.py`. Este plan cambia en `application.py` solo dos llamadas a `iniciar_partida` (la carga y la reproducción). Al juntar ramas, el conflicto posible se resuelve conservando los dos cambios.
+- **Especificación 006 (resolubilidad)**: es la que usa la ubicación de llaves, mediante `RepositorioCripta.ubicacion_de_llaves()`.
 
 ## Complexity Tracking
 

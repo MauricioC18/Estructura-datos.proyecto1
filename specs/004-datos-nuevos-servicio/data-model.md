@@ -2,26 +2,16 @@
 
 Solo se describen los cambios respecto de la primera parte.
 
-## Door (modelo, `model/room.py`)
+## Door, Exit y Enemy (modelo, ya en `main`)
 
-| Campo | Tipo | Regla | Requisito |
+Las especificaciones 001 y 002 ya agregaron lo que esta especificación necesita de estas clases:
+
+| Clase | Campo | Regla | Requisito de esta especificación |
 | --- | --- | --- | --- |
-| `cost` | entero ≥ 1 | El costo del paso, igual en ambos sentidos. Vale `DEFAULT_EXIT_COST` (100) cuando ninguno de los dos lados lo declara. | FR-001, FR-003, FR-004 |
-
-Los demás campos (`room_a`, `room_b`, `closed`, `key_id`, `auto_close`) no cambian.
-
-## Exit (modelo, `model/room.py`)
-
-| Campo | Tipo | Regla | Requisito |
-| --- | --- | --- | --- |
-| `cost` | propiedad de solo lectura | Devuelve `door.cost`. | FR-001, FR-005 |
-
-## Enemy (modelo, `model/enemy.py`)
-
-| Campo | Tipo | Regla | Requisito |
-| --- | --- | --- | --- |
-| `HUNTER` | constante `"cazador"` | Cuarto comportamiento, junto a `GUARDIAN`, `WANDERER` y `TRACKER`. | FR-006 |
-| `hunt_range` | entero ≥ 1 o `None` | El rango del cazador en unidades de costo. `None` en cualquier enemigo que no sea cazador. | FR-007, FR-009 |
+| `Door` | `cost` | Entero ≥ 1, igual en ambos sentidos; 100 (`DEFAULT_EXIT_COST`) cuando ningún lado lo declara o lo declara en null. | FR-001 a FR-005 |
+| `Exit` | `cost` | Propiedad de solo lectura que devuelve `door.cost`. | FR-001, FR-005 |
+| `Enemy` | `HUNTER` | Cuarto comportamiento, `"cazador"`. | FR-006 |
+| `Enemy` | `pursuit_range` | Rango del cazador, entero ≥ 1; 0 en los demás enemigos. | FR-007, FR-009 |
 
 ## KeyLocation (modelo nuevo, `model/key_location.py`)
 
@@ -51,10 +41,10 @@ Ciclo de vida (FR-014, FR-021, FR-022):
 1. Al iniciar una partida nueva, una reproducción o `--verificar`, después del esqueleto: si hay copia vigente en disco, se lee de ahí; si no, se pide a la fuente y se guarda en disco.
 2. Si cambia la versión de la cripta, el almacén borra la copia completa de esa cripta, incluida la ubicación de llaves.
 3. Una copia dañada se trata como ausente y se vuelve a pedir.
-4. Al cargar una partida guardada no se obtiene (FR-011).
+4. Al cargar una partida guardada no se obtiene, y tampoco al reproducir una partida que empezó así (FR-011).
 
 ## ReporteDeRed (repositorio)
 
 | Campo | Tipo | Regla | Requisito |
 | --- | --- | --- | --- |
-| `origen_de_la_ubicacion_de_llaves` | texto | Una de las cuatro descripciones de la tabla anterior; se muestra como `Ubicación de llaves: <origen>`. | FR-025 |
+| `origen_de_la_ubicacion_de_llaves` | texto | Una de las cuatro descripciones de la tabla anterior, o «no se obtuvo en esta partida» si la partida empezó cargando una partida guardada; se muestra como `Ubicación de llaves: <origen>`. | FR-025 |
