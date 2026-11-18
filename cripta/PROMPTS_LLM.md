@@ -1861,3 +1861,57 @@ Ajustá la spec 001: renumerala a 004-datos-nuevos-servicio, marcá como cubiert
 Uso en el proyecto: Primer commit: la carpeta `specs/001-datos-nuevos-servicio` pasa a `specs/004-datos-nuevos-servicio`; la especificación agrega la sección «Relación con otras especificaciones» y tres respuestas fechadas el 2026-11-17 en Clarifications (FR-009, FR-011 y FR-025); el plan, la investigación, el modelo de datos y las tareas quedan solo con lo pendiente. Segundo commit: el código y las pruebas de esas tareas.
 
 Cambios realizados por el estudiante: Al traer `main` a su rama se vio que el costo de las salidas, el cazador y el rango ya estaban implementados por las especificaciones 001 y 002 de otro integrante, con las mismas reglas que había decidido en su especificación. El estudiante aceptó la numeración propuesta en el grupo (004 para esta especificación) y decidió no repetir ese trabajo: lo marcó como cubierto por esas especificaciones. Ajustó FR-009 para que coincida con el aviso que ya da el traductor cuando un enemigo que no es cazador trae rango, y conservó como pendiente el costo en null, porque el contrato 1.1.0 lo permite y la implementación de `main` lo rechazaba. La corrección de la especificación se confirmó en Git en un commit propio, antes del código.
+
+### 5.34 Revisión del repositorio y `/speckit.specify` de la especificación 006, resolubilidad
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai. El modelo revisó el zip del repositorio con todas las ramas y después ejecutó `/speckit.specify` de spec-kit v1.4.1 siguiendo `.claude/skills/speckit-specify/SKILL.md` y la plantilla base `.specify/templates/spec-template.md` (el script de PowerShell que resuelve la plantilla no se pudo correr en ese entorno, que es Linux sin PowerShell, y el repositorio no tiene plantillas propias, presets ni extensiones).
+
+Fecha: 2026-11-17
+
+Objetivo: Comprobar que los commits de la especificación 004 quedaron bien y qué traía la rama nueva de otro integrante, y escribir la especificación de la verificación de resolubilidad (§3.5, §5.4 y los cuatro casos de resolubilidad del Apéndice B).
+
+Prompts utilizados:
+
+```text
+Ya ejecute los comandos anteriores debido a que la rama main no cambio, revisa los cambios que hicimos mas los cambios hechos por Erick en el proyecto.
+
+/speckit.specify Verificación de resolubilidad (§3.5 y §5.4 de cripta/docs/SegundoProyecto-EDII-2026.md, más los cuatro casos de resolubilidad del Apéndice B). Antes de iniciar una partida, el programa debe decidir, con el esqueleto y la ubicación de las llaves (spec 004), si desde sala_inicial se puede obtener llave_salida y llegar a sala_salida a través de una puerta que la requiera. Supuestos de la verificación: se puede atravesar toda salida abierta y toda salida cerrada cuya llave ya se obtuvo; las llaves no se gastan; todo enemigo se puede derrotar; una llave que suelta un enemigo se obtiene en la sala donde ese enemigo inicia; las trampas y el cierre automático no impiden el paso. Si es resoluble, el reporte da un orden de obtención de llaves en el que cada llave aparece después de las que hacen falta para alcanzarla, y ese orden tiene que salir siempre igual aunque haya varios válidos. Si no es resoluble, el reporte dice qué llaves no se pueden obtener, qué puertas cerradas de la frontera de la región alcanzable bloquean el avance y qué llave pide cada una, dónde está cada una de esas llaves, y, si una llave está detrás de puertas que solo ella abre, directamente o por una cadena de llaves, señala ese ciclo concreto. Hay que definir qué pasa cuando la ubicación de llaves no está disponible. Una cripta no resoluble no inicia salvo con --forzar; --verificar <cripta> hace solo la verificación y muestra el reporte, sin la vista del juego. El reporte se muestra al iniciar cada partida. El costo tiene que ser aproximadamente lineal en salas, salidas y llaves, sin repetir el recorrido completo por cada llave; la frontera y las dependencias salen del mismo recorrido, y la detección de ciclos es determinista. Tiene que tardar menos de 200 ms en la cripta publicada más grande, sin red, y --bench debe compararla contra la versión ingenua que repite el recorrido por cada llave, con criptas sintéticas de muchas llaves encadenadas generadas con semilla. Las banderas las conecta Steven (spec 005), así que el reporte tiene que exponer si la cripta es resoluble y sus líneas de texto. Carpeta: specs/006-resolubilidad.
+```
+
+Respuesta a las tres preguntas que dejó el comando, sobre FR-006, FR-008 y FR-020:
+
+```text
+P1: A, P2: A, P3: A
+/speckit.clarify
+```
+
+Uso en el proyecto: La revisión confirmó que los tres commits de la especificación 004 quedaron idénticos a lo preparado, y que la rama nueva de otro integrante era una subida por la web que mezclaba archivos de otras ramas, con 40 errores en sus pruebas y sin nada de resolubilidad. El comando produjo `specs/006-resolubilidad/spec.md` (4 historias, 28 requisitos y los cuatro casos del Apéndice B como escenarios) y su lista de verificación.
+
+Cambios realizados por el estudiante: Escribió el texto del comando a partir de la propuesta del modelo y lo envió sin cambios. Avisó al grupo que la resolubilidad era suya, como decía el reparto, y aceptó la numeración 004, 005 y 006. En las tres preguntas eligió la opción A: el orden incluye todas las llaves obtenibles; si la cripta es resoluble pero hay llaves que no se obtienen, se mencionan como aviso; y si falta la ubicación de llaves, el reporte dice que no se pudo verificar, la partida inicia igual y `--verificar` termina con un código propio.
+
+### 5.35 `/speckit.clarify`, `/speckit.plan`, `/speckit.tasks` y `/speckit.analyze` de la especificación 006
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai. El modelo ejecutó los cuatro comandos de spec-kit v1.4.1 siguiendo las instrucciones del repositorio (`.claude/skills/speckit-clarify`, `speckit-plan`, `speckit-tasks` y `speckit-analyze`) y sus plantillas. Las rutas se tomaron de `.specify/feature.json`, porque los scripts de PowerShell no se pudieron correr en ese entorno.
+
+Fecha: 2026-11-18
+
+Objetivo: Cerrar las ambigüedades de la especificación 006, escribir el plan, la investigación, el modelo de datos, el contrato para la especificación 005 y las tareas, y revisar la consistencia antes del código. En el mismo mensaje, revisar los avisos del grupo para ver qué faltaba.
+
+Prompts utilizados:
+
+```text
+/speckit.clarify Respuestas: acepto las cinco recomendadas.
+/speckit.plan
+/speckit.tasks
+/speckit.analyze
+```
+
+El mismo mensaje traía los mensajes de otros tres integrantes sobre el estado de la integración (la línea de tiempo ya en `main`, la rama de la niebla de guerra lista para unirse a `main`, la falta del paquete `datos_offline_p2` en Git y la pregunta de cómo iba la resolubilidad), y terminaba con este pedido:
+
+```text
+Revisa los mensajes con las posibles actualizaciones que pudieron hacerse en el proyecto para verificar con que toca proseguir y asi terminar nuestra parte.
+```
+
+Uso en el proyecto: `specs/006-resolubilidad/spec.md` (cinco respuestas nuevas en Clarifications y el límite conocido de las salidas de un solo sentido en las suposiciones), `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, `contracts/interfaz-resolubilidad.md`, `tasks.md` y `cripta/docs/INTERFAZ_RESOLUBILIDAD.md`, que es el contrato con el que la especificación 005 conecta `--verificar` y `--forzar`. Antes de esta documentación se integró `main` en la rama; el único conflicto de código fue el costo en null, que `main` ya había corregido igual, y se tomó la versión de `main`.
+
+Cambios realizados por el estudiante: Las cinco preguntas de `/speckit.clarify` se presentaron juntas, cada una con una opción recomendada. El estudiante aceptó las cinco: el orden va por rondas y, dentro de cada ronda, por id; cuando hay varias explicaciones de un bloqueo se prefiere la que apunta a una llave sin ubicación y después la de menor id; el reporte explica cada llave que no se puede obtener; `--replay` nunca se detiene por la verificación; y cada línea del orden dice dónde se obtiene la llave. `/speckit.analyze` cubrió los 28 requisitos con tareas, sin conflictos con la constitución, y dejó tres hallazgos: las banderas dependen de la especificación 005; las salidas de un solo sentido se tratan con una aproximación, que quedó escrita como límite conocido; y la medición de la cripta de referencia necesita el paquete con su ubicación de llaves real. También notó que FR-002 y FR-021 solo tenían pruebas indirectas, y se agregaron pruebas explícitas en la implementación.
