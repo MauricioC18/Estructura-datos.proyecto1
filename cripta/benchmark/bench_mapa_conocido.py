@@ -562,6 +562,14 @@ def run(carpeta_sin_conexion=CARPETA_SIN_CONEXION):
                 f"{_ms(salientes)}, sin parada; {comparacion}",
             ))
 
+    mediciones.extend(mediciones_de_criptas_reales(carpeta_sin_conexion))
+
+    return mediciones
+
+
+def mediciones_de_criptas_reales(carpeta_sin_conexion=CARPETA_SIN_CONEXION):
+    """Medición 5 en cada cripta del paquete, con el id que traen sus datos."""
+    mediciones = []
     reales = criptas_sin_conexion(carpeta_sin_conexion)
 
     if not reales:
@@ -572,10 +580,15 @@ def run(carpeta_sin_conexion=CARPETA_SIN_CONEXION):
 
     for id_cripta, room_map in reales:
         primero, por_paso, completa, lineal, largo = medir_paso_de_ir_a(room_map)
+        if largo == 0:
+            # Sin ruta entre los extremos no hay viaje que promediar.
+            promedio = "por paso: sin ruta entre los extremos"
+        else:
+            promedio = f"por paso en un viaje de {largo} pasos {_ms(por_paso)}"
         mediciones.append(Measurement(
             f"5. Paso de ir a, mapa completo de {id_cripta} ({len(room_map)} salas)", primero,
-            f"primer paso {_ms(primero)}; busqueda completa {_ms(completa)}; "
-            f"sin monticulo {_ms(lineal)}; viaje de {largo} pasos",
+            f"primer paso {_ms(primero)}; {promedio}; "
+            f"busqueda completa {_ms(completa)}; sin monticulo {_ms(lineal)}",
         ))
 
     return mediciones
