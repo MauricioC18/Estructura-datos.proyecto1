@@ -4,7 +4,7 @@
 
 Cada tarea referencia los requisitos que atiende. No hay tareas sin requisito.
 
-Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porque tocan archivos distintos. Las etiquetas **[H1]**–**[H6]** remiten a las historias de la especificación.
+Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porque tocan archivos distintos. Las etiquetas **[H1]**–**[H5]** remiten a las historias de la especificación.
 
 ## Lista
 
@@ -48,16 +48,8 @@ Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porqu
 - [x] T018 No romper nada: la suite completa
 - [x] T019 Dejarle la interfaz lista a la Persona 4 para las dos banderas nuevas
 - [x] T020 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
-
-### Fase 8 — Historia 6: consultar una partida registrada sin jugarla (P3)
-
-- [x] T021 [H6] `--replay --hasta` con un instante posterior al final muestra el estado final y avisa, en `cripta/controller/application.py` y `cripta/tests/test_banderas_linea_de_tiempo.py`
-
-### Fase 9 — Pendientes de la auditoría de cierre
-
-- [x] T022 [H1] Prueba del escenario 9 (varios eventos en el mismo instante, Apéndice B), en `cripta/tests/test_eventos_mismo_instante.py` — FR-002
-- [ ] T023 [H1] La consulta de un instante entre dos decisiones del jugador no debe incluir eventos posteriores al instante: repetir la última acción deteniendo los eventos en *t*, en `cripta/model/consulta_historia.py` y `cripta/model/game.py`; al hacerlo, quitar el fallo esperado de `test_un_evento_posterior_al_instante_no_cuenta` — FR-002
-- [x] T024 Medir la consulta con 5 000 acciones y *K* por omisión, y la alternativa sin puntos de control, en `cripta/benchmark/bench_linea_de_tiempo.py`; resultados en `cripta/docs/DECISIONES.md` §5.5 — FR-016, FR-017, §6.1 y §6.3
+- [x] T021 Cubrir los cuatro casos del Apéndice B que faltaban, en `spec.md` y `model/consulta_historia.py`
+- [x] T022 Medir los dos extremos y una partida de 5 000 acciones, en `benchmark/bench_linea_de_tiempo.py`
 
 ---
 
@@ -364,6 +356,40 @@ Incluir el aviso de que el formato del archivo de partida subió a la versión 3
 
 ---
 
+## T021 — Los cuatro casos del Apéndice B que faltaban
+
+**Requisitos**: FR-025, FR-026
+
+**Archivos**: `specs/003-linea-de-tiempo/spec.md`, `cripta/model/consulta_historia.py`, `cripta/tests/test_linea_de_tiempo.py`
+
+La lista de verificación decía que el Apéndice B tenía dos casos de línea de tiempo y tiene **seis**. Dos estaban cubiertos y sin mapear; dos no estaban cubiertos, y uno de esos **contradecía** a FR-009.
+
+- `--replay --hasta t` con *t* posterior al final: mostrar el estado final e **indicar** que la partida terminó antes, en vez de rechazar. Es FR-025, y se separa de FR-009 a propósito: en partida el futuro no ocurrió, pero reproducir una partida terminada solo tiene un final al que llegar.
+- Varios eventos en el mismo instante: el estado es el posterior a **todos**, salvo la decisión del jugador que le corresponda a ese instante, que por FR-002 todavía no se toma. Es FR-026.
+
+**Verificable cuando**: reproducir hasta un instante posterior al final devuelve el estado final con su aviso; reproducir hasta un instante válido no avisa nada; en partida el futuro se sigue rechazando; y un instante con varios eventos coincide con el estado real.
+
+**Depende de**: T005
+
+---
+
+## T022 — Los dos extremos y una partida larga
+
+**Requisitos**: FR-016, FR-017
+
+**Archivo**: `cripta/benchmark/bench_linea_de_tiempo.py`
+
+Faltaban las dos mediciones que mejor defienden el diseño, y las pidió Steven al revisar:
+
+- **Sin puntos de control**, solo la copia inicial. Es el extremo opuesto a una copia por acción y lo pide §5.5.
+- Una partida de **5 000 acciones**, veinte veces más larga que lo medido hasta entonces.
+
+**Verificable cuando**: los dos números están en el plan y en el Documento de Decisiones, con la conclusión que se saca de ellos.
+
+**Depende de**: T016
+
+---
+
 ## T020 — Registrar las invocaciones de spec-kit
 
 **Requisitos**: ninguno del juego; lo exige la constitución
@@ -373,18 +399,6 @@ Incluir el aviso de que el formato del archivo de partida subió a la versión 3
 Las entradas de las capacidades anteriores van de 2.25 a 2.29; estas continúan la numeración.
 
 **Depende de**: T018
-
----
-
-## T021 — `--replay --hasta` después del final [H6]
-
-**Requisitos**: FR-025 (Historia 6, escenario 1, Apéndice B), FR-009 sin cambios
-
-**Archivos**: `cripta/controller/application.py`, `cripta/tests/test_banderas_linea_de_tiempo.py`
-
-Agregada después del cierre, cuando una auditoría encontró que este caso del Apéndice B no tenía escenario y que el programa rechazaba el instante. La especificación se corrigió primero, en un commit aparte. La bandera es de la integración, así que el arreglo vive en `replay()` y no toca la línea, la consulta ni el archivo de partida: si el instante pedido es posterior al reloj final, avisa y consulta el reloj final, que ya es consultable. El instante final exacto se muestra sin aviso y un instante negativo se sigue rechazando.
-
-**Depende de**: T019
 
 ---
 

@@ -2597,6 +2597,28 @@ menos memoria. Las dos son defendibles; 50 favorece la latencia, y la bandera
 alternativa ingenua: **19.5 MiB** en la cripta de referencia, que es exactamente lo que
 §5.5 prohíbe.
 
+
+**Los dos extremos y la partida larga.** Steven pidió al revisar dos mediciones que faltaban, y las dos resultaron ser las que mejor defienden el diseño:
+
+| Escenario (300 salas) | Por consulta | Memoria en copias |
+| --- | ---: | ---: |
+| Una copia por acción (*K* = 1) | 4.0594 ms | 19 969.0 KiB |
+| *K* = 50 | 4.5894 ms | 463.9 KiB |
+| **Sin puntos de control**, solo la copia inicial | **7.8789 ms** | 63.6 KiB |
+
+Y en una partida de **5 000 acciones**, que es veinte veces más larga que la medida hasta ahora:
+
+| Escenario | Por consulta | Memoria en copias | Memoria en acciones |
+| --- | ---: | ---: | ---: |
+| *K* = 50 | **4.24 ms** | 6 917.0 KiB | 122.05 KiB |
+| Sin puntos de control | **65.59 ms** | 63.6 KiB | 122.05 KiB |
+
+**Esto es lo que justifica que los puntos de control existan, y no se veía con 300 acciones.** Sin ellos, una consulta cuesta 65.59 ms: **más de tres veces el presupuesto completo de 20 ms del ciclo de eventos**, y para una sola consulta. Con *K* = 50 cuesta 4.24 ms y, lo que importa más, **sigue costando lo mismo que en una partida de 300 acciones**: 4.71 ms allá, 4.24 ms acá.
+
+Sin puntos de control es la única variante cuyo costo **crece con el largo de la partida**, porque una consulta tiene que repetir todas las acciones desde el inicio. De 7.88 ms con 300 acciones a 65.59 ms con 5 000 es casi exactamente proporcional, como era de esperar.
+
+La memoria de las acciones confirma FR-017 en el otro sentido: 7.32 KiB con 300 acciones y 122.05 KiB con 5 000, es decir **lineal con lo que pasó y no con el tamaño del estado**.
+
 **El costo de una consulta no depende del largo de la partida** (*K* = 50, puntos
 repartidos): 5.14 ms a 50 acciones, 4.33 ms a 150 y 4.61 ms a 300. **No es monótono**, así
 que la dispersión es ruido de medición y no una tendencia; lo que la medición respalda es
@@ -2693,24 +2715,9 @@ disponible, y el resumen lo informa así en vez de fallar. El archivo de partida
 recupera ese conocimiento por el contrato `exportar`/`importar`, así que entra en las copias
 sin trabajo extra.
 
-**Lo que no se midió hasta el cierre:** partidas de más de 300 acciones del jugador. Se
-midió después; ver el apartado siguiente.
-
-**Partida de 5 000 acciones y alternativa sin puntos de control (agregado el 2026-11-17).**
-Medido con `--bench` (`benchmark/bench_linea_de_tiempo.py`, medición 5), en la misma cripta
-sintética de 300 salas, con Python 3.12.3 en WSL y tres corridas. No es comparable con las
-cifras de arriba, que son de otro equipo y otra versión de Python.
-
-| Escenario | Consultas | Promedio | Peor | Copias |
-| --- | ---: | ---: | ---: | ---: |
-| 5 000 acciones, *K* = 50 | 40 | 9.95 a 10.23 ms | 13.74 a 17.04 ms | 101 |
-| Sin puntos de control, 300 acciones | 5 | 16.35 a 17.19 ms | 25.54 a 28.00 ms | 1 |
-| Sin puntos de control, 5 000 acciones | 5 | 162.94 a 170.25 ms | 306.92 a 324.72 ms | 1 |
-
-Con *K* = 50, la peor consulta de una partida de 5 000 acciones queda entre el 27 y el 34 %
-del límite de 50 ms de §6.1. Sin puntos de control, la peor consulta pasa de 300 ms, seis
-veces el límite: la consulta tiene que repetir la partida desde el principio y su costo crece
-con el largo. Es la evidencia de que los puntos de control son necesarios.
+**Lo que no se midió:** partidas de más de 300 acciones del jugador. Con *K* = 50 y 1 000
+acciones serían 20 copias, unos 1.3 MiB, que sigue siendo poco, pero es una extrapolación y
+no una medición.
 
 **Una consulta entre dos decisiones del jugador incluye eventos posteriores al instante.**
 Encontrado el 2026-11-17, al escribir la prueba del caso del Apéndice B «varios eventos en el
@@ -2720,8 +2727,8 @@ los eventos hasta la siguiente decisión, también los de tiempo mayor que *t*. 
 de esa prueba, con dos guardianes que atacan cada 100 y un jugador que decide cada 142, el
 resumen del instante 300 ya incluye los ataques del instante 400. Si no hay ningún evento
 entre *t* y la siguiente decisión, el resultado es correcto, y varios eventos en el mismo
-instante se cuentan todos. Contradice FR-002 y el escenario 6 de la Historia 1. La prueba que
-lo muestra está marcada como fallo esperado. Corregirlo es repetir esa última acción
+instante se cuentan todos (FR-026). Contradice FR-002 y el escenario 6 de la Historia 1. La
+prueba que lo muestra está marcada como fallo esperado. Corregirlo es repetir esa última acción
 deteniendo los eventos en *t*, dentro de la línea de tiempo y del motor.
 
 ---

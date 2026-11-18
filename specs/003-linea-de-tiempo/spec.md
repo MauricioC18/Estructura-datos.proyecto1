@@ -6,7 +6,7 @@
 
 **Estado**: Borrador
 
-**Origen**: §3.6 del enunciado de la segunda parte (`cripta/docs/SegundoProyecto-EDII-2026.md`), el problema de estructuras de datos §5.5, y cuatro casos del Apéndice B bajo «Línea de tiempo». Se apoya en el pergamino de retroceso de P1 §2.11 y en el guardado binario de P1 §4.10, y no modifica ninguno de los dos.
+**Origen**: §3.6 del enunciado de la segunda parte (`cripta/docs/SegundoProyecto-EDII-2026.md`), el problema de estructuras de datos §5.5, y los dos casos del Apéndice B bajo «Línea de tiempo». Se apoya en el pergamino de retroceso de P1 §2.11 y en el guardado binario de P1 §4.10, y no modifica ninguno de los dos.
 
 **Qué la distingue del pergamino**: el pergamino **cambia** la partida y solo alcanza cinco acciones atrás. La línea de tiempo **no cambia nada** y alcanza hasta el instante 0. Son capacidades independientes: la primera es una jugada, la segunda es una consulta.
 
@@ -32,9 +32,10 @@ Puede preguntar de dos formas: por un instante del reloj, o por el número de un
 4. **Dado** un número de acción del jugador, **cuando** se consulta por ese número, **entonces** se recibe el estado justo **antes** de tomar esa acción.
 5. **Dado** un instante al que le corresponde una decisión del jugador, **cuando** se consulta, **entonces** el estado es el de justo antes de tomarla, no el de después.
 6. **Dado** un instante que cae entre dos eventos, **cuando** se consulta, **entonces** el estado incluye todos los eventos de tiempo menor o igual que el pedido y ninguno posterior.
+7. **Dado** un instante en el que ocurren **varios eventos a la vez** —por ejemplo dos enemigos que actúan y un pulso de veneno—, **cuando** se consulta ese instante, **entonces** el estado es el posterior a todos ellos y no a solo algunos. *(Apéndice B)*
+8. **Dado** un instante en el que coinciden varios eventos **y** una decisión del jugador, **cuando** se consulta, **entonces** se ven aplicados los eventos y **no** la decisión, que es lo que dice FR-002.
 7. **Dado** una consulta cualquiera, **cuando** termina, **entonces** el reloj, la vida, el inventario, la agenda de eventos y las acciones que quedan por revertir están exactamente como antes de consultar.
 8. **Dado** el mismo instante, **cuando** se consulta dos veces, **entonces** el resumen es idéntico.
-9. **Dado** varios eventos que ocurren en el mismo instante t, por ejemplo dos enemigos que atacan a la vez, **cuando** se consulta t, **entonces** el estado es el de después de todos ellos. *(Apéndice B)*
 
 ---
 
@@ -53,6 +54,7 @@ No se puede consultar el futuro. Si el jugador pide un instante que todavía no 
 3. **Dado** una consulta rechazada, **cuando** termina, **entonces** no consumió tiempo virtual ni contó como acción.
 4. **Dado** el instante exacto del reloj actual, **cuando** se consulta, **entonces** **sí** se acepta: el presente es parte de la historia.
 5. **Dado** el instante 0, **cuando** se consulta, **entonces** se acepta y devuelve el estado con que empezó la partida.
+6. **Dado** que se reproduce una bitácora **sin interacción** hasta un instante posterior al final de la partida, **cuando** termina la reproducción, **entonces** se muestra el estado final y se indica que la partida terminó antes, en vez de rechazarse. *(Apéndice B)*
 
 ---
 
@@ -114,20 +116,6 @@ Y un archivo guardado con la primera parte, que no tiene línea de tiempo, se re
 
 ---
 
-### Historia 6 — Consultar una partida registrada sin jugarla (Prioridad: P3)
-
-Quien revisa una partida ya jugada no quiere volver a jugarla: quiere reproducir su bitácora y ver cómo estaba todo en un instante, con el mismo resumen que da la consulta en partida. Si pide un instante al que la partida nunca llegó, porque terminó antes, lo útil es ver cómo quedó al final y saber que terminó antes, no un rechazo: la partida ya no puede avanzar, así que ese instante nunca va a existir.
-
-**Por qué esta prioridad**: es un caso borde obligatorio, pero se apoya en una consulta que ya existe (FR-014).
-
-**Prueba independiente**: se juega una partida corta, se reproduce su bitácora hasta un instante mayor que el reloj final y se comprueba que se muestra el resumen del estado final con un aviso de que la partida terminó antes.
-
-**Escenarios de aceptación**:
-
-1. **Dado** la bitácora de una partida cuyo reloj quedó en 4000 al terminar, **cuando** se reproduce hasta el instante 5000, **entonces** se muestra el resumen del estado final, el del instante 4000, y se indica que la partida terminó antes del instante pedido. *(Apéndice B)*
-
----
-
 ### Casos borde
 
 - **El instante 0 y el instante exacto del reloj actual**: los dos son consultables. El primero da el estado inicial; el segundo, el presente.
@@ -137,9 +125,10 @@ Quien revisa una partida ya jugada no quiere volver a jugarla: quiere reproducir
 - **La cantidad entre copias mayor que el total de acciones de la partida**: existe una sola copia, la inicial, y las consultas reconstruyen desde ahí. Debe seguir funcionando.
 - **Varios pergaminos usados seguidos**: la línea se recorta una vez por cada uno y queda consistente.
 - **Una consulta en una partida ya terminada**: válida; la historia no deja de existir porque la partida acabó.
+- **Varios eventos en el mismo instante**: cuentan todos. El orden entre ellos lo fija el número de secuencia de la primera parte, así que no hay ambigüedad.
+- **Reproducir una bitácora hasta un instante posterior al final**: se muestra el final y se avisa, no se rechaza. Es el único caso en que pedir «el futuro» tiene una respuesta razonable, porque ese futuro ya se sabe que no existió.
 - **El mapa conocido todavía no existe en el programa**: el resumen debe poder construirse igual y decir que ese dato no está disponible, en vez de fallar. Cuando la niebla de guerra exista, el mismo resumen lo incluye sin que cambie el resto.
 - **Una consulta con un instante negativo o con un texto que no es un número**: se rechaza con un mensaje, como cualquier dato mal escrito.
-- **Reproducir una bitácora hasta exactamente el instante en que terminó la partida**: no es posterior al final, así que se muestra el resumen de ese instante sin el aviso de que la partida terminó antes. Esto no cambia la consulta en partida: ahí un instante posterior al reloj sigue rechazándose (FR-009), porque la partida todavía puede llegar a él.
 
 ## Requisitos
 
@@ -153,12 +142,14 @@ Quien revisa una partida ya jugada no quiere volver a jugarla: quiere reproducir
 - **FR-006**: Una consulta NO DEBE registrarse como una acción del jugador ni aparecer en la bitácora de reproducción.
 - **FR-007**: Una consulta NO DEBE alterar ningún estado de la partida: ni el reloj, ni los actores, ni las puertas, ni los objetos, ni la agenda de eventos, ni los efectos.
 - **FR-008**: Una consulta NO DEBE alterar el historial del pergamino de retroceso ni cuántas acciones quedan por revertir.
-- **FR-009**: Una consulta de un instante posterior al reloj actual DEBE rechazarse con un mensaje que lo explique.
+- **FR-009**: Una consulta **en partida** de un instante posterior al reloj actual DEBE rechazarse con un mensaje que lo explique. Durante la partida, el futuro todavía no ocurrió.
 - **FR-010**: Una consulta del número de una acción que el jugador no ha tomado DEBE rechazarse con un mensaje que lo explique.
 - **FR-011**: Las acciones revertidas con un pergamino DEBEN dejar de existir en la línea de tiempo, junto con todo lo ocurrido durante ellas.
 - **FR-012**: El pergamino de retroceso DEBE seguir limitado a cinco acciones. La línea de tiempo NO DEBE ampliar ese límite ni permitir deshacer más.
 - **FR-013**: La línea de tiempo DEBE cubrir desde el instante 0, también más allá de las cinco acciones que el pergamino alcanza.
 - **FR-014**: El mismo resumen DEBE poder producirse sin interacción, reproduciendo una bitácora de partida hasta un instante dado, sin instanciar la vista.
+- **FR-025**: Cuando se reproduce una bitácora hasta un instante **posterior al final de la partida**, el programa DEBE mostrar el estado final e **indicar que la partida terminó antes**. NO DEBE rechazarse. Es distinto de FR-009 a propósito: reproducir una partida ya terminada no tiene futuro que inventar, solo un final al que llegar, y pedir «hasta el instante 9999» de una partida que duró 3 000 es una forma normal de pedir el final.
+- **FR-026**: Cuando varios eventos ocurren en el mismo instante *t*, el estado que se informa DEBE ser el posterior a **todos** ellos, salvo la decisión del jugador que le corresponda a *t*, que por FR-002 todavía no se ha tomado.
 - **FR-015**: La cantidad de acciones del jugador entre dos copias completas del estado DEBE ser configurable, y DEBE tener un valor por omisión.
 - **FR-016**: Responder una consulta NO DEBE requerir aplicar ni deshacer los cambios de más acciones del jugador que esa cantidad configurada.
 - **FR-017**: La memoria que ocupa la línea DEBE crecer con la cantidad de cambios ocurridos, más una copia completa cada esa cantidad de acciones. NO DEBE crecer como la cantidad de acciones multiplicada por el tamaño del estado.
@@ -168,7 +159,6 @@ Quien revisa una partida ya jugada no quiere volver a jugarla: quiere reproducir
 - **FR-021**: Un archivo guardado por la primera parte, que no contiene línea de tiempo, DEBE detectarse como incompatible y rechazarse con un mensaje, sin leerse a medias.
 - **FR-022**: Dos consultas del mismo instante DEBEN producir resúmenes idénticos.
 - **FR-023**: El resumen de un instante DEBE coincidir con el estado que la partida tuvo de verdad en ese instante.
-- **FR-025**: Al reproducir una bitácora hasta un instante posterior al reloj con que terminó la partida reproducida, el programa DEBE mostrar el resumen del estado final y DEBE indicar que la partida terminó antes del instante pedido, en vez de rechazar la consulta. La consulta en partida no cambia: FR-009 sigue vigente.
 
 ### Requisitos de rendimiento
 
@@ -192,6 +182,7 @@ Quien revisa una partida ya jugada no quiere volver a jugarla: quiere reproducir
 - **SC-007**: En una partida de 500 acciones, la memoria de la línea es una fracción pequeña de lo que ocuparían 500 copias completas del estado.
 - **SC-008**: Recortar la línea al usar un pergamino cuesta prácticamente lo mismo en una partida de 50 acciones que en una de 500.
 - **SC-009**: El ciclo completo de eventos entre dos decisiones del jugador sigue resolviéndose en menos de 20 ms con la línea activa.
+- **SC-011**: Reproducir una bitácora hasta un instante posterior al final devuelve el estado final y lo dice, en el 100 % de los casos probados.
 - **SC-010**: Las 945 pruebas anteriores a esta capacidad siguen pasando sin modificarlas, con la excepción de las que fijan la versión del formato del archivo de partida, porque guardar la línea cambia ese formato.
 
 ## Supuestos

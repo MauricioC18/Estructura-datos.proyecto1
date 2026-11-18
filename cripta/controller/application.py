@@ -42,6 +42,7 @@ from structures.mapa_conocido import ABIERTA, CERRADA, MapaConocido
 from model.consulta_historia import (
     ConsultaRechazada,
     consultar_accion,
+    consultar_hasta,
     consultar_instante,
 )
 from model.game import DEFEAT, VICTORY, Game
@@ -743,39 +744,26 @@ def replay(repository, log_path, output=print, in_use=None, verbose=True,
     output(_ending_text(game))
 
     if hasta is not None:
-        show_instant(game, _instante_reproducido(game, hasta, output), output)
+        show_instant(game, hasta, output)
 
     return game
 
 
-def _instante_reproducido(game, hasta, output):
-    """El instante que se muestra al reproducir hasta hasta.
-
-    Un instante posterior al reloj final no se rechaza como en la partida en
-    curso (FR-009): la partida reproducida ya no puede llegar a el. Se
-    muestra el estado final y se avisa que la partida termino antes (FR-025
-    de la linea de tiempo, Apendice B).
-    """
-    final = game.state.clock
-
-    if isinstance(hasta, int) and not isinstance(hasta, bool) and hasta > final:
-        output(
-            f"La partida termino en el instante {final}, antes del instante "
-            f"{hasta}: se muestra el estado final."
-        )
-        return final
-
-    return hasta
-
-
 def show_instant(game, instant, output=print):
-    """Imprime con output el resumen de un instante pasado, o por que no se
-    puede. No usa la vista interactiva: solo su formato de lineas."""
+    """Imprime con output el resumen del instante de --replay --hasta, o por
+    que no se puede. No usa la vista interactiva: solo su formato de lineas.
+
+    Usa consultar_hasta de la linea de tiempo: un instante posterior al final
+    de la partida reproducida no se rechaza, sino que da el estado final con
+    un aviso, que se imprime antes del resumen (FR-025)."""
     try:
-        resumen = consultar_instante(game, instant, reconstruir_con_mapa_conocido)
+        resumen = consultar_hasta(game, instant, reconstruir_con_mapa_conocido)
     except ConsultaRechazada as error:
         output(str(error))
         return None
+
+    if resumen.aviso:
+        output(resumen.aviso)
 
     for line in lineas_de_historia(resumen):
         output(line)

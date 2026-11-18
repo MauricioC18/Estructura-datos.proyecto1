@@ -12,6 +12,7 @@ from unittest import mock
 
 from adapters.fuente_offline import FuenteOffline
 from controller.application import InUseIds, play, replay
+from model.consulta_historia import PARTIDA_TERMINO_ANTES
 from main import parse_arguments
 from repository.repositorio_cripta import RepositorioCripta
 from structures.linea_de_tiempo import COPIAS_CADA
@@ -129,7 +130,7 @@ class TestConPartidaReal(unittest.TestCase):
         self.assertIn("Mapa conocido: 1 salas exploradas", texto)
 
     def test_replay_hasta_despues_del_final_muestra_el_estado_final(self):
-        """FR-025 (Historia 6, escenario 1, Apéndice B): un instante posterior
+        """FR-025 (Historia 2, escenario 6, Apéndice B): un instante posterior
         al reloj final muestra el estado final e indica que la partida
         terminó antes, sin instanciar la vista."""
         cripta, _ = self.primera_cripta_y_salida()
@@ -139,8 +140,7 @@ class TestConPartidaReal(unittest.TestCase):
 
         juego, salida = self.reproducir(hasta=pedido)
 
-        aviso = (f"La partida termino en el instante {final}, antes del instante "
-                 f"{pedido}: se muestra el estado final.")
+        aviso = PARTIDA_TERMINO_ANTES
         self.assertIn(aviso, salida)
         instantes = [linea for linea in salida if linea.startswith("Instante ")]
         self.assertEqual(len(instantes), 1)
@@ -157,7 +157,7 @@ class TestConPartidaReal(unittest.TestCase):
 
         _, salida = self.reproducir(hasta=final)
 
-        self.assertFalse([linea for linea in salida if linea.startswith("La partida termino")])
+        self.assertNotIn(PARTIDA_TERMINO_ANTES, salida)
         instantes = [linea for linea in salida if linea.startswith("Instante ")]
         self.assertEqual(len(instantes), 1)
         self.assertTrue(instantes[0].startswith(f"Instante {final} "))

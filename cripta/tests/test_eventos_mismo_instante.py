@@ -1,8 +1,8 @@
 """Consultar un instante con varios eventos (specs/003-linea-de-tiempo).
 
-Historia 1, escenarios 6 y 9, y el caso del Apéndice B «varios eventos
+Historia 1, escenarios 6 y 7, y el caso del Apéndice B «varios eventos
 ocurren en el mismo instante t: historia <t> muestra el estado después de
-todos ellos». Lo exige FR-002.
+todos ellos». Lo exigen FR-002 y FR-026.
 
 Dos guardianes de la misma velocidad atacan al jugador a la vez, cada 100
 unidades, y el jugador, más lento, espera cada 142. Así hay instantes con
@@ -142,14 +142,14 @@ class VariosEventosEnElMismoInstanteTest(unittest.TestCase):
         self.assertTrue([caso for caso in self.instantes if caso[2]])
 
     def test_varios_eventos_en_el_mismo_instante_cuentan_todos(self):
-        """FR-002 (Historia 1, escenario 9, Apéndice B): con dos ataques en el
+        """FR-026 (Historia 1, escenario 7, Apéndice B): con dos ataques en el
         mismo instante t, el estado de t es el de después de los dos. Instantes
         tras los que no hay otro evento antes de la siguiente decisión."""
         self.comprobar([caso for caso in self.instantes if not caso[2]])
 
     @unittest.expectedFailure
     def test_un_evento_posterior_al_instante_no_cuenta(self):
-        """FR-002 (Historia 1, escenarios 6 y 9): si después de t y antes de la
+        """FR-002 (Historia 1, escenario 6): si después de t y antes de la
         siguiente decisión del jugador hay otro evento, el estado de t no lo
         incluye.
 
