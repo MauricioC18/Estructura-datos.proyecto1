@@ -3644,16 +3644,16 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 
 | Archivo | Pruebas | Capacidad |
 | --- | ---: | --- |
-| `tests/test_rutas_mas_baratas.py` | 18 | §5.1, la búsqueda, probada sin el motor |
+| `tests/test_rutas_mas_baratas.py` | 22 | §5.1, la búsqueda, probada sin el motor |
 | `tests/test_cazador.py` | 40 | §5.1 y §5.2, incluidas 5 de salidas de un solo sentido |
-| `tests/test_parada_anticipada.py` | 4 | §5.1, equivalencia contra un cálculo de referencia independiente |
-| `tests/test_linea_de_tiempo.py` | 69 | §5.5 |
+| `tests/test_parada_anticipada.py` | 4 | §5.1, equivalencia contra un cálculo de referencia independiente, escrito por otro integrante |
+| `tests/test_linea_de_tiempo.py` | 79 | §5.5 |
 
 Las pruebas del terreno (§3.1) no están en archivos nuevos: quedaron repartidas en
 `test_room.py`, `test_traductor.py`, `test_movement.py` y `test_actor.py`, porque son
 cambios a reglas que ya existían.
 
-**El proyecto tiene 1 026 pruebas y todas pasan** en Python 3.14.6, al cerrar las
+**El proyecto tiene 1 047 pruebas y todas pasan** en Python 3.14.6, al cerrar las
 capacidades de §5.1, §5.2, §5.5 y el terreno. Eran 861 al terminar la primera parte. Se
 corren con `python -m unittest discover -s tests -t . -v` desde `cripta/`, con las
 dependencias de `requirements.txt` instaladas.
