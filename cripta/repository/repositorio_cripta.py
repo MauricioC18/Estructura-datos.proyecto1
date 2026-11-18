@@ -60,7 +60,7 @@ from pathlib import Path
 
 from adapters.almacen_cripta import AlmacenCripta
 from adapters.almacen_fichas import AlmacenFichas, ErrorAlmacenDisco
-from adapters.fuente_datos import PresupuestoAgotado
+from adapters.fuente_datos import PresupuestoAgotado, UbicacionDeLlavesNoDisponible
 from structures.cache_catalogo import CAPACIDAD_POR_DEFECTO, CacheCatalogo
 from structures.grafo_salas import construir_grafo_desde_esqueleto
 from structures.lista_sin_repetidos import ListaSinRepetidos
@@ -72,7 +72,11 @@ from repository.gestor_contenido import (
     descargar_salas_del_esqueleto,
     tipos_de_la_sala,
 )
-from repository.traductor import NOMBRE_DEL_JUGADOR, Traductor
+from repository.traductor import NOMBRE_DEL_JUGADOR, ErrorDatosCripta, Traductor
+
+UBICACION_DE_LLAVES_DESDE_DISCO = "recuperada de disco"
+UBICACION_DE_LLAVES_NO_DISPONIBLE = "no disponible"
+UBICACION_DE_LLAVES_NO_OBTENIDA = "no se obtuvo en esta partida"
 
 
 class VersionesIncompatibles(Exception):
@@ -113,6 +117,7 @@ class ReporteDeRed:
         self.salas_recuperadas_de_disco = 0
         self.esperas_en_la_puerta = 0
         self.desalojos_de_memoria = 0
+        self.origen_de_la_ubicacion_de_llaves = UBICACION_DE_LLAVES_NO_OBTENIDA
         self.avisos = []
 
     def lineas_de_texto(self):
@@ -129,6 +134,7 @@ class ReporteDeRed:
             f"Contenido: salas descargadas {self.salas_descargadas} (lotes: {self.lotes_de_contenido}), "
             f"recuperadas de disco {self.salas_recuperadas_de_disco}",
             f"Esperas en la puerta: {self.esperas_en_la_puerta}",
+            f"Ubicación de llaves: {self.origen_de_la_ubicacion_de_llaves}",
         ]
         for aviso in self.avisos:
             lineas.append(f"Aviso: {aviso}")
@@ -164,6 +170,8 @@ class RepositorioCripta:
         self._salas_por_id = None
         self._traductor = None
         self._enemigos_con_soltados_listos = None
+        self._ubicacion_de_llaves = None
+        self._origen_de_la_ubicacion_de_llaves = UBICACION_DE_LLAVES_NO_OBTENIDA
         self._avisos = []
 
     # ------------------------------------------------------------------
@@ -180,7 +188,7 @@ class RepositorioCripta:
         """Lista de criptas publicadas: [{"id", "nombre", "salas", "dificultad"}, ...]."""
         return self._fuente.listar_criptas()["criptas"]
 
-    def iniciar_partida(self, id_cripta, versiones_requeridas=None):
+    def iniciar_partida(self, id_cripta, versiones_requeridas=None, obtener_ubicacion_de_llaves=True):
         """Carga lo necesario para empezar y deja lista la sala inicial.
 
         versiones_requeridas: (version_cripta, version_catalogo) de un log
@@ -213,6 +221,11 @@ class RepositorioCripta:
         self._salas_por_id = TablaHash()
         for sala in salas:
             self._salas_por_id.insertar(sala["id"], sala)
+
+        self._ubicacion_de_llaves = None
+        self._origen_de_la_ubicacion_de_llaves = UBICACION_DE_LLAVES_NO_OBTENIDA
+        if obtener_ubicacion_de_llaves:
+            self._obtener_ubicacion_de_llaves(id_cripta, copia_vigente)
 
         self._gestor_contenido = GestorContenido(
             self._fuente, id_cripta, self._grafo, self._gestor_catalogo,
@@ -344,9 +357,18 @@ class RepositorioCripta:
     # Reporte final (§5.1)
     # ------------------------------------------------------------------
 
+    def ubicacion_de_llaves(self):
+        if self._ubicacion_de_llaves is None:
+            return None
+        return list(self._ubicacion_de_llaves)
+
+    def origen_de_la_ubicacion_de_llaves(self):
+        return self._origen_de_la_ubicacion_de_llaves
+
     def reporte_de_red(self):
         reporte = ReporteDeRed()
         reporte.origen_de_los_datos = self._fuente.descripcion_del_origen()
+        reporte.origen_de_la_ubicacion_de_llaves = self._origen_de_la_ubicacion_de_llaves
         reporte.solicitudes_realizadas = self._fuente.solicitudes_realizadas()
         reporte.presupuesto_solicitudes = self._fuente.presupuesto()
 
@@ -414,6 +436,29 @@ class RepositorioCripta:
         # Se marcan al final: si faltó presupuesto, se reintentará.
         for id_tipo in tipos_sin_revisar.elementos:
             self._enemigos_con_soltados_listos.agregar(id_tipo)
+
+    def _obtener_ubicacion_de_llaves(self, id_cripta, copia_vigente):
+        existe_sala = self._salas_por_id.contiene
+        if copia_vigente:
+            guardada = self._almacen_cripta.leer_ubicacion_de_llaves(id_cripta)
+            if guardada is not None:
+                try:
+                    self._ubicacion_de_llaves = self._traductor.crear_ubicaciones_de_llaves(
+                        guardada, existe_sala)
+                    self._origen_de_la_ubicacion_de_llaves = UBICACION_DE_LLAVES_DESDE_DISCO
+                    return
+                except ErrorDatosCripta:
+                    self._ubicacion_de_llaves = None
+        try:
+            respuesta = self._fuente.ubicacion_de_llaves(id_cripta)
+        except UbicacionDeLlavesNoDisponible as error:
+            self._origen_de_la_ubicacion_de_llaves = UBICACION_DE_LLAVES_NO_DISPONIBLE
+            self._avisos.append(f"La ubicación de las llaves no está disponible: {error}")
+            return
+        self._ubicacion_de_llaves = self._traductor.crear_ubicaciones_de_llaves(respuesta, existe_sala)
+        self._origen_de_la_ubicacion_de_llaves = self._fuente.forma_de_obtencion()
+        self._intentar_en_disco(
+            lambda: self._almacen_cripta.guardar_ubicacion_de_llaves(id_cripta, respuesta))
 
     def _preparar_copia_en_disco(self, generales):
         try:

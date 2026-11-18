@@ -47,6 +47,7 @@ class FuenteCatalogoFalsa(FuenteDatos):
     def version_cripta(self, id_cripta): raise NotImplementedError
     def pagina_salas(self, id_cripta, pagina): raise NotImplementedError
     def contenido(self, id_cripta, ids_salas): raise NotImplementedError
+    def ubicacion_de_llaves(self, id_cripta): raise NotImplementedError
 
 
 class AlmacenQueNoPuedeGuardar(AlmacenFichas):

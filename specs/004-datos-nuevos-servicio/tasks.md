@@ -32,7 +32,7 @@ Revisión del 2026-11-17, al integrar `main`. Estas tareas de la versión anteri
 
 **Purpose**: Punto de partida verificado.
 
-- [ ] T001 Correr `python -m unittest discover -s tests -t .` desde `cripta/` después de integrar `main` y confirmar que pasan las 1010 pruebas (SC-005)
+- [x] T001 Correr `python -m unittest discover -s tests -t .` desde `cripta/` después de integrar `main` y confirmar que pasan las 1010 pruebas (SC-005)
 
 ---
 
@@ -40,9 +40,9 @@ Revisión del 2026-11-17, al integrar `main`. Estas tareas de la versión anteri
 
 **Purpose**: Las piezas del modelo y del contrato de fuentes que usa la ubicación de llaves.
 
-- [ ] T002 [P] Crear `KeyLocation(key_id, room_id, enemy_id=None)` con la propiedad `is_dropped_by_enemy` en `cripta/model/key_location.py` (FR-011, FR-012)
-- [ ] T003 Agregar la operación abstracta `ubicacion_de_llaves(id_cripta)`, la excepción `UbicacionDeLlavesNoDisponible(ErrorFuenteDatos)` y `forma_de_obtencion()`, que describe cómo entrega sus datos cada fuente, en `cripta/adapters/fuente_datos.py` (FR-011, FR-016, FR-025)
-- [ ] T004 Implementar `ubicacion_de_llaves` en los dobles de fuente de datos: en las pruebas (`cripta/tests/test_fuente_datos.py`, `cripta/tests/test_repositorio_cripta.py`, `cripta/tests/test_gestor_catalogo.py`, `cripta/tests/test_gestor_contenido.py`) consumiendo una solicitud como el servicio real, y en los benchmarks (`cripta/benchmark/bench_frecuencia_bloque2.py`, `cripta/benchmark/bench_precarga_contenido.py`) sin consumir, para no alterar sus mediciones (FR-013)
+- [x] T002 [P] Crear `KeyLocation(key_id, room_id, enemy_id=None)` con la propiedad `is_dropped_by_enemy` en `cripta/model/key_location.py` (FR-011, FR-012)
+- [x] T003 Agregar la operación abstracta `ubicacion_de_llaves(id_cripta)`, la excepción `UbicacionDeLlavesNoDisponible(ErrorFuenteDatos)` y `forma_de_obtencion()`, que describe cómo entrega sus datos cada fuente, en `cripta/adapters/fuente_datos.py` (FR-011, FR-016, FR-025)
+- [x] T004 Implementar `ubicacion_de_llaves` en los dobles de fuente de datos: en las pruebas (`cripta/tests/test_fuente_datos.py`, `cripta/tests/test_repositorio_cripta.py`, `cripta/tests/test_gestor_catalogo.py`, `cripta/tests/test_gestor_contenido.py`) consumiendo una solicitud como el servicio real, y en los benchmarks (`cripta/benchmark/bench_frecuencia_bloque2.py`, `cripta/benchmark/bench_precarga_contenido.py`) sin consumir, para no alterar sus mediciones (FR-013)
 
 **Checkpoint**: el contrato de fuentes acepta la operación nueva y las pruebas existentes siguen pasando.
 
@@ -54,8 +54,8 @@ Revisión del 2026-11-17, al integrar `main`. Estas tareas de la versión anteri
 
 **Independent Test**: Traducir un esqueleto con una salida cuyo costo viene en null.
 
-- [ ] T005 [US2] Escribir en `cripta/tests/test_datos_nuevos_servicio.py` la prueba del escenario US2.2: una salida con costo en null vale 100, también cuando el lado de vuelta declara un costo (FR-001, FR-003)
-- [ ] T006 [US2] En `cripta/repository/traductor.py`, `_costo_de_salida` trata un costo en null como no declarado (FR-001)
+- [x] T005 [US2] Escribir en `cripta/tests/test_datos_nuevos_servicio.py` la prueba del escenario US2.2: una salida con costo en null vale 100, también cuando el lado de vuelta declara un costo (FR-001, FR-003)
+- [x] T006 [US2] En `cripta/repository/traductor.py`, `_costo_de_salida` trata un costo en null como no declarado (FR-001)
 
 **Checkpoint**: las criptas que declaran costos en null se pueden cargar.
 
@@ -69,17 +69,17 @@ Revisión del 2026-11-17, al integrar `main`. Estas tareas de la versión anteri
 
 ### Tests for User Story 3
 
-- [ ] T007 [US3] Escribir en `cripta/tests/test_datos_nuevos_servicio.py` las pruebas de los escenarios US3.1 a US3.11 y sus casos borde: ruta y conteo en la fuente HTTP, incluido un reintento tras HTTP 429; lectura offline y archivo ausente; copia en disco, copia dañada y copia de otra versión; validación de entradas (sin id, sin sala, tipos equivocados, sala inexistente, campos adicionales); llaves repetidas y orden conservado entre servicio, disco y offline; momento del inicio (después del esqueleto, antes de contenido y fichas); falla de la consulta y presupuesto agotado; carga de partida guardada sin consulta; reproducción de una partida nueva y de una que empezó cargando; y la línea del reporte final (FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-017, FR-018, FR-019, FR-020, FR-021, FR-025)
+- [x] T007 [US3] Escribir en `cripta/tests/test_datos_nuevos_servicio.py` las pruebas de los escenarios US3.1 a US3.11 y sus casos borde: ruta y conteo en la fuente HTTP, incluido un reintento tras HTTP 429; lectura offline y archivo ausente; copia en disco, copia dañada y copia de otra versión; validación de entradas (sin id, sin sala, tipos equivocados, sala inexistente, campos adicionales); llaves repetidas y orden conservado entre servicio, disco y offline; momento del inicio (después del esqueleto, antes de contenido y fichas); falla de la consulta y presupuesto agotado; carga de partida guardada sin consulta; reproducción de una partida nueva y de una que empezó cargando; y la línea del reporte final (FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-017, FR-018, FR-019, FR-020, FR-021, FR-025)
 
 ### Implementation for User Story 3
 
-- [ ] T008 [P] [US3] Implementar `ubicacion_de_llaves` en `cripta/adapters/fuente_http.py` con la ruta `/criptas/<id>/llaves` (FR-011, FR-013)
-- [ ] T009 [P] [US3] En `cripta/adapters/fuente_offline.py`: la ruta `<carpeta>/criptas/<id>/llaves.json`, `ubicacion_de_llaves` con `UbicacionDeLlavesNoDisponible` cuando falta el archivo, `forma_de_obtencion` «leída del paquete offline» y `guardar_ubicacion_de_llaves` en el guardador (FR-015, FR-016, FR-025)
-- [ ] T010 [P] [US3] Agregar `leer_ubicacion_de_llaves` y `guardar_ubicacion_de_llaves` a `cripta/adapters/almacen_cripta.py`, con el archivo `<id_cripta>/llaves.json`; un archivo que falta o no se puede leer se lee como ausente (FR-014, FR-021, FR-022)
-- [ ] T011 [US3] Agregar `crear_ubicaciones_de_llaves` a `cripta/repository/traductor.py`: valida la respuesta, comprueba cada sala contra el esqueleto, conserva el orden y las repeticiones, ignora campos adicionales y no consulta el catálogo (FR-012, FR-017, FR-018, FR-019, FR-024)
-- [ ] T012 [US3] En `cripta/repository/repositorio_cripta.py`: obtener la ubicación de llaves en `iniciar_partida` después del esqueleto y antes del contenido, con el argumento `obtener_ubicacion_de_llaves`; leer la copia vigente (y descartarla si no es válida) o pedirla a la fuente y guardarla; tratar `UbicacionDeLlavesNoDisponible` como no disponible con aviso; exponer `ubicacion_de_llaves()`; y agregar la línea del origen al reporte final (FR-011, FR-014, FR-016, FR-020, FR-021, FR-025)
-- [ ] T013 [US3] En `cripta/controller/application.py`: la carga de una partida guardada llama a `iniciar_partida` sin obtener la ubicación de llaves, y la reproducción la obtiene solo si su log no empezó cargando una partida guardada (FR-011)
-- [ ] T014 [P] [US3] En `cripta/tools/descargar_datos_offline.py`: descargar también la ubicación de llaves de cada cripta, con su prueba en `cripta/tests/test_descargar_datos_offline.py` (FR-015)
+- [x] T008 [P] [US3] Implementar `ubicacion_de_llaves` en `cripta/adapters/fuente_http.py` con la ruta `/criptas/<id>/llaves` (FR-011, FR-013)
+- [x] T009 [P] [US3] En `cripta/adapters/fuente_offline.py`: la ruta `<carpeta>/criptas/<id>/llaves.json`, `ubicacion_de_llaves` con `UbicacionDeLlavesNoDisponible` cuando falta el archivo, `forma_de_obtencion` «leída del paquete offline» y `guardar_ubicacion_de_llaves` en el guardador (FR-015, FR-016, FR-025)
+- [x] T010 [P] [US3] Agregar `leer_ubicacion_de_llaves` y `guardar_ubicacion_de_llaves` a `cripta/adapters/almacen_cripta.py`, con el archivo `<id_cripta>/llaves.json`; un archivo que falta o no se puede leer se lee como ausente (FR-014, FR-021, FR-022)
+- [x] T011 [US3] Agregar `crear_ubicaciones_de_llaves` a `cripta/repository/traductor.py`: valida la respuesta, comprueba cada sala contra el esqueleto, conserva el orden y las repeticiones, ignora campos adicionales y no consulta el catálogo (FR-012, FR-017, FR-018, FR-019, FR-024)
+- [x] T012 [US3] En `cripta/repository/repositorio_cripta.py`: obtener la ubicación de llaves en `iniciar_partida` después del esqueleto y antes del contenido, con el argumento `obtener_ubicacion_de_llaves`; leer la copia vigente (y descartarla si no es válida) o pedirla a la fuente y guardarla; tratar `UbicacionDeLlavesNoDisponible` como no disponible con aviso; exponer `ubicacion_de_llaves()`; y agregar la línea del origen al reporte final (FR-011, FR-014, FR-016, FR-020, FR-021, FR-025)
+- [x] T013 [US3] En `cripta/controller/application.py`: la carga de una partida guardada llama a `iniciar_partida` sin obtener la ubicación de llaves, y la reproducción la obtiene solo si su log no empezó cargando una partida guardada (FR-011)
+- [x] T014 [P] [US3] En `cripta/tools/descargar_datos_offline.py`: descargar también la ubicación de llaves de cada cripta, con su prueba en `cripta/tests/test_descargar_datos_offline.py` (FR-015)
 
 **Checkpoint**: las pruebas de US2 y US3 pasan; la verificación de resolubilidad ya tiene sus datos.
 
@@ -91,7 +91,7 @@ Revisión del 2026-11-17, al integrar `main`. Estas tareas de la versión anteri
 
 **Independent Test**: Dejar en disco una copia de otra versión y cargar datos con un campo inventado.
 
-- [ ] T015 [US4] Escribir en `cripta/tests/test_datos_nuevos_servicio.py` las pruebas de los escenarios US4.1 a US4.3: una copia de otra versión (esqueleto, contenido y ubicación de llaves) no se usa y se reemplaza por la vigente; `costo` y `rango` no producen aviso de campo desconocido, y un campo inventado en una salida o en una ficha sí, una sola vez (FR-022, FR-023, FR-024)
+- [x] T015 [US4] Escribir en `cripta/tests/test_datos_nuevos_servicio.py` las pruebas de los escenarios US4.1 a US4.3: una copia de otra versión (esqueleto, contenido y ubicación de llaves) no se usa y se reemplaza por la vigente; `costo` y `rango` no producen aviso de campo desconocido, y un campo inventado en una salida o en una ficha sí, una sola vez (FR-022, FR-023, FR-024)
 
 **Checkpoint**: todas las historias pasan sus pruebas.
 
@@ -99,8 +99,8 @@ Revisión del 2026-11-17, al integrar `main`. Estas tareas de la versión anteri
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T016 Ajustar en `cripta/tests/test_repositorio_cripta.py` (y donde aparezcan) las aserciones que cuentan las solicitudes exactas de un inicio de partida o las líneas del reporte final, sumando la consulta de llaves y su línea (FR-013, FR-025, SC-005)
-- [ ] T017 Correr la suite completa desde `cripta/` y los pasos de `quickstart.md`, incluida una partida offline con las criptas de la segunda parte (SC-001, SC-002, SC-003, SC-004, SC-005)
+- [x] T016 Ajustar en `cripta/tests/test_repositorio_cripta.py` (y donde aparezcan) las aserciones que cuentan las solicitudes exactas de un inicio de partida o las líneas del reporte final, sumando la consulta de llaves y su línea (FR-013, FR-025, SC-005)
+- [ ] T017 Correr la suite completa desde `cripta/` y los pasos de `quickstart.md`, incluida una partida offline con las criptas de la segunda parte (SC-001, SC-002, SC-003, SC-004, SC-005). Hecho: la suite completa (1047 pruebas) y una partida offline en `cripta-06` con el paquete de la segunda parte, que inicia y muestra los costos. Falta el paso 3, la descarga con la ubicación de llaves, porque necesita conexión al servicio.
 
 ---
 

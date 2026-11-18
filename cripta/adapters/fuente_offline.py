@@ -30,6 +30,7 @@ from pathlib import Path
 from adapters.fuente_datos import (
     ErrorFuenteDatos,
     FuenteDatos,
+    UbicacionDeLlavesNoDisponible,
     validar_ids_catalogo,
     validar_ids_salas,
     validar_numero_de_pagina,
@@ -55,6 +56,9 @@ class RutasDatosOffline:
 
     def contenido_de_sala(self, id_cripta, id_sala):
         return self._carpeta_de_cripta(id_cripta) / "contenido" / f"sala_{id_sala}.json"
+
+    def ubicacion_de_llaves(self, id_cripta):
+        return self._carpeta_de_cripta(id_cripta) / "llaves.json"
 
     def version_catalogo(self):
         return self.carpeta / "catalogo" / "version.json"
@@ -128,6 +132,21 @@ class FuenteOffline(FuenteDatos):
                 )
             )
         return {"contenido": entradas}
+
+    def ubicacion_de_llaves(self, id_cripta):
+        operacion = f"obtener la ubicación de las llaves de {id_cripta}"
+        try:
+            ruta = self._rutas.ubicacion_de_llaves(id_cripta)
+        except ValueError as error:
+            raise ErrorFuenteDatos(operacion, str(error)) from error
+        if not ruta.is_file():
+            raise UbicacionDeLlavesNoDisponible(
+                operacion, f"el paquete offline no trae {ruta}"
+            )
+        return self._leer_json(operacion, lambda: ruta)
+
+    def forma_de_obtencion(self):
+        return "leída del paquete offline"
 
     def catalogo(self, ids):
         validar_ids_catalogo(ids)
@@ -203,6 +222,9 @@ class GuardadorDatosOffline:
         """Separa la respuesta en un archivo por ficha."""
         for ficha in respuesta["entidades"]:
             _escribir_json(self._rutas.ficha_catalogo(ficha["id"]), ficha)
+
+    def guardar_ubicacion_de_llaves(self, id_cripta, respuesta):
+        _escribir_json(self._rutas.ubicacion_de_llaves(id_cripta), respuesta)
 
     def guardar_version_catalogo(self, respuesta):
         _escribir_json(self._rutas.version_catalogo(), respuesta)

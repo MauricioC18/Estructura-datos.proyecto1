@@ -114,6 +114,12 @@ class FuenteHttp(FuenteDatos):
             {"salas": texto_de_salas},
         )
 
+    def ubicacion_de_llaves(self, id_cripta):
+        return self._pedir_json(
+            f"obtener la ubicación de las llaves de {id_cripta}",
+            f"/criptas/{_segmento_de_ruta(id_cripta)}/llaves",
+        )
+
     def catalogo(self, ids):
         validar_ids_catalogo(ids)
         texto_de_ids = ",".join(ids)

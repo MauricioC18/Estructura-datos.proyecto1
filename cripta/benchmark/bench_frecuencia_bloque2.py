@@ -114,6 +114,9 @@ class FuenteCripta01(FuenteDatos):
         self._consumir_solicitud("obtener la versión del catálogo")
         return {"version": VERSION_CATALOGO_REAL}
 
+    def ubicacion_de_llaves(self, id_cripta):
+        return {"llaves": []}
+
     def descripcion_del_origen(self):
         return "datos reales de cripta-01 en memoria"
 
@@ -187,6 +190,9 @@ class FuenteCriptaSintetica(FuenteDatos):
     def version_catalogo(self):
         self._consumir_solicitud("obtener la versión del catálogo")
         return {"version": "cat-sintetico"}
+
+    def ubicacion_de_llaves(self, id_cripta):
+        return {"llaves": []}
 
     def descripcion_del_origen(self):
         return "cripta sintética en memoria"

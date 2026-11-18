@@ -72,6 +72,10 @@ class PresupuestoAgotado(ErrorFuenteDatos):
         self.presupuesto = presupuesto
 
 
+class UbicacionDeLlavesNoDisponible(ErrorFuenteDatos):
+    pass
+
+
 def validar_ids_salas(ids_salas):
     """Exige una lista de 1 a 10 enteros distintos.
 
@@ -177,6 +181,10 @@ class FuenteDatos(ABC):
         """
 
     @abstractmethod
+    def ubicacion_de_llaves(self, id_cripta):
+        pass
+
+    @abstractmethod
     def catalogo(self, ids):
         """GET /catalogo?ids=...
 
@@ -196,6 +204,9 @@ class FuenteDatos(ABC):
     def descripcion_del_origen(self):
         """Texto para el reporte final: de dónde vienen los datos."""
         return "fuente de datos"
+
+    def forma_de_obtencion(self):
+        return "descargada del servicio"
 
     # ------------------------------------------------------------------
     # Presupuesto de solicitudes

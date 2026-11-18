@@ -39,6 +39,9 @@ class FuenteFalsa(FuenteDatos):
         validar_ids_salas(ids_salas)
         return self._solicitar(f"descargar el contenido de las salas {ids_salas}")
 
+    def ubicacion_de_llaves(self, id_cripta):
+        return self._solicitar(f"obtener la ubicación de las llaves de {id_cripta}")
+
     def catalogo(self, ids):
         validar_ids_catalogo(ids)
         return self._solicitar(f"descargar las fichas {ids}")

@@ -274,7 +274,7 @@ def load_saved_game(repository, view, load_path, in_use=None):
         )
         return None, None, None
 
-    repository.iniciar_partida(partida.id_cripta)
+    repository.iniciar_partida(partida.id_cripta, obtener_ubicacion_de_llaves=False)
     comprobar_versiones_vigentes(partida, repository)
     game = construir_juego_reversible(partida)
 
@@ -550,7 +550,8 @@ def replay(repository, log_path, output=print, in_use=None, verbose=True):
 
     try:
         repository.iniciar_partida(
-            header.crypt_id, (header.crypt_version, header.catalog_version)
+            header.crypt_id, (header.crypt_version, header.catalog_version),
+            obtener_ubicacion_de_llaves=not header.saved_game,
         )
     except VersionesIncompatibles as error:
         # El mensaje ya explica que no se puede garantizar una reproduccion fiel.

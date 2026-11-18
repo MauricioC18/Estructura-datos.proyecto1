@@ -53,6 +53,7 @@ class FuenteContenidoFalsa(FuenteDatos):
     def datos_generales(self, id_cripta): raise NotImplementedError
     def version_cripta(self, id_cripta): raise NotImplementedError
     def catalogo(self, ids): raise NotImplementedError
+    def ubicacion_de_llaves(self, id_cripta): raise NotImplementedError
     def version_catalogo(self): raise NotImplementedError
 
 

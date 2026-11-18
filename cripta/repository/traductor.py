@@ -51,6 +51,7 @@ Complejidad
 """
 from model.enemy import Enemy
 from model.item import Item
+from model.key_location import KeyLocation
 from model.player import Player
 from model.room import DIRECTIONS, Door, Exit, Room, RoomMap
 from model.trap import DEFAULT_REARM_INTERVAL, Trap
@@ -214,7 +215,7 @@ class Traductor:
         tal: sustituirlo en silencio por el valor por omision escondería el
         error.
         """
-        if "costo" not in salida:
+        if salida.get("costo") is None:
             return None
 
         costo = salida["costo"]
@@ -393,6 +394,38 @@ class Traductor:
             self._avisar_campos_desconocidos(ficha, campos_conocidos_de_la_clase(clase),
                                              f"La ficha {id_tipo}")
         return ficha
+
+    def crear_ubicaciones_de_llaves(self, respuesta, existe_sala):
+        entradas = respuesta.get("llaves") if isinstance(respuesta, dict) else None
+        if not isinstance(entradas, list):
+            raise ErrorDatosCripta("La ubicación de las llaves no trae la lista 'llaves'.")
+        ubicaciones = []
+        for posicion, entrada in enumerate(entradas):
+            ubicaciones.append(self._crear_ubicacion_de_llave(entrada, posicion, existe_sala))
+        return ubicaciones
+
+    def _crear_ubicacion_de_llave(self, entrada, posicion, existe_sala):
+        if not isinstance(entrada, dict):
+            raise ErrorDatosCripta(
+                f"La entrada {posicion} de la ubicación de las llaves no es un objeto: {entrada!r}."
+            )
+        id_llave = entrada.get("id")
+        if not isinstance(id_llave, str) or not id_llave:
+            raise ErrorDatosCripta(
+                f"La entrada {posicion} de la ubicación de las llaves no trae un id de llave "
+                f"válido: {id_llave!r}."
+            )
+        sala = entrada.get("sala")
+        if isinstance(sala, bool) or not isinstance(sala, int):
+            raise ErrorDatosCripta(f"La llave {id_llave} no trae una sala válida: {sala!r}.")
+        if not existe_sala(sala):
+            raise ErrorDatosCripta(
+                f"La llave {id_llave} está en la sala {sala}, que no existe en el esqueleto."
+            )
+        enemigo = entrada.get("enemigo")
+        if enemigo is not None and (not isinstance(enemigo, str) or not enemigo):
+            raise ErrorDatosCripta(f"La llave {id_llave} trae un enemigo inválido: {enemigo!r}.")
+        return KeyLocation(id_llave, sala, enemigo)
 
     def _rango_de_cazador(self, ficha, id_tipo, comportamiento):
         """Rango de la ficha de un cazador (§3.2, §4.1).
