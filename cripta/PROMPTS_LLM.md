@@ -1599,3 +1599,401 @@ La misma prueba de equivalencia destapó un defecto ajeno a esta capacidad: el a
 Se corrigieron además tres errores propios en las pruebas, todos detectados al comparar contra el estado real: el ayudante guardaba el estado posterior a una espera en vez del anterior cuando una acción se rechazaba; los objetos extra del inventario se agregaban después de que se tomaba la copia inicial, por fuera del flujo registrado, lo que era un defecto de la prueba y no del programa; y la medición del costo de una consulta frente al largo de la partida consultaba siempre la última acción, que cae justo después de una copia y casi no repite nada, de modo que salía plana por el caso más fácil sin probar nada. Es el mismo error que ya había aparecido en la capacidad del cazador. Se cambió a puntos repartidos y entonces sí midió lo que decía medir.
 
 El valor por omisión de K quedó en 50, elegido con las mediciones como exige el enunciado. La alternativa ingenua de una copia por acción cuesta 43 veces más memoria para ganar menos de 0.6 ms por consulta. Entre los valores razonables el argumento resultó ser de latencia y no de memoria: con 98 KiB la memoria ya es irrelevante en términos absolutos, así que lo que queda por optimizar es cuánto tarda una consulta, y K de 200 ahorra 71 KiB que nadie nota y duplica el tiempo. También quedó anotado que esas cifras son de una cripta de 40 salas y que la memoria de las copias crece con el tamaño de la cripta, más la optimización evidente que no se hizo a propósito: guardar en la copia solo el estado mutable y no el esqueleto, que no cambia nunca. Se prefirió reutilizar el serializador ya probado antes que escribir un segundo serializador, y el costo está medido.
+
+### 2.31 Cierre: el Documento de Decisiones y la vista del cazador
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-17
+
+Objetivo: Escribir las secciones de la segunda parte del Documento de Decisiones de Diseño (§7.1) y cerrar el último pendiente propio.
+
+Prompts utilizados:
+
+```text
+hacé el documento de decisiones
+```
+
+```text
+Ok, sí, perfecto. Termina con lo mío
+```
+
+Uso en el proyecto: las secciones 5.1, 5.2, 5.5 y 5.6 de `docs/DECISIONES.md`; el requisito FR-019 y la Historia 6 de `specs/002-cazador-ruta-mas-barata/spec.md`; `view/console_view.py` y `tests/test_console_view.py`.
+
+Cambios realizados por el estudiante: Antes de escribir se revisó cómo había titulado su sección el compañero que escribe la 5.3, para usar la misma convención y que al juntar las ramas el conflicto fuera trivial de resolver. Las secciones 5.3 y 5.4 quedaron con una nota de a quién pertenecen y qué les falta, siguiendo la convención que el documento ya usaba para las secciones de la primera parte sin escribir.
+
+Lo que §7.1 pide y más suma es indicar si la decisión final coincide con la del plan original. Dos no coinciden y las dos quedaron escritas con lo que motivó el cambio. En §5.2 la decisión se mantiene pero la justificación cambió: el plan esperaba que el ahorro viniera de reutilizar el cálculo cuando las puertas están quietas, y la medición mostró 252 búsquedas en 300 decisiones, porque el jugador se mueve y moverse invalida; el ahorro real es compartir una búsqueda entre los cazadores del mismo instante. En §5.5 la idea de anotar solo el estado del generador en cada pergamino la tumbó la prueba de equivalencia, porque el pergamino también consume un pergamino del inventario.
+
+Para la §5.6 se repitieron las mediciones de la primera parte con la carga nueva, como exige el enunciado. El montículo de la agenda sigue siendo 6.5 veces más rápido que la lista sin ordenar que se había descartado, así que esa decisión no cambia; se anotó además que los cazadores no agregan eventos a la agenda, solo cambian a dónde se mueven, de modo que la carga sobre la agenda crece con los actores y no con el terreno.
+
+Al revisar la capacidad contra §7.3 se encontró que la vista debía distinguir a los cazadores de los demás enemigos y que ninguna especificación lo cubría: el dato ya estaba en la vista de enemigo del motor, pero la vista no lo pintaba distinto. Se agregó el requisito a la especificación del cazador, con su historia, sus escenarios, un caso borde y un criterio de éxito, en una confirmación aparte y antes de tocar el código. Ese orden se eligió a propósito porque es el ejercicio que §7.4 anuncia para la defensa: pedir un cambio pequeño a una regla y mostrar primero la modificación de la especificación y luego la del código.
+
+También se actualizó el resumen de pruebas del Documento, que fijaba 861 como si fuera definitivo. Ahora reporta 1 029 con el desglose por capacidad y explica que la cifra sube al juntar las ramas, de modo que lo que queda fijo es la regla —que ninguna prueba deje de pasar— y no el número.
+
+### 2.30 Niebla de guerra e «ir a»: análisis del repositorio, /speckit.specify y /speckit.clarify
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Entender el estado real del repositorio y lo que le toca a la Persona 4 en la segunda parte, y escribir la especificación de la capacidad de niebla de guerra y viaje automático «ir a» antes de cualquier código, como exige §2.6.
+
+Prompts utilizados:
+
+```text
+Voy a trabajar en la segunda parte del proyecto CRIPTA. Esta es una tarea de SOLO LECTURA Y ANÁLISIS: no edites archivos, no crees archivos, no hagas commits y NO ejecutes specify init ni ningún comando de spec-kit. Lee CLAUDE.md y README.md, el reparto, el prompt de SDD, los dos enunciados, ARQUITECTURA.md, DECISIONES.md y todo el código con sus pruebas, y ejecuta las pruebas.
+
+[El prompt completo pide un informe con: estado real del repositorio, mi parte desglosada con sus casos del Apéndice B, dependencias con los otros tres integrantes, interacciones delicadas de la niebla, ambigüedades del enunciado y del reparto, riesgos frente a §6.2, orden de trabajo para los dos días y las preguntas que necesitan respuesta. Con las reglas de no inventar requisitos, distinguir requisito del enunciado de decisión de implementación y citar sección o archivo.]
+```
+
+```text
+/speckit.specify Niebla de guerra y viaje automático «ir a» (§3.3 y §3.4, casos del Apéndice B de "Niebla de guerra e ir a").
+
+[El prompt completo describe el conocimiento del jugador (tres estados de sala, memoria de puertas, antorcha, separación entre mapa y conocimiento, conocimiento como estado del juego, comando de mapa), el viaje «ir a» (ruta sobre el conocimiento, desempate del cazador, un paso por acción, recálculo antes de cada paso, motivos de detención, no abre puertas, registro en partida.log, pergamino), la vista de §7.3, cinco supuestos del grupo, los seis escenarios obligatorios del Apéndice B y lo que queda fuera de alcance. Limita la sesión a escribir en specs/ y en este archivo, sin commit, sin ramas y sin plan.]
+```
+
+```text
+/speckit.clarify Registrar tres decisiones del grupo: (1) las puertas de una vecina explorada por la antorcha que el jugador nunca observó son desconocidas hasta que las observe; (2) una puerta se observa al entrar a una sala y también cuando cambia mientras el jugador está en una de sus dos salas; (3) una sala avistada se muestra como "hay algo en esa dirección", sin revelar su id. Otras ambigüedades reales se preguntan, no se deciden.
+```
+
+Uso en el proyecto: informe de arranque de la Persona 4 (no se guardó como archivo); `specs/003-niebla-ir-a/spec.md` y su lista de verificación.
+
+Cambios realizados por el estudiante: El análisis encontró que las 945 pruebas pasan, pero que la cifra de 861 que siguen diciendo el README, la constitución y el Documento de Decisiones está desactualizada, y que el `python` del PATH de la máquina era el acceso directo de la tienda de Windows y no un intérprete, de modo que hubo que correrlas con otro. También mostró que el traductor ya lee el costo y el rango aunque el reparto se los asignaba a otro integrante, que la consulta de ubicación de llaves no existe todavía, y que los datos sin conexión son de la primera parte. Se rechazó correr `/speckit.plan` antes de tener especificación, porque el plan no puede contener reglas que no estén en `spec.md`. En la especificación, las tres decisiones de la aclaración se dejaron primero como marcadores en los puntos exactos donde el enunciado no decide, para que la sesión de aclaración las registrara como preguntas y respuestas en vez de aparecer escritas como si fueran del enunciado. Los cinco supuestos del grupo quedaron marcados como tales en la sección de supuestos. La aclaración detectó cuatro ambigüedades más, y se le pidió a la herramienta que las preguntara en vez de decidirlas; dos de ellas eran puntos que la herramienta había resuelto por su cuenta en el primer borrador y que se convirtieron en preguntas. Las respuestas del grupo fueron: si un paso cumple varios motivos de detención se informan todos, en el orden en que los enumera el requisito; encender la antorcha dentro de una sala no explora nada hasta el siguiente movimiento; mientras no exista la cripta de referencia, los 5 ms se miden con la cripta publicada más grande y con criptas sintéticas de al menos ese tamaño; y un identificador de sala que no existe se rechaza igual que una sala no explorada, para no revelar el mapa real.
+
+### 2.31 Plan de la niebla de guerra e «ir a» con /speckit.plan
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Planificar la capacidad `specs/003-niebla-ir-a`: estructuras, alternativas, complejidad, reversión con el historial, exportación para el guardado, dependencias con el resto del grupo y mediciones previstas, sin agregar reglas que no estén en la especificación.
+
+Prompts utilizados:
+
+```text
+/speckit.plan para la spec specs/003-niebla-ir-a (niebla de guerra e «ir a»).
+
+[El prompt completo autoriza crear .specify/feature.json, prohíbe tasks, implement, commit, push, cambiar de rama y tocar código o pruebas, y pide que el plan contenga: estructuras con al menos dos alternativas por decisión y el motivo del descarte; complejidad de consultar una sala, consultar una puerta recordada, explorar, anotar e invertir cambios y calcular un paso de «ir a»; la decisión justificada de compartir o no la búsqueda del cazador; cómo se revierte la exploración con el historial existente, incluidos la antorcha y el pergamino durante un viaje; cómo se exporta e importa el conocimiento sin decidir el formato binario; módulos afectados y lo que se necesita de cada integrante; y mediciones previstas con la alternativa descartada medida. Recuerda las prohibiciones de §6.2 y que la tabla hash del grupo solo acepta claves enteras o de texto.]
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/plan.md`, `research.md`, `data-model.md`, `contracts/comandos.md`, `contracts/interfaz-mapa-conocido.md` y `quickstart.md`.
+
+Cambios realizados por el estudiante: Antes de escribir el plan se revisó si la búsqueda del cazador servía para «ir a» y se encontró que sí, porque recibe las vecinas desde afuera, pero también se encontró un supuesto que comparte con el cazador y que nadie había comprobado: el traductor admite pasos de un solo sentido, y una búsqueda que corre desde el destino daría distancias por caminos que no se pueden recorrer en ese sentido. Se revisaron los datos de `cripta-01`, que no tiene ninguno, y se dejó como riesgo para coordinar con el dueño del cazador en vez de cambiar su estructura. La clave de una puerta en la memoria del jugador se pensó tres veces: una tupla no sirve porque la tabla hash del grupo la rechaza, y un texto con los ids de las dos salas no es único, porque dos salidas pueden unir las mismas dos salas; quedó un entero calculado desde un lado fijo de la puerta. Se descartó también deducir si una sala está avistada mirando sus propias salidas, porque con un paso de un solo sentido da una respuesta falsa, y se eligió un contador por sala que se suma al explorar y se resta al revertir. Se detectó una regla que la especificación no escribe y que el plan no debía inventar: si «una sala que contiene enemigos» cuenta a los enemigos muertos; se dejó señalada para corregir la especificación.
+
+### 2.32 Tareas y revisión de consistencia de la niebla de guerra con /speckit.tasks y /speckit.analyze
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Descomponer el plan de `specs/003-niebla-ir-a` en tareas trazables y revisar la consistencia entre especificación, plan y tareas antes de implementar, como pide §2.2.
+
+Prompts utilizados:
+
+```text
+/speckit.tasks y luego /speckit.analyze para specs/003-niebla-ir-a.
+
+[El prompt completo prohíbe implement, commit, push, cambiar de rama y tocar código o pruebas; pide que /speckit.analyze solo reporte y que nada se corrija sin preguntar, recordando que la especificación se corrige primero y en commit aparte. Reglas de las tareas: cada tarea cita sus FR y ninguna queda sin FR; cada escenario tiene una prueba que cita su FR, agrupadas por historia; tareas pequeñas con dependencias explícitas; orden mapa conocido, antorcha y reversión, luego «ir a», vista, exportar e importar, mediciones y documentación; marcar las bloqueadas por los avisos del motor y por la versión del formato de partida y decir qué se puede avanzar antes; marcar las estrictamente necesarias para los seis casos del Apéndice B; respetar §6.2.]
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/tasks.md` y el reporte de la revisión de consistencia (no se guardó como archivo).
+
+Cambios realizados por el estudiante: Se pidió seguir el orden de trabajo del grupo y no el de prioridad de las historias, y separar las pruebas que se pueden escribir sin los avisos del motor, armando el conocimiento a mano, de las que necesitan la partida real; así casi toda la capacidad puede avanzar mientras llegan los cambios de otros integrantes. El registro de prompts quedó fuera de la lista de tareas porque no atiende ningún requisito de la especificación, que era una regla explícita. La revisión encontró un problema que el plan había introducido sin notarlo: los motivos de parada se evaluaban después del ciclo de eventos, así que un enemigo que entrara a la sala del jugador sin atacarlo detenía el viaje, cosa que la especificación dice expresamente que no ocurre, y un enemigo que estuviera al entrar y se fuera antes de la siguiente decisión no lo detenía. Los hallazgos se reportaron sin corregir nada, a la espera de la decisión del grupo.
+
+### 2.33 Corrección de los hallazgos de la revisión de consistencia de la niebla de guerra
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Aplicar las correcciones aprobadas por el grupo a los hallazgos de `/speckit.analyze` sobre `specs/003-niebla-ir-a`, con la especificación primero y por separado.
+
+Prompts utilizados:
+
+```text
+Sí a todo, con este orden y estos límites: 1. A1: corrige FR-028 (b) en spec.md a "enemigos vivos, activos o dormidos" y registra la decisión en la sección de aclaraciones; esto toca SOLO spec.md y su checklist. 2. F1 a F8 y C1: aplica las correcciones propuestas en plan.md, research.md, data-model.md y tasks.md. En F5 NO pidas el tamaño de la cripta a nadie: usa criptas sintéticas deterministas por semilla en tres tamaños crecientes, sin escribir ningún tamaño de cripta concreto. 3. Mantén "conocimiento del jugador" y "mapa conocido" como lo mismo y acláralo una sola vez.
+
+[El prompt completo prohíbe commit, push, cambiar de rama, tocar código o pruebas y ejecutar /speckit.implement, y pide al final la lista de cambios por hallazgo con archivo y líneas, y confirmar que repetir la revisión ya no encuentra hallazgos de severidad media o alta.]
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` y su lista de verificación, por un lado; `plan.md`, `research.md`, `data-model.md` y `tasks.md`, por otro.
+
+Cambios realizados por el estudiante: Al corregir FR-028 (b) se encontró un defecto propio de la sesión de aclaración: tres de las aclaraciones habían quedado escritas dentro de la lista de requisitos, después de FR-029, y no en su sección, porque la edición se anclaba en una frase que aparecía en dos lugares del archivo. Ese defecto ya estaba en la especificación confirmada. Se movieron sin cambiar su texto, en la misma corrección de la especificación. La decisión de medir solo con criptas sintéticas contradice lo que la especificación dice sobre FR-036, que mide también sobre la cripta publicada más grande. Como el permiso para tocar la especificación se limitaba a A1, esa contradicción no se corrigió: se dejó anotada como pendiente en el plan y en las tareas para que el grupo decida. Al reestructurar dos tareas largas, sus requisitos habían quedado en una línea aparte, que era justamente uno de los hallazgos; se detectó al volver a comprobar y se corrigió.
+
+### 2.34 Alinear FR-036 con §6.1 y la medición de «ir a» con la cripta de referencia
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Resolver la contradicción entre la especificación y el plan sobre con qué criptas se mide el límite de 5 ms de «ir a», con la especificación fiel al enunciado.
+
+Prompts utilizados:
+
+```text
+Muéstrame, sin modificar nada, el texto exacto de FR-036, SC-006 y la aclaración de spec.md:24, y la nota pendiente de plan.md:34. Luego dime si realmente se contradicen con medir con criptas sintéticas por semilla. Mi criterio: la spec debe seguir fiel al enunciado §6.1. Si la spec dice eso, NO la cambies [...] Solo propón un cambio a la spec si el texto afirma algo que el enunciado no dice. Si propones cambiarla, muéstrame el cambio y espera mi confirmación. Repite /speckit-analyze completo al terminar.
+```
+
+```text
+Sí, aplica el cambio a la spec tal como lo propusiste [...] Luego ajusta plan.md, research.md y tasks.md (T042 y T044): criptas sintéticas deterministas por semilla en tres tamaños crecientes, y además los datos de la cripta de referencia en cuanto exista un paquete sin conexión con ella, cargados como cualquier cripta, sin ningún tamaño ni id de cripta en el código. Quita las dos notas "Pendiente". Un dato nuevo: la cripta de referencia ya está publicada.
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` y su lista de verificación, por un lado; `plan.md`, `research.md` y `tasks.md`, por otro.
+
+Cambios realizados por el estudiante: La comparación contra el texto del enunciado mostró que la contradicción no venía del plan sino de la especificación: la primera oración de FR-036 repetía §6.1, pero la segunda, SC-006 y una aclaración agregaban una regla de medición que el enunciado no dice y que había salido de una aclaración anterior del propio grupo. Se quitó esa regla de la especificación. La aclaración original no se borró, para que el registro de lo decidido ese día siga intacto; se marcó como reemplazada y se agregó la nueva. Para no escribir el id de la cripta de referencia en el código, la medición recorre todas las criptas del paquete sin conexión y las reporta con el id que traen sus datos.
+
+### 2.35 Implementación de la niebla de guerra, tramo sin dependencias, con /speckit.implement
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Implementar la parte de `specs/003-niebla-ir-a` que no depende de archivos de otros integrantes: el mapa conocido, la reversión, exportar e importar, las reglas del viaje en el modelo, los comandos y la presentación del mapa.
+
+Prompts utilizados:
+
+```text
+Ejecuta /speckit-implement para specs/003-niebla-ir-a, SOLO el tramo que no depende de otros integrantes.
+
+[El prompt completo enumera el alcance (mapa conocido; exploración, antorcha y observación de puertas con avisos simulados desde las pruebas; reversión con el historial existente, incluidas la antorcha y la sala avistada por dos; exportar e importar; reglas de «ir a» en el modelo reutilizando la búsqueda del cazador; comandos mapa e ir a y la presentación del mapa) y los límites: no tocar model/game.py ni adapters/almacen_partida.py, ni el bucle de pasos del controlador, las banderas, el bench, el README o DECISIONES.md; cada prueba cita sus FR; respetar §6.2 con claves de tabla enteras o de texto; ningún dato de cripta en el código; marcar las tareas; commits pequeños que citen los FR, sin push ni cambio de rama; avisar si la especificación o el plan están mal; buscar un Python real.]
+```
+
+Uso en el proyecto: `cripta/structures/mapa_conocido.py`, `cripta/model/viaje.py`, `cripta/controller/commands.py`, `cripta/replay/replay_log.py`, `cripta/controller/application.py`, `cripta/view/console_view.py` y las pruebas `tests/test_mapa_conocido.py`, `tests/test_viaje.py`, `tests/test_vista_mapa_conocido.py`, `tests/test_commands.py` y `tests/test_replay_log.py`.
+
+Cambios realizados por el estudiante: Se hizo solo lo que no necesitaba los avisos del motor: las pruebas llaman a mano a los avisos que algún día dará el motor, y las reglas del viaje se probaron moviendo al jugador con el motor real y actualizando el mapa conocido a mano. Quedaron sin hacer, y así marcadas, las tareas que necesitan que la partida tenga el mapa conocido, aunque algunas tocaran solo archivos propios, porque conectarlas antes haría fallar el inicio de toda partida. Tres pruebas fallaron al primer intento, y en los tres casos el error era de la prueba y no del código: dos topologías asignaban dos salidas a la misma dirección de una sala, y una prueba suponía un orden de salidas distinto del real, que es N, S, E, O. Las reglas del viaje se escribieron en un módulo aparte del motor en vez de dentro de él, para no tocar el archivo de otro integrante y porque así se prueban sin armar un viaje entero.
+
+### 2.36 La especificación no decía que «ir a» se rechaza con la partida terminada
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Cerrar un hueco que apareció al implementar: el código rechazaba la orden «ir a» con la partida terminada y ningún requisito lo decía.
+
+Prompts utilizados:
+
+```text
+Corrige primero la spec (specs/003-niebla-ir-a/spec.md y su checklist, nada más): agrega como requisito o supuesto, con su FR o con la numeración que corresponda sin reenumerar los existentes, que la orden «ir a» se rechaza sin consumir tiempo cuando la partida ya terminó, igual que toda otra acción. Regístralo en aclaraciones si hace falta. Muestra el cambio y no hagas commit.
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` y su lista de verificación.
+
+Cambios realizados por el estudiante: Al revisar la implementación se notó que el viaje rechazaba la orden con la partida terminada por decisión de la herramienta, siguiendo la regla de la primera parte de que una partida terminada rechaza toda acción, pero sin que la especificación lo dijera. Según §1 del enunciado, un programa que hace algo que ninguna especificación describe es un defecto, así que se corrige primero la especificación, en una confirmación aparte, antes de que el código quede como lo único que lo describe. Se agregó como FR-038 y no como supuesto, porque es una regla del juego que se puede probar, y se numeró después del último requisito para no cambiar los identificadores que ya citan las pruebas y las tareas.
+
+### 2.37 Alinear tareas, plan y prueba con FR-038
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Después de la confirmación de la especificación con FR-038, llevar el requisito nuevo a la tarea, a la trazabilidad del plan y a la prueba que ya lo comprobaba, en una confirmación aparte.
+
+Prompts utilizados:
+
+```text
+Sí, hazlo ahora, en UN commit aparte posterior al de la spec: agrega FR-038 a T020 en tasks.md y a la trazabilidad de plan.md, y cambia el docstring de test_con_la_partida_terminada_se_rechaza en cripta/tests/test_viaje.py para que cite FR-038. No cambies nada más. Corre todas las pruebas, dime cuántas pasan, haz el commit (mensaje: "Alinea tareas, plan y prueba con FR-038") y NO hagas push.
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/tasks.md`, `specs/003-niebla-ir-a/plan.md` y `cripta/tests/test_viaje.py`.
+
+Cambios realizados por el estudiante: Se respetó el orden que exige la constitución: la especificación primero, en su propia confirmación, y después lo que depende de ella. La prueba ya comprobaba el comportamiento; solo citaba el requisito equivocado, que es justo lo que se revisa en la defensa al seguir un requisito hasta su prueba.
+
+### 2.38 Segundo tramo de la niebla de guerra: viaje, mediciones y documentación
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Implementar el bucle del viaje «ir a» en el controlador, las mediciones de `--bench` del mapa conocido y un borrador de la sección §5.3 del Documento de Decisiones, sin tocar archivos de otros integrantes.
+
+Prompts utilizados:
+
+```text
+Continúa /speckit-implement para specs/003-niebla-ir-a, segundo tramo. Haz SOLO tareas pendientes que NO requieran modificar model/game.py ni adapters/almacen_partida.py: 1. El bucle de viaje del controlador (T025 a T028) y sus pruebas, hasta donde se pueda probar con el motor actual. 2. Las mediciones de --bench (T042 a T044), con criptas sintéticas deterministas por semilla en tres tamaños crecientes, más cada cripta del paquete sin conexión, midiendo directamente las alternativas descartadas del plan. No inventes números. 3. Un borrador de la sección §5.3 de DECISIONES.md y la parte del README que me corresponda (T045 a T047), en un commit aparte.
+
+[El prompt completo repite las prohibiciones de §6.2, pide que cada prueba cite sus FR, commits pequeños sin push y sin cambiar de rama, y que si la especificación o el plan resultan incorrectos se avise en vez de corregirlos en silencio.]
+```
+
+Uso en el proyecto: `cripta/controller/game_controller.py`, `cripta/controller/application.py`, `cripta/view/console_view.py`, `cripta/tests/test_ir_a.py`, `cripta/benchmark/bench_mapa_conocido.py`, `cripta/benchmark/benchmark.py`, la sección de resultados de `specs/003-niebla-ir-a/plan.md`, el borrador de §5.3 en `cripta/docs/DECISIONES.md` y `cripta/README.md`.
+
+Cambios realizados por el estudiante: Las mediciones contradijeron al plan en dos puntos, y se reportaron sin cambiar ninguna decisión. Primero, la clave entera de las puertas, elegida en parte por ser más barata que una de texto, resultó el doble de cara, porque hay que buscar por qué dirección sale la puerta; sigue siendo la única correcta, pero el motivo de costo no se sostiene. Segundo, y más grave, un paso de «ir a» con el mapa conocido completo no cumple los 5 ms a partir de 400 salas, y la alternativa que el plan tenía prevista para ese caso, reutilizar la búsqueda durante el viaje, solo baja el promedio y no el primer paso. Antes de reportarlo se midió por separado la misma búsqueda con las vecinas reales, para saber si el problema era el mapa conocido o la búsqueda: la búsqueda misma ya supera el límite en mapas medianos, y el mapa conocido le agrega cerca de un setenta por ciento. Como el paquete sin conexión todavía no trae la cripta de referencia, no se puede decir si FR-036 se cumple en la condición del enunciado; queda para el grupo. Además, tres pruebas fallaron al primer intento por topologías mal armadas en las propias pruebas, no por el código.
+
+### 2.39 Mejoras de rendimiento del viaje «ir a» para FR-036
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-16
+
+Objetivo: Atacar el incumplimiento del límite de 5 ms por paso de «ir a», con el plan revisado primero y cada mejora en su propio commit, medida antes y después.
+
+Prompts utilizados:
+
+```text
+Voy a abordar el problema de rendimiento de FR-036 que mediste. Trabaja en orden y respeta §2.6 (primero plan, luego código, en commits separados): 1. PLAN PRIMERO: actualiza plan.md y research.md con la decisión nueva [...] Describe las mejoras a probar, en este orden: (a) calcular la clave de puerta desde la salida que ya se tiene, sin buscarla; (b) detener la búsqueda de «ir a» cuando se finaliza la sala del jugador, con una justificación escrita de por qué el desempate de FR-024 sigue correcto; (c) reutilizar la ruta durante el viaje. NO cambies la spec ni FR-036. 2. CÓDIGO, en commits separados por mejora, cada uno con su medición ANTES y DESPUÉS con --bench (mismos tamaños y semillas) [...] (b) modifica structures/rutas_mas_baratas.py (es de Carlos y lo usa el cazador) SOLO agregando un parámetro opcional de parada que no cambie el comportamiento por defecto [...] Agrega una prueba que compare, sobre muchos mapas sintéticos deterministas por semilla (incluidos empates de costo y salidas paralelas), que la decisión con parada anticipada es IDÉNTICA al cálculo completo, y que el cazador sigue dando el mismo resultado. 3. [...] Si tras todo sigue sin cumplirse 5 ms en el tamaño de la cripta de referencia, no lo escondas.
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/plan.md` y `research.md`, `cripta/structures/mapa_conocido.py`, `cripta/structures/rutas_mas_baratas.py` (cambio rotulado para revisión de su dueño), `cripta/model/viaje.py`, `cripta/controller/game_controller.py`, `cripta/benchmark/bench_mapa_conocido.py`, las pruebas `tests/test_parada_anticipada.py`, `tests/test_reutilizar_ruta.py` y `tests/test_mapa_conocido.py`, y `cripta/docs/DECISIONES.md`.
+
+Cambios realizados por el estudiante: Antes de la primera mejora se cambió la medición para que mida el paso que da el viaje del programa y no la búsqueda suelta; si no, las mejoras dentro del viaje no se habrían visto en el número. Al probar la parada anticipada apareció un caso que la justificación escrita no cubría: si la sala del jugador no tiene ruta al destino, la búsqueda nunca se detiene, y pedirle el paso no debe ser un error sino «no hay ruta». La prueba de equivalencia lo encontró en los mapas aleatorios y se corrigió antes del commit. Las mediciones se reportaron con su ruido: repetidas tres veces, el primer paso varió alrededor de un veinte por ciento, así que las diferencias pequeñas no se presentaron como mejoras. El resultado final no cumple el límite en el primer paso de un viaje largo con 400 salas o más, y así quedó escrito en el Documento de Decisiones, junto con lo que falta probar.
+
+### 2.40 Resolución del merge de main (línea de tiempo) sobre la rama de niebla de guerra e «ir a»
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Terminar el merge de `origin/main` en `Parte_2-niebla-ir-a` resolviendo los conflictos sin perder trabajo de ninguno de los dos lados.
+
+Prompts utilizados:
+
+```text
+Estoy en medio de un merge de origin/main en la rama Parte_2-niebla-ir-a, con conflictos en cripta/PROMPTS_LLM.md, cripta/benchmark/benchmark.py y cripta/controller/commands.py. NO abortes el merge. Resuélvelos conservando AMBOS lados [...] No cambies ningún otro archivo salvo lo estrictamente necesario para que compile. Luego corre TODAS las pruebas con un Python 3.11 o superior real. Si pasan todas, haz el commit del merge con el mensaje por defecto, SIN líneas de atribución de Claude, y no hagas push. Si alguna falla, NO commitees [...] Respeta la constitución y §6.2 [...] Registra la entrada en cripta/PROMPTS_LLM.md, al final de mi sección.
+```
+
+Uso en el proyecto: `cripta/PROMPTS_LLM.md`, `cripta/benchmark/benchmark.py` y `cripta/controller/commands.py`.
+
+Cambios realizados por el estudiante: Los tres conflictos eran de dos lados que agregaban cosas distintas en el mismo lugar, no de cambios incompatibles. En este archivo quedaron la entrada de la línea de tiempo que trajo main y, a continuación, las entradas 2.30 a 2.39 de esta rama, sin tocar su texto; las dos ramas numeraron su primera entrada como 2.30, y esa repetición se dejó así porque renumerar habría reescrito entradas ajenas. En `benchmark.py` quedaron las dos suites nuevas (mapa conocido y viaje «ir a», y línea de tiempo), y en `commands.py` las líneas de ayuda de `mapa`, `ir a` e `historia`; el resto de ambos archivos ya lo había combinado git sin conflicto. No hizo falta cambiar ningún otro archivo. Las 1143 pruebas pasaron con Python 3.12.3 (el de WSL, porque en Windows solo estaba el atajo de la Microsoft Store), y se comprobó que el código fusionado no importa heapq, bisect ni collections.
+
+### 2.41 Análisis de «ir a» frente a salidas de un solo sentido
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Saber, sin modificar nada, si el cálculo de ruta de «ir a» sigue siendo correcto ahora que Carlos confirmó que el servicio puede publicar salidas de un solo sentido, y qué habría que cambiar.
+
+Prompts utilizados:
+
+```text
+Carlos confirma que el servicio puede publicar salidas de un solo sentido. Analiza SIN modificar nada: 1. Cómo calcula hoy mi «ir a» la ruta [...] ¿es incorrecto con salidas dirigidas? Dímelo con un ejemplo concreto de mapa asimétrico. 2. Revisa cómo quedó structures/rutas_mas_baratas.py en main y los avisos de Carlos sobre un proveedor de aristas entrantes. Dime si puedo reutilizar eso para el mapa conocido. 3. Propón la solución más simple que mantenga el desempate de FR-024 y la parada anticipada [...] Compara y recomienda, con las mediciones que habría que hacer. 4. Dime si esto exige cambiar la spec 003-niebla-ir-a (futura 005) o solo el plan [...] 5. Dime qué parte depende de que Carlos termine su proveedor de aristas entrantes y qué puedo hacer ya. No toques código, tests ni documentos. Registra la entrada en PROMPTS_LLM.md.
+```
+
+Uso en el proyecto: ninguno todavía; es el análisis previo a actualizar el plan de `specs/003-niebla-ir-a`. Se leyeron `cripta/model/viaje.py`, `cripta/structures/mapa_conocido.py`, `cripta/structures/rutas_mas_baratas.py` en esta rama y en `origin/mauricio-logica-juego`, y `cripta/model/game.py` y `cripta/docs/DECISIONES.md` de esa rama.
+
+Cambios realizados por el estudiante: Pendiente de la decisión. El análisis confirmó lo que el plan ya listaba como riesgo: la búsqueda va desde el destino por las salidas que salen de cada sala, así que con un paso de un solo sentido calcula la distancia del destino a cada sala y no la de cada sala al destino. Con las salidas 1→3, 3→2 y 2→1, todas de costo 1 y sin vuelta, el jugador en 1 queda sin ruta hacia 3 aunque tiene una salida directa. También se encontró que el proveedor de salidas entrantes de Carlos no está en main sino en su rama, que su versión de la búsqueda rechaza a propósito combinar la parada anticipada con el proveedor de salidas, y que la especificación ya pide lo correcto (recorrer salidas y minimizar su costo), de modo que el defecto es de implementación y de plan, no de requisito.
+
+### 2.42 La especificación de «ir a» no decía nada de las salidas de un solo sentido
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Dejar escrito en la especificación, antes de tocar plan o código (§2.6), que «ir a» debe respetar el sentido de las salidas, ahora que se confirmó que el servicio puede publicar salidas de un solo sentido.
+
+Prompts utilizados:
+
+```text
+Agrega a specs/003-niebla-ir-a/spec.md (y su checklist), SIN reenumerar FR existentes: un caso límite y, si hace falta, un escenario de aceptación que diga que «ir a» debe encontrar la ruta de menor costo respetando el sentido de las salidas. Una salida puede existir en un solo sentido (la sala destino no declara la vuelta); la ruta del jugador solo puede usar salidas en el sentido en que existen, y no debe declararse "sin ruta" cuando existe una salida directa. No nombres estructuras, clases ni algoritmos. Registra la decisión en aclaraciones. Muestra el cambio y NO hagas commit.
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/spec.md` (aclaración de la sesión 2026-11-17, caso borde y escenarios 7 y 8 de la Historia 4) y `specs/003-niebla-ir-a/checklists/requirements.md` (nota de la corrección).
+
+Cambios realizados por el estudiante: No se agregó ningún requisito ni se reenumeró ninguno, porque FR-023 ya pide recorrer salidas y minimizar su costo: el defecto estaba en el código y en el plan, no en el requisito. Lo que faltaba era que la especificación lo hiciera verificable. El escenario 7 es el mapa de tres salas del análisis anterior (2.41), con el que la implementación actual se declara sin ruta teniendo una salida directa de costo 1; así la prueba que lo cubra falla hoy y deja de fallar con la corrección. El escenario 8 cubre el caso contrario, que la ruta no use una salida al revés. La especificación sigue sin nombrar estructuras, clases ni algoritmos. El cambio queda sin commit hasta revisarlo.
+
+### 2.43 Merge de la rama de Carlos (salidas dirigidas y objeto nulo del mapa conocido)
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Terminar el merge de `origin/mauricio-logica-juego` en `Parte_2-niebla-ir-a`: limpiar las marcas de conflicto que quedaron en este archivo, revisar la versión de Carlos de la búsqueda de costo mínimo y correr todas las pruebas antes de commitear.
+
+Prompts utilizados:
+
+```text
+Estoy en medio de un merge de origin/mauricio-logica-juego en mi rama Parte_2-niebla-ir-a. NO abortes el merge. [...] 1. Limpia las marcas de PROMPTS_LLM.md conservando AMBOS lados completos, sin borrar ninguna entrada. Solo quita las líneas de marca. Verifica que no quede ninguna marca en ningún archivo del repo. 2. Revisa que rutas_mas_baratas.py quedó con parar_en y salidas_de, y que las protecciones de distancia_a, alcanza y primer_paso_desde siguen ahí. 3. Corre TODAS las pruebas con un Python 3.11 o superior real [...] 4. Si TODAS pasan: haz el commit del merge [...] 5. Si alguna falla: NO hagas commit. Dime cuáles y por qué.
+```
+
+Uso en el proyecto: `cripta/PROMPTS_LLM.md`. Se revisaron `cripta/structures/rutas_mas_baratas.py`, `cripta/model/game.py`, `cripta/controller/game_controller.py` y `cripta/tests/test_ir_a.py`.
+
+Cambios realizados por el estudiante: Quitar solo las líneas de marca habría dejado entradas mezcladas, porque git había alineado el encabezado de la entrada 2.31 de Carlos con fragmentos de las entradas 2.40 y 2.42 de esta rama. Se rearmó el archivo con la parte común, la entrada 2.31 de Carlos y, a continuación, las entradas 2.30 a 2.42 de esta rama, y se comprobó que tiene exactamente las mismas líneas que el archivo con las marcas quitadas, más las líneas comunes («Prompts utilizados:», la apertura del bloque de texto y líneas vacías) que cada entrada necesita para quedar completa. No quedó ninguna marca en el repositorio. La búsqueda de Carlos conserva `parar_en`, `salidas_de` y las protecciones de `distancia_a`, `alcanza` y `primer_paso_desde`. De 1158 pruebas falló una, `test_ir_a.TestOrden.test_sin_mapa_conocido_no_hay_viaje`: la partida de Carlos ya no deja el mapa conocido en `None`, sino que pone un objeto nulo con `disponible = False`, y el controlador del viaje solo comprobaba `None`, así que le pedía a ese objeto un método que no tiene. Por eso el merge no se commiteó.
+
+### 2.44 El controlador del viaje trata el objeto nulo del mapa conocido como ausencia de mapa
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Cerrar el merge de la rama de Carlos en su propio commit y arreglar, en otro commit aparte, la prueba que dejó fallando.
+
+Prompts utilizados:
+
+```text
+Sí, aplica el arreglo en MI archivo cripta/controller/game_controller.py: que known_map devuelva None cuando el mapa tenga disponible = False, para que travel y el comando mapa rechacen la orden como cuando no hay mapa. Cambio mínimo, sin tocar nada más. [...] 1. Primero cierra el merge [...] SIN el arreglo dentro [...] 2. Aplica el arreglo y haz un SEGUNDO commit aparte [...] 3. Corre TODAS las pruebas [...] 4. Revisa la comprobación de None en cripta/adapters/almacen_partida.py:1289 y dime si tiene el mismo problema. NO modifiques ese archivo (es de Carlos). 5. Verifica que PROMPTS_LLM.md conserva todas las entradas de ambos lados [...]
+```
+
+Uso en el proyecto: `cripta/controller/game_controller.py` (propiedad `known_map`).
+
+Cambios realizados por el estudiante: El merge se cerró primero con la prueba fallando, para que el arreglo quedara en un commit propio y se viera qué lo motivó. El arreglo es solo la propiedad `known_map`: devuelve `None` si el mapa falta o si se declara no disponible, y el mapa real, que no tiene ese atributo, sigue contando como disponible. Con eso pasan las 1158 pruebas. Se revisó la comprobación de `None` de `adapters/almacen_partida.py` y no tiene el mismo problema: recibe el mapa que le pasa quien carga la partida, que es `None` o un mapa real, nunca el objeto nulo, porque ese lo crea la partida después; y la copia para la línea de tiempo pide `exportar` por duck typing, que el objeto nulo no tiene, así que se guarda como «sin mapa». Al buscar dónde se atiende el comando `mapa` se encontró que la aplicación no lo despacha: cae en «Comando sin atender». Es un defecto aparte, anterior a este merge, y no se tocó. También se comprobó que este archivo conserva todos los encabezados y todas las líneas de los dos padres del merge.
+
+### 2.45 Integración del mapa conocido con el motor real
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Conectar la niebla de guerra con la partida real ahora que la rama de Carlos trae los avisos del motor, el colaborador opcional, `is_hunter` y el guardado (tareas T011 a T019, T029, T032 a T035, T039 y T040 de `specs/003-niebla-ir-a`).
+
+Prompts utilizados:
+
+```text
+Ya tengo mezclada la rama de Carlos. Haz la integración de mi mapa conocido con el motor real (specs/003-niebla-ir-a: T011 a T019, T029, T032 a T035, T039, T040). Carlos ya implementó los avisos, el colaborador opcional, is_hunter y el guardado: NO reescribas lo suyo. Para cada tarea, verifica si ya está cubierta y márcala con la referencia a su prueba; implementa solo lo que falte. Prioridades, en este orden: 1. Que el comando «mapa» funcione en una partida real [...] 2. Que una partida real construya mi mapa conocido (construir_juego / Game) y que «ir a N» lo use de punta a punta, con pruebas con el motor real para los casos del Apéndice B [...] 3. Marca de cazador en la vista con is_hunter y costos de las salidas de la sala actual. 4. Prueba de guardar y cargar que conserve el conocimiento [...] NO toques rutas_mas_baratas.py, la línea de tiempo ni almacen_partida.py. NO resuelvas aún el problema de salidas de un solo sentido [...]
+```
+
+Uso en el proyecto: `cripta/controller/application.py` (comando `mapa`, `build_game`, `build_saved_game`, `room_view`), `cripta/structures/mapa_conocido.py` (`usar_historial`), `cripta/view/console_view.py` (`show_room`), las pruebas `tests/test_comando_mapa.py`, `tests/test_niebla.py`, `tests/test_niebla_guardado.py` y `tests/test_vista_sala_actual.py`, y `specs/003-niebla-ir-a/tasks.md`.
+
+Cambios realizados por el estudiante: Antes de escribir código se revisó qué ya estaba hecho: los avisos `jugador_entro` y `puerta_cambio`, el objeto nulo, `is_hunter` con su marca en la vista y el guardado del conocimiento eran de Carlos y coincidían con los nombres y el contrato `exportar`/`importar` del mapa conocido, así que esas tareas se marcaron con la referencia a la prueba que las ejercita, sin tocar su código. Lo que faltaba era del lado de la aplicación. El comando `mapa` se interpretaba pero nadie lo atendía. La partida nueva no armaba el mapa conocido; ahora lo arma con el mismo historial que el rastro. La partida cargada tenía un problema que no se veía: el historial lo crea el adaptador de Carlos al cargar, así que un mapa armado antes no podía compartirlo y lo explorado después de cargar no se habría revertido con el pergamino. Como el adaptador no se podía tocar, el mapa recibe el historial después de armada la partida, y hay una prueba que lo comprueba. Las pruebas nuevas usan el motor real, sin llamar a mano a los avisos, y criptas sintéticas sin ids ni tamaños de criptas publicadas; la de punta a punta usa la primera cripta offline que se lista, sin nombrarla. Quedan pendientes, fuera de este pedido: la consulta de la línea de tiempo no le pasa al reconstructor cómo crear el mapa conocido, así que el resumen de un instante pasado lo informa como no disponible (FR-016), y las salidas de un solo sentido.
+
+### 2.46 Cierre de la niebla de guerra: salidas de un solo sentido y mapa conocido en la historia
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Cerrar lo pendiente de `specs/003-niebla-ir-a`: que «ir a» respete el sentido de las salidas, que «historia» informe el mapa conocido (FR-016), las banderas `--checkpoint-cada` y `--hasta`, y los documentos de cierre, con reglas de parada si aparecía algo que no se pudiera arreglar en archivos propios.
+
+Prompts utilizados:
+
+```text
+Cierra todo lo que queda de mi parte en specs/003-niebla-ir-a, en este orden, con commits pequeños y separados (documentos aparte del código), SIN push y SIN cambiar de rama. [...] REGLAS DE PARADA (obligatorias): si algo de la spec o el plan resulta incorrecto, NO lo corrijas en silencio [...] Si una tarea exige cambiar archivos de Carlos [...] NO los cambies: déjala bloqueada [...] Si fallan pruebas que no puedas arreglar dentro de mis archivos, detente. [...] PASO 1. SALIDAS DE UN SOLO SENTIDO [...] 1.1 PLAN [...] 1.2 PRUEBA PRIMERO [...] 1.3 CÓDIGO en mis archivos [...] 1.4 MEDICIONES [...] PASO 2. HISTORIA Y MAPA CONOCIDO (FR-016) [...] PASO 3. BANDERAS [...] PASO 4. CIERRE DE DOCUMENTOS [...] PASO 5. AUDITORÍA FINAL [...]
+```
+
+Uso en el proyecto: `specs/003-niebla-ir-a/plan.md` (alternativa 9), `research.md` §3, `tasks.md` (T048 a T053), `cripta/docs/DECISIONES.md` §5.3, `cripta/structures/mapa_conocido.py` (`entrantes_conocidas`), `cripta/benchmark/bench_mapa_conocido.py` (medición 6), `cripta/controller/application.py` (`reconstruir_con_mapa_conocido`) y las pruebas `tests/test_ir_a_sentido.py`, `tests/test_equivalencia_sentido.py`, `tests/test_historia_mapa_conocido.py` y `tests/test_mapa_conocido.py`.
+
+Cambios realizados por el estudiante: El orden fue plan, prueba y código, cada uno en su commit. Las dos pruebas de los escenarios 7 y 8 se commitearon fallando, y siguen marcadas como fallo esperado porque el cableado final depende de que Carlos acepte la parada anticipada junto con el proveedor de salidas; se comprobó aparte, simulando ese cableado en memoria sin la parada, que con él pasan junto con todas las demás pruebas del viaje. Al planificar apareció que el índice de salidas entrantes ocupa memoria proporcional a la cripta completa, cosa que la tabla de complejidad del plan negaba para todo el mapa conocido; se dejó escrito en el plan en vez de esconderlo, con la aclaración de que el índice no es conocimiento y de que la especificación no fija un límite de memoria. La prueba de equivalencia comprueba además que su propio generador produce salidas sin vuelta, paralelas y empates, y tiene un control que demuestra que expandir por las salidas que salen sí da resultados distintos: sin eso, que pasara no habría probado nada. Las mediciones no mostraron diferencia de tiempo entre expandir por las salidas que entran y por las que salen fuera del ruido entre corridas. Al conectar el mapa conocido con «historia» se encontró un defecto de la línea de tiempo: repetir un movimiento desde una copia tomada antes de cargar el contenido de la sala destino falla en silencio, y el resumen entero queda en la sala anterior. No se puede arreglar sin tocar código de Carlos, así que se aplicó la regla de parada: se commiteó lo que estaba bien, la prueba que lo reproduce quedó fuera y los pasos 3 a 5 no se hicieron.
+
+### 2.47 Banderas de la línea de tiempo, revisión de --bench y cierre de documentos de la niebla de guerra
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Terminar los pasos que quedaron pendientes en la sesión anterior: las banderas `--checkpoint-cada` y `--replay --hasta`, la revisión de que `--bench` tiene lo que pide §6.3, y el cierre de los documentos con una auditoría.
+
+Prompts utilizados:
+
+```text
+Continúa donde te detuviste: los pasos 3, 4 y 5 del prompt anterior. Mismas reglas [...] NO hagas el cableado T052 (depende de Carlos). PASO 3. Banderas: --checkpoint-cada K y --replay partida.log --hasta t [...] Si la reconstrucción de la línea de tiempo falla por el defecto que encontraste, deja la bandera conectada pero anótalo en una nota visible en el README y en tasks.md. NO hagas --verificar ni --forzar [...] PASO 4. Integración de --bench [...] PASO 5. Cierre de documentos, commit aparte del código [...] Auditoría: términos prohibidos, ids o tamaños de cripta en el código, la vista usada desde --bench o --replay, FR sin prueba que los cite.
+```
+
+Uso en el proyecto: `cripta/main.py`, `cripta/controller/application.py` (`show_instant`, parámetros `copias_cada` y `hasta`), `cripta/view/console_view.py` (`lineas_de_historia`), las pruebas `tests/test_banderas_linea_de_tiempo.py` y `tests/test_vista_sala_actual.py`, `cripta/docs/DECISIONES.md` §5.3, `cripta/README.md`, `specs/003-niebla-ir-a/plan.md` y `tasks.md`.
+
+Cambios realizados por el estudiante: Para imprimir el resumen de `--hasta` sin instanciar la vista, el formato que ya tenía `show_history` se sacó a una función del módulo de la vista, y el método la usa igual; las pruebas de la vista y de la línea de tiempo pasaron sin cambios. Una prueba de `--hasta` reemplaza la vista por una que falla si alguien la crea, para comprobar de verdad que no se instancia. Las pruebas que dependen de un movimiento usan una copia por acción, porque con copias espaciadas aparece el defecto de reconstrucción ya reportado; ese defecto quedó como nota visible en el README y en las tareas. Al revisar `--bench` contra §6.3 faltan dos cosas que son de otros: la resolubilidad, que nadie tomó, y la alternativa de la línea de tiempo sin puntos de control. En el cierre se cuidaron tres cosas: la sección §5.3 estaba como borrador delante de §5.1 y se movió a su lugar; las mediciones nuevas, de WSL con Python 3.12, se separaron de las de Windows con Python 3.11 en vez de mezclarlas en una tabla; y cada cifra del documento se comparó con la salida de las tres corridas, lo que llevó a corregir dos frases que decían más de lo medido (cuántas corridas eran de `--bench` completo y cuánto cuesta el índice frente a una búsqueda). También se encontró que el plan del cazador ya sabía que la cripta de referencia es cripta-06, de 300 salas: se dejó dicho sin interpolar un número entre las cuadrículas de 100 y 400 salas. La auditoría encontró que FR-021 no tenía prueba propia en esta capacidad y se agregó una con el motor real. Un comando de la terminal se quedó esperando entrada y la nota de la auditoría llegó en un commit aparte, en vez de reescribir el anterior.
+
+### 2.48 Renombrar la especificación de la niebla de guerra a 005
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Aplicar la numeración que acordó el grupo (001 a 003 de Carlos, 004 de Mauricio, 005 de esta capacidad) renombrando `specs/003-niebla-ir-a` a `specs/005-niebla-ir-a`, y subir la rama.
+
+Prompts utilizados:
+
+```text
+Renombra mi spec de specs/003-niebla-ir-a a specs/005-niebla-ir-a y sube la rama. [...] PASO 1. Renombra con git mv (para conservar el historial), no copiando. PASO 2. Actualiza las referencias a la ruta y al nombre [...] NO cambies nada que diga "003-linea-de-tiempo". NO modifiques las entradas anteriores de PROMPTS_LLM.md: es un registro histórico [...] Si encuentras menciones sueltas tipo "spec 003" o "003" sin el nombre, muéstrame la lista y cambia solo las que sean claramente de niebla; reporta las ambiguas sin tocarlas. [...] PASO 5. Haz git push normal a origin/Parte_2-niebla-ir-a. NO uses --force.
+```
+
+Uso en el proyecto: `specs/005-niebla-ir-a/` (renombrada con `git mv`), las referencias en `spec.md`, `plan.md`, `tasks.md`, `cripta/docs/DECISIONES.md`, `cripta/README.md`, `cripta/benchmark/bench_mapa_conocido.py` y los docstrings de quince archivos de pruebas, y `.specify/feature.json`, que git ignora.
+
+Cambios realizados por el estudiante: Solo se cambiaron identificadores y rutas: 25 apariciones de `003-niebla-ir-a` en 20 archivos versionados, más `.specify/feature.json`. Ninguna regla, requisito ni lógica cambió, y las pruebas dieron lo mismo antes y después: 1205, con los dos fallos esperados de los escenarios 7 y 8. Las entradas anteriores de este registro conservan la ruta vieja a propósito, porque cuentan lo que se hizo en su momento. La única mención suelta de esta capacidad por número está en `structures/rutas_mas_baratas.py` («de la capacidad 003»), que es de Carlos: no se tocó y queda para que él la actualice. Las demás apariciones de «003» son números de requisito (FR-003, SC-003) o datos de mediciones.

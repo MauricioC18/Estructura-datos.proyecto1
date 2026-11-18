@@ -41,7 +41,10 @@ from structures.trail import PlayerTrail
 
 
 SEED = 2026
-ROOMS = 40
+# La cripta de referencia publicada es cripta-06: 300 salas. El tamano de una
+# copia completa crece con la cripta, asi que la memoria de la linea se mide a
+# esa escala y no a la de las criptas de prueba.
+ROOMS = 300
 ENEMIES = 6
 
 

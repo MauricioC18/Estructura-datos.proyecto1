@@ -21,6 +21,15 @@ del grupo, y al final el estado de las pruebas.
 Las secciones 4.2, 4.3, 4.4 y 4.10 todavía no están escritas. Cada una dice de quién es
 y qué le falta.
 
+Después de las del §4 vienen las de los problemas del §5 del enunciado de la **segunda
+parte**, con los mismos seis apartados. Cada una enlaza a la especificación y al plan de
+spec-kit de los que proviene, y dice si la decisión final coincide con la del plan
+original; cuando no coincide, dice qué medición o qué prueba motivó el cambio. La §5.6
+muestra el antes y el después de las decisiones de la primera parte que cambiaron.
+
+De las secciones del §5 están escritas la 5.1, la 5.2, la 5.5 y la 5.6. La 5.3 y la 5.4
+dicen de quién son y qué les falta.
+
 ---
 
 ## 4.1 Qué ocurre a continuación (agenda de eventos)
@@ -1978,6 +1987,832 @@ sin reproducir ninguna acción.
 
 ---
 
+## 5.1 La ruta más barata del cazador (segunda parte)
+
+Estado: implementado, probado y medido a escala de la cripta de referencia.
+
+Proviene de la especificación [`specs/002-cazador-ruta-mas-barata/spec.md`](../../specs/002-cazador-ruta-mas-barata/spec.md) y del plan [`specs/002-cazador-ruta-mas-barata/plan.md`](../../specs/002-cazador-ruta-mas-barata/plan.md), que tiene el detalle de cada alternativa y la tabla completa de mediciones.
+
+### Problema
+
+El cazador necesita, en cada turno, dos cosas: el costo mínimo de llegar desde su sala
+hasta la sala del jugador, y la vecina por la que empieza una ruta de ese costo. Suma el
+costo de cada salida y cuenta solo las abiertas en ese instante.
+
+Contar salas no alcanza. Con costos distintos, una ruta de cuatro salas baratas puede ser
+más barata que una de dos caras, y el enunciado pone ese caso como obligatorio.
+
+Lo que hace difícil el problema no es el algoritmo, es la frecuencia y la escala:
+
+| Operación | Cuándo ocurre | Escala en la cripta de referencia |
+| --- | --- | ---: |
+| Decidir el paso de un cazador | una vez por turno de cada cazador activo | 36 cazadores a la vez |
+| Recorrer la región alcanzable | dentro de cada decisión | hasta 300 salas |
+
+Y el enunciado agrega tres exigencias que no son del algoritmo sino del diseño: que la
+decisión de un cazador de rango pequeño no cueste proporcionalmente al tamaño de la
+cripta sino a su región; que midamos si conviene un cálculo por cazador o uno compartido;
+y que el desempate se cumpla siempre, aunque haya muchas rutas de igual costo.
+
+### Alternativas consideradas
+
+**Desde dónde se busca.** Es la decisión que manda sobre todas las demás.
+
+| Alternativa | A favor | En contra |
+| --- | --- | --- |
+| **Desde la sala del jugador** | El desempate del enunciado está escrito como `costo(u,v) + dist(v, jugador)`. Buscar desde el jugador entrega `dist(v, jugador)` para todas las vecinas de golpe: es el número literal que la fórmula pide. Y una sola búsqueda sirve a **todos** los cazadores activos | Hay que distinguir el sentido de las salidas, porque el grafo puede ser asimétrico (ver límites conocidos) |
+| Desde la sala del cazador | Es la lectura literal de «el cazador busca al jugador» | Para aplicar el desempate hay que reconstruir rutas y recuperar la distancia de cada vecina. Y el trabajo no se comparte: *n* cazadores son *n* búsquedas |
+
+**Qué cola de prioridad usa la búsqueda.**
+
+| Alternativa | A favor | En contra |
+| --- | --- | --- |
+| **Reutilizar el montículo binario de la agenda de eventos** | Ya está escrito, probado y defendido en §4.1. Ordena por el par `(time, sequence)`; se le entregan pares `(distancia, id de sala)` y queda ordenando por distancia y desempatando por id, sin tocarlo | No tiene «disminuir clave», así que hay que insertar de nuevo y descartar al extraer lo ya asentado |
+| Escribir un montículo nuevo | Interfaz a medida | Sería un segundo montículo binario en el mismo repositorio haciendo lo mismo, y la constitución pide justificar no reutilizar |
+| Escoger el mínimo recorriendo una lista | No necesita ninguna estructura | O(V²). Con 300 salas y 36 cazadores no es discutible |
+
+**Uno por cazador, uno compartido, o recalcular siempre.** Las tres se implementaron,
+porque §5.1 y §5.2 piden medir las alternativas y no solo nombrarlas. Las dos descartadas
+quedaron como modos del banco de mediciones.
+
+### Decisión
+
+Se busca **desde la sala del jugador**, con Dijkstra, cortando la expansión en cuanto la
+distancia pasa del rango mayor entre los cazadores activos. Una sola búsqueda por
+instante sirve a todos.
+
+La cola de prioridad es **el montículo binario de la agenda de eventos**, al que se le
+entregan pares `(distancia, id de sala)`. Las distancias y las salas asentadas van en la
+`TablaHash` del grupo. **No se escribió ninguna estructura de datos nueva**, y no entra
+`dict` como índice, ni `set`, ni `heapq`, ni `bisect`.
+
+El montículo no sabe qué ordena: ordena por un par. Que ese par sea «instante y número de
+secuencia» o «distancia e id de sala» es cosa de quien lo usa. Ese es el argumento de la
+reutilización.
+
+**El desempate se aplica aparte**, sobre las salidas que salen de la sala del cazador, y
+**no** se deja al orden de expansión del montículo. Esa distinción importa: si se dejara
+al montículo, muchas criptas darían el resultado correcto de casualidad. Hay una prueba
+con una topología construida para que el orden de expansión y el id den respuestas
+distintas, de modo que una implementación que confíe en el montículo falle.
+
+El código está en [`structures/rutas_mas_baratas.py`](../structures/rutas_mas_baratas.py)
+y la decisión del cazador en `Enemy._hunt`, en [`model/enemy.py`](../model/enemy.py). La
+estructura **no conoce el modelo**: recibe desde afuera quién provee las vecinas.
+
+**Y la vista marca al cazador.** Es lo mínimo que hace visible la regla: para el jugador,
+un cazador y un guardián se ven igual —un nombre y una vida— pero la decisión que le
+conviene tomar es opuesta, porque de un guardián puede alejarse y olvidarlo y de un
+cazador no. Lo exige §7.3 del enunciado, y el requisito se agregó a la especificación
+antes de tocar la vista, en su propia confirmación. El motor expone el dato; la vista
+decide cómo se ve.
+
+**¿Coincide con el `plan.md` original?** Sí en lo central: buscar desde el jugador,
+reutilizar el montículo y compartir el cálculo son las tres decisiones del plan y las tres
+se mantienen. Cambió un supuesto, no una decisión: el plan daba por hecho que el grafo era
+simétrico, y el contrato del servicio lo desmintió. El arreglo está en los límites
+conocidos y no obligó a rediseñar nada, precisamente porque la búsqueda estaba
+parametrizada por quién provee las vecinas.
+
+### Complejidad
+
+Sea *V* el total de salas, *E* el de salidas, y *Vr* y *Er* las que quedan dentro del
+corte por rango.
+
+| Operación | Costo | Nota |
+| --- | --- | --- |
+| Búsqueda desde el jugador con corte | O((Vr + Er) log Vr) | El log es el montículo. Con el corte, independiente de *V* |
+| Armar el índice de salidas entrantes | O(V + E), una sola vez | La topología no cambia durante la partida |
+| Primer paso de un cazador, cálculo vigente | O(grado de la sala) | A lo sumo 4 salidas por sala |
+| Primer paso, cálculo invalidado | O((Vr + Er) log Vr) | Paga la búsqueda |
+| Turno de un cazador fuera de rango | O(1) | Su sala no quedó dentro del corte |
+| *n* cazadores en el mismo instante | una búsqueda + O(n) | Frente a *n* búsquedas si no se comparte |
+| Espacio | O(Vr) por búsqueda, O(V + E) por el índice | |
+
+### Evidencia empírica
+
+Todo medido con `benchmark/bench_cazador.py`, registrado en `--bench`, con criptas
+sintéticas deterministas por semilla. Python 3.14.6 sobre Windows 11.
+
+**El corte por rango.** Un cazador de rango 300, decidiendo en criptas de tamaño
+creciente:
+
+| Cripta | Por decisión |
+| ---: | ---: |
+| 60 salas | 0.0057 ms |
+| 300 salas (la de referencia) | 0.0055 ms |
+| 1 200 salas | 0.0058 ms |
+| 1 200 salas, **sin corte efectivo** | **3.7777 ms** |
+
+Plano hasta veinte veces el tamaño de la cripta de referencia, y sin el corte la misma
+decisión cuesta **650 veces más**. El rango no es solo una regla del juego: es lo que
+hace barata la decisión.
+
+**Esta medición hubo que corregirla, y vale decirlo.** La primera versión salía plana
+también *sin* corte, por un motivo que no era bueno: la cripta sintética de la primera
+parte nace con una puerta cerrada de cada tres, así que la región alcanzable desde la
+sala del jugador es de dos o tres salas por grande que sea la cripta. No se estaba
+midiendo el corte por rango sino el bloqueo por puertas. Se agregó al generador la opción
+de no cerrar ninguna puerta y se volvió a medir.
+
+**Compartir el cálculo frente a uno por cazador.** 36 cazadores en 300 salas, 300
+instantes:
+
+| Escenario | Compartido | Uno por cazador | Del límite de 20 ms |
+| --- | ---: | ---: | ---: |
+| Rangos iguales (300) | 0.0119 ms | 0.2045 ms | 1.0 % |
+| Rangos desiguales (300 y sin tope) | 0.8730 ms | **15.3555 ms** | **77 %** |
+
+**Este es el número que vuelve obligatoria la decisión, y a 60 salas no se veía.** Con
+rangos desiguales, un cálculo por cazador cuesta 15.36 ms por instante: el **77 % del
+presupuesto completo de 20 ms**, solo para que los enemigos decidan, antes de que el
+ciclo haga cualquier otra cosa. Compartido son 0.8730 ms, el 4.4 %.
+
+A 60 salas la diferencia era 0.20 contra 3.87 ms y parecía una comodidad de 19 veces. A
+la escala real es la diferencia entre caber y no caber en el presupuesto. Conviene decirlo
+así: **la decisión no se justifica con los números de la cripta de prueba, se justifica
+con los de la cripta de referencia.**
+
+**El ciclo completo de eventos.**
+
+| Escenario | Por ciclo | Del límite de 20 ms |
+| --- | ---: | ---: |
+| 60 salas, 50 cazadores | 0.1854 ms | 0.93 % |
+| **300 salas, 36 cazadores** | **0.1259 ms** | **0.63 %** |
+
+Se cumple con dos órdenes de magnitud de margen. Que la cripta grande salga más rápida
+por ciclo no es raro: con 300 salas el jugador camina más y pelea menos, y los turnos de
+combate son los caros.
+
+### Límites conocidos
+
+**El contrato del servicio permite salidas de un solo sentido, y eso casi rompió la
+decisión central.** El esquema `Exit` de la versión 1.1.0 se describe como «One
+**directed** exit from a room» y no exige que la sala destino declare la vuelta.
+
+Con un grafo asimétrico, expandir la búsqueda por las salidas que **salen** del jugador da
+el costo de que el **jugador** llegue a cada sala, y lo que el cazador necesita es el
+costo de llegar **hasta** el jugador. Son dos cosas distintas, y en un grafo simétrico
+coinciden, que es por lo que no se notaba.
+
+El arreglo **no fue un rediseño**, y la razón es la decisión de diseño que ya estaba
+tomada: la búsqueda está parametrizada por quién provee las vecinas. Se le pasa un
+proveedor de salidas **entrantes** para expandir y se mantienen las **salientes** para el
+primer paso. El motor arma el índice de entrantes una sola vez; el estado de las puertas
+se filtra al consultar, porque sí cambia.
+
+En una cripta donde toda salida tiene vuelta los dos proveedores coinciden y el
+comportamiento es idéntico al anterior: las 57 pruebas que ya existían pasan sin tocar
+ninguna. Hay cinco nuevas con mapas de un solo sentido, incluida una donde la versión
+anterior **se quedaba esperando en vez de perseguir**.
+
+El traductor, además, ahora **avisa** cuando una salida no tiene vuelta declarada. Antes
+producía mapas asimétricos en silencio, que es el comportamiento correcto pero invisible.
+
+**El sobrecosto de compartir con rangos desiguales.** El corte es el rango mayor entre los
+cazadores activos, así que un cazador de rango pequeño que decide en el mismo instante que
+uno sin tope paga por una región que no le interesa: 0.8730 contra 0.0119 ms, unas 73
+veces. Es real y está reportado. Se mantiene porque la alternativa, un cálculo por
+cazador, cuesta 17 veces más que ese sobrecosto. El requisito FR-017 de la especificación
+se corrigió para admitir esta salvedad y obligar a medirla, en vez de quedar escrito como
+si no existiera.
+
+**El costo de una salida tiene que ser el mismo en los dos sentidos cuando los dos lados
+la declaran.** Eso lo garantiza el modelo por construcción, porque la puerta es un único
+objeto compartido, y el traductor avisa si los dos lados declaran costos distintos. Si
+alguna vez el enunciado permitiera costos distintos por sentido, esta es la primera
+decisión que habría que revisar.
+
+**`parar_en` y `salidas_de` juntos no están probados.** La parada anticipada que agregó la
+capacidad de niebla de guerra asienta solo una parte del grafo, y el primer paso desde
+otra sala podría no ser definitivo. La combinación se rechaza con un mensaje explícito en
+vez de permitirla sin respaldo.
+
+**Lo que no se midió:** el comportamiento con más de 36 cazadores. La cripta de referencia
+trae 36 y las mediciones llegan a 50; si la revisión usara cientos, la cifra del cálculo
+compartido crecería con la región del rango mayor y no con la cantidad de cazadores, así
+que es el escenario que más margen tiene, pero no está medido.
+
+---
+
+## 5.2 Rutas que dejan de ser válidas (segunda parte)
+
+Estado: implementado, probado y medido.
+
+Proviene de la misma especificación y plan que §5.1, en particular de su requisito FR-011.
+
+### Problema
+
+Entre dos turnos de un cazador puede pasar de todo: puertas que se abren y se cierran,
+el jugador que camina, actores que mueren, velocidades que cambian. El enunciado exige
+que la decisión de cada turno sea **idéntica** a la que daría un cálculo desde cero en
+ese instante.
+
+Reutilizar un cálculo anterior está permitido, pero solo si se puede demostrar que no
+cambia la respuesta. Y hay que identificar qué eventos invalidan qué información y cuánto
+trabajo se ahorra de verdad.
+
+Lo peligroso de este problema es que **un error no se ve**. Un cazador que decide con un
+cálculo viejo no produce ningún fallo: produce una partida levemente distinta de la que
+debía, y nadie lo nota.
+
+### Alternativas consideradas
+
+| Alternativa | Qué hace |
+| --- | --- |
+| **Compartido con invalidación** | Una búsqueda desde la sala del jugador, reutilizada mientras siga siendo válida |
+| Recalcular siempre | Una búsqueda por turno de cazador, sin reutilizar nada. Es también la **definición** de «decidir desde cero», así que se implementó para poder comparar contra ella |
+| Uno por cazador | Una búsqueda por turno, cortada en el rango de ese cazador |
+
+### Decisión
+
+Se reutiliza el cálculo entre turnos, y se invalida en **cuatro** puntos:
+
+1. el jugador cambia de sala;
+2. una puerta se abre con llave;
+3. una puerta se cierra sola, que lo dispara la agenda y no una acción del jugador;
+4. se usa un pergamino de retroceso, que revierte el historial y puede cambiar la sala del
+   jugador y el estado de las puertas de golpe.
+
+Y **no** se invalida por el movimiento de un cazador, la muerte de un actor ni un cambio
+de velocidad. El argumento es que buscar desde la sala del jugador hace que la respuesta
+dependa solo de dos cosas —la sala del jugador y el estado de las puertas— y ninguno de
+esos tres eventos cambia ninguna de las dos.
+
+Eso es una consecuencia directa de la decisión de §5.1, y conviene decirlo en la defensa:
+**buscar desde el jugador no solo hizo compartible el cálculo, también redujo la
+invalidación a dos cosas observables.** Si se buscara desde cada cazador, cada movimiento
+de cada cazador invalidaría su propio cálculo.
+
+**La equivalencia no se da por supuesta.** La prueba que respalda el requisito no compara
+contra valores escritos a mano: corre la misma partida, con la misma semilla y las mismas
+acciones, en modo compartido y en modo recalcular siempre, y exige que las decisiones de
+los cazadores sean **idénticas turno por turno**. Si alguna difiere, la invalidación está
+mal.
+
+**¿Coincide con el `plan.md` original?** La decisión sí; **la justificación no**, y eso es
+el hallazgo de esta sección. Ver la evidencia.
+
+### Complejidad
+
+| Operación | Costo |
+| --- | --- |
+| Invalidar | O(1): marcar, no recorrer |
+| Turno de cazador con cálculo vigente | O(grado de la sala) |
+| Turno de cazador con cálculo invalidado | una búsqueda, O((Vr + Er) log Vr) |
+| *n* cazadores entre dos invalidaciones | una búsqueda + O(n) |
+
+### Evidencia empírica
+
+Diez cazadores sin tope de rango en 300 salas, 300 decisiones del jugador:
+
+| Cripta | Modo | Tiempo | Búsquedas |
+| --- | --- | ---: | ---: |
+| Puertas que cambian mucho | compartido | 0.0276 s | **252** |
+| Puertas que cambian mucho | recalcular siempre | 0.0905 s | 4 730 |
+| Puertas que casi no cambian | compartido | 0.1054 s | **215** |
+| Puertas que casi no cambian | recalcular siempre | 1.6149 s | 4 730 |
+
+**La columna de búsquedas desmiente la mitad de lo que el plan esperaba, y es el hallazgo
+de esta capacidad.** El plan suponía que el ahorro vendría de reutilizar el cálculo entre
+turnos cuando las puertas están quietas. No es así: **252 búsquedas en 300 decisiones**
+significa que el cálculo se invalida casi en cada decisión del jugador, y con las puertas
+quietas también, 215 de 300. La razón es que el jugador se mueve, y moverse invalida.
+
+Entonces el ahorro real no es la reutilización entre turnos: es **compartir una búsqueda
+entre los diez cazadores del mismo instante**. De 4 730 búsquedas a 252 es casi exactamente
+dividir por la cantidad de cazadores, no por la quietud de las puertas.
+
+Eso cambia cuál es la justificación de la decisión: **lo que vale no es la caché, es haber
+buscado desde el jugador en vez de desde cada cazador.** Si el cálculo se hiciera desde
+cada cazador, compartirlo sería imposible y este ahorro no existiría. La decisión se
+mantiene; el motivo por el que se defiende es otro.
+
+De paso explica la tercera fila, que a primera vista parece un error: con las puertas
+quietas el modo compartido cuesta **más** en tiempo absoluto (0.1054 contra 0.0276 s)
+aunque haga **menos** búsquedas. Con las puertas abiertas la región alcanzable es toda la
+cripta, así que cada búsqueda es mucho más cara.
+
+### Límites conocidos
+
+**El cuarto punto de invalidación no estaba en el plan.** El pergamino de retroceso
+revierte el historial y puede cambiar la sala del jugador y el estado de las puertas de
+golpe. Apareció al implementar, no al planificar.
+
+**El cierre automático de puertas es el caso fácil de olvidar**, porque no lo dispara
+ninguna acción del jugador sino la agenda de eventos. Se invalida en el mismo lugar donde
+se cambia el estado de cualquier puerta, no en el lugar donde el jugador abre una.
+
+**La garantía es la prueba de equivalencia, no el razonamiento.** Si mañana alguien agrega
+un evento que cambie el estado de una puerta por otro camino y no invalide, el programa
+seguirá funcionando y dará decisiones distintas de las correctas. Lo único que lo
+detectaría es esa prueba. Está escrita para incluir cierres automáticos frecuentes, que
+es el evento que más fácil se olvida, y comprueba dentro de sí misma que la invalidación
+se disparó más de una vez: sin eso, podría pasar comparando dos partidas en las que nunca
+pasó nada.
+
+**Lo que no se midió:** el caso de un jugador que no se mueve durante muchos turnos, que
+es el único en que la reutilización entre turnos aportaría de verdad. Las mediciones usan
+un jugador que camina, que es lo que hace un jugador real.
+
+---
+
+## 5.3 El mapa conocido (segunda parte)
+
+Es de Steven, junto con el viaje automático «ir a». Proviene de la especificación [`specs/005-niebla-ir-a/spec.md`](../../specs/005-niebla-ir-a/spec.md) y del plan [`specs/005-niebla-ir-a/plan.md`](../../specs/005-niebla-ir-a/plan.md), que tiene el detalle de cada alternativa y las tablas completas de mediciones.
+
+### Problema
+
+Con la niebla de guerra, el jugador ya no ve la cripta completa: cada sala está, para él, explorada, avistada o desconocida, y de cada puerta recuerda el estado de la última vez que la vio (§3.3). Ese conocimiento es estado del juego, así que el pergamino lo revierte, la partida lo guarda y la línea de tiempo lo reconstruye. Sobre él se calcula el viaje automático «ir a» (§3.4).
+
+Las operaciones y su frecuencia, según §5.3:
+- **Consultar** si una sala está explorada, avistada o desconocida, y qué se recuerda de una puerta. Ocurre en cada vista, en cada paso de «ir a» y, durante la búsqueda, por cada vecina examinada. Es la operación más frecuente.
+- **Explorar.** Una sala por movimiento; hasta cinco con la antorcha.
+- **Revertir** los cambios de una acción con el pergamino.
+- **Calcular un paso de «ir a»**: una búsqueda de costo mínimo sobre el mapa conocido.
+
+La frecuencia de cada operación en una partida real **no se midió**: las mediciones de abajo son por operación, no un conteo de cuántas veces ocurre cada una en una partida.
+
+### Alternativas consideradas
+
+| Decisión | Elegida | Descartada, y por qué |
+| --- | --- | --- |
+| Dónde vive el conocimiento | Estructura propia, separada del mapa de salas | Atributos en las salas y las puertas: mezclan el mapa real con lo que sabe el jugador, cambian el archivo de partida y obligan a recorrer la cripta entera para copiar el conocimiento |
+| ¿Está explorada? | `TablaHash` por id de sala | Lista recorrida en cada consulta: O(k). **Medida** |
+| ¿Está avistada? | Contador por sala de salidas de exploradas que llevan a ella | Recalcular todas las avistadas al explorar: O(mapa conocido). **Medida** |
+| Clave de una puerta | Entero: id de la sala × 4 + dirección, guardado por cada lado | Texto `"a-b"`: no es única cuando dos salidas unen las mismas salas. **Medida** |
+| Reversión | Anotar en el historial la inversa de cada cambio | Copiar el conocimiento antes de cada acción: es copia de estado por acción. **Medida** |
+| Ruta de «ir a» | Reutilizar la búsqueda del cazador con proveedores del mapa conocido | Una búsqueda propia (duplicaría el desempate); recorrido en anchura (cuenta salas, no costo); búsqueda sin montículo. **Medida** |
+| Recalcular o reutilizar la ruta | Parar la búsqueda en la sala del jugador y reutilizarla mientras el conocimiento no cambie | Recalcular la búsqueda completa en cada paso, que era la decisión original. **Medida** |
+| Salidas de un solo sentido | Expandir por las salidas conocidas que entran a cada sala (`entrantes_conocidas`, sobre un índice armado una vez desde la topología y filtrado por lo explorado y lo recordado) y dar el primer paso por las que salen | Mantener el índice de entrantes conocidas al explorar: estado nuevo que explorar y revertir tendrían que actualizar. Buscar desde el jugador: pierde la reutilización de la ruta y el desempate de FR-024 en cada paso. Usar el índice del motor: filtra por el estado real de las puertas (FR-012). **Medida** |
+
+### Decisión
+
+El mapa conocido (`structures/mapa_conocido.py`) guarda solo lo que no se deduce del esqueleto: las salas exploradas y el recuerdo de cada puerta, en `TablaHash` con claves enteras. Mantiene además un contador de avistamiento por sala, el orden de exploración como pila (una `list`) y un número de versión que sube con cada cambio. El recuerdo de una puerta se guarda bajo la clave de cada uno de sus lados, para consultarlo desde una salida sin buscar su dirección. El nombre, las salidas y los costos de una sala explorada se leen del mapa de salas, porque no cambian durante la partida.
+
+Cada cambio anota su inversa en el historial reversible que ya existía, como el rastro del jugador. Si nada cambia, no anota nada. El motor avisa al mapa al entrar a una sala y al cambiar una puerta; la aplicación arma el mapa con el mismo historial que la partida, también al cargarla.
+
+«ir a» tiene sus reglas en el modelo (`model/viaje.py`) y su bucle de pasos en el controlador. Cada paso pasa por el mismo camino que un `mover` escrito a mano. La búsqueda de la ruta se detiene al asentar la sala del jugador y se reutiliza durante el viaje mientras no cambie la versión del conocimiento.
+
+Para las salidas de un solo sentido, el mapa ofrece `entrantes_conocidas(u)`: las salidas que el jugador sabe que llevan a *u*. Filtra un índice de salidas entrantes que se arma una vez desde la topología, así que no hay nada que mantener al explorar ni al revertir. **Todavía no está conectado al viaje**: la búsqueda compartida rechaza la parada anticipada junto con el proveedor de salidas (ver Límites).
+
+**¿Coincide con el `plan.md` original?** En las estructuras, sí. **En la ruta, no, dos veces.**
+- El plan elegía recalcular la búsqueda completa en cada paso. Las mediciones mostraron que no cumplía los 5 ms desde 400 salas. El plan se revisó antes de cambiar el código y se aplicaron tres mejoras, cada una medida antes y después: **(a)** el recuerdo de las puertas por lado; **(b)** la búsqueda se detiene en la sala del jugador; **(c)** la búsqueda se reutiliza mientras no cambie el conocimiento.
+- El plan suponía, como el cazador, que toda salida tiene vuelta. El grupo confirmó que no es así, y el plan se revisó otra vez (alternativa 9) antes de escribir la prueba y el código.
+
+### Análisis de complejidad
+
+*k* = salas exploradas; *E* = salidas de la cripta.
+
+| Operación | Costo |
+| --- | --- |
+| Estado de una sala | O(1) promedio |
+| Puerta recordada | O(1) promedio. Desde una salida, sin buscar nada; desde la puerta sola, a lo sumo 4 salidas |
+| Entrar a una sala | O(1); con antorcha, a lo sumo 5 salas y 20 contadores |
+| Revertir una acción | O(cambios de la acción) |
+| Primer paso de «ir a» | O((k' + e') log k'), con *k'* las salas a menor distancia del destino que la del jugador y *e'* sus salidas; en el peor caso, todo el mapa conocido |
+| Pasos siguientes del mismo viaje | O(grado de la sala), si el conocimiento no cambió |
+| Salidas entrantes conocidas de una sala | O(salidas que entran a la sala) |
+| Armar el índice de salidas entrantes | O(V + E), una vez |
+| Memoria | O(k + puertas recordadas) de conocimiento, más O(E) del índice de entrantes, que no es conocimiento: no se guarda, no se copia ni se revierte |
+
+### Evidencia empírica
+
+Suite «Mapa conocido y viaje ir a». Las del 2026-11-16 y la primera corrida del 2026-11-17 se tomaron con `python main.py --bench`; las otras dos del 2026-11-17, corriendo solo esta suite (`python -m benchmark.bench_mapa_conocido`), que ejecuta el mismo `run()`. Las criptas sintéticas son cuadrículas de 100, 400 y 1600 salas con costos deterministas por semilla. **Hay dos entornos, y sus cifras no son comparables entre sí**: las del 2026-11-16 se tomaron con Python 3.11.3 sobre Windows; las del 2026-11-17, con Python 3.12.3 en WSL (Linux x86_64) en el mismo equipo. Cada tabla dice de cuál es.
+
+**Mediciones 1 a 4 (Windows, 2026-11-16).**
+
+| Medición | 100 salas | 400 salas | 1600 salas |
+| --- | ---: | ---: | ---: |
+| 1. Estado de una sala, tabla / lista | 0.51 / 26.42 µs | 0.55 / 109.38 µs | 0.53 / 508.11 µs |
+| 2. Puerta recordada, entera / texto (antes de la mejora a) | 2.33 / 1.06 µs | 2.35 / 1.09 µs | 2.52 / 1.12 µs |
+| 3. Explorar una sala más, contadores / recalcular | 21.62 / 222.13 µs | 20.17 / 882.34 µs | 20.77 / 3708.92 µs |
+| 4. Antorcha y revertir, anotaciones / copia | 74.08 / 835.54 µs | 69.39 / 3051.14 µs | 75.09 / 13882.56 µs |
+
+**Medición 5, un paso de «ir a», antes y después de las mejoras (Windows, 2026-11-16).** La línea base y las mejoras (a) y (b) se midieron una vez; la (c), tres veces. Entre corridas el primer paso varió alrededor de un 20 %.
+
+| Medida | Línea base | Tras (a) | Tras (b) | Tras (c), 3 corridas |
+| --- | ---: | ---: | ---: | ---: |
+| 400 salas, primer paso | 12.24 ms | 9.62 ms | 8.91 ms | 9.21 a 11.29 ms |
+| 400 salas, promedio por paso | 13.59 ms | 11.35 ms | 3.62 ms | 0.26 a 0.33 ms |
+| 1600 salas, primer paso | 58.96 ms | 51.41 ms | 41.03 ms | 42.70 a 57.70 ms |
+| 1600 salas, promedio por paso | 59.18 ms | 53.68 ms | 18.32 ms | 0.58 a 0.64 ms |
+| cripta-01 (6 salas), primer paso | 0.0134 ms | 0.0118 ms | 0.0128 ms | 0.0129 ms |
+
+**Medición 5 con el código actual (WSL, 2026-11-17, tres corridas).**
+
+| Cripta | Primer paso | Promedio por paso del viaje | Búsqueda completa | Sin montículo |
+| --- | ---: | ---: | ---: | ---: |
+| 100 salas (viaje de 18 pasos) | 1.09 a 1.14 ms | 0.067 a 0.068 ms | 1.17 a 1.18 ms | 1.60 a 1.66 ms |
+| 400 salas (38 pasos) | 5.52 a 5.98 ms | 0.168 a 0.171 ms | 5.78 a 5.91 ms | 13.33 a 21.88 ms |
+| 1600 salas (84 pasos) | 25.66 a 26.54 ms | 0.333 a 0.339 ms | 26.01 a 26.92 ms | 112.80 a 114.99 ms |
+| cripta-01 (6 salas) | 0.0082 a 0.0083 ms | — (sin ruta entre los extremos) | 0.0072 a 0.0073 ms | 0.0097 a 0.0101 ms |
+
+**Medición 6, salidas de un solo sentido (WSL, 2026-11-17, tres corridas).** Las mismas cuadrículas y una variante con la misma semilla donde una de cada cuatro uniones existe en un solo sentido.
+
+| Medida | 100 salas | 400 salas | 1600 salas |
+| --- | ---: | ---: | ---: |
+| Armar el índice, simétrica | 0.33 a 0.39 ms, 34.1 KiB | 1.56 a 1.58 ms, 131.2 KiB | 7.68 a 8.05 ms, 782.1 KiB |
+| Armar el índice, con un sentido | 0.31 ms, 34.1 KiB | 1.47 a 1.64 ms, 131.2 KiB | 7.03 a 7.80 ms, 731.8 KiB |
+| Salidas que entran por sala, simétrica (mín / prom / máx) | 2 / 3.60 / 4 | 2 / 3.80 / 4 | 2 / 3.90 / 4 |
+| Salidas que entran por sala, con un sentido | 1 / 3.15 / 4 | 1 / 3.34 / 4 | 1 / 3.40 / 4 |
+| Búsqueda completa por entrantes / por salientes, simétrica | 1.07–1.21 / 1.18–1.38 ms | 5.14–5.87 / 5.59–6.14 ms | 23.48–25.22 / 26.42–29.51 ms |
+| Búsqueda completa por entrantes / por salientes, con un sentido | 1.00–1.03 / 1.05–1.23 ms | 4.99–5.09 / 5.14–5.61 ms | 23.37–25.61 / 23.91–25.29 ms |
+
+Lo que muestran:
+- Las mediciones 1, 3 y 4 respaldan FR-033, FR-034 y FR-035: la elegida queda plana y la descartada crece con el mapa conocido.
+- **Medición 2, contra lo esperado**: la clave entera costaba el doble que la de texto porque había que buscar la dirección de la puerta. Eso motivó la mejora (a). La de texto sigue siendo incorrecta, así que no era reemplazo.
+- **Medición 5, contra lo esperado**: recalcular en cada paso no cumplía FR-036 desde 400 salas. Con las mejoras, el promedio por paso queda por debajo de 1 ms en los tres tamaños, pero el primer paso de un viaje entre los extremos sigue pasando de 5 ms con 400 salas o más, en los dos entornos.
+- **Medición 6**: expandir por las salidas que entran no cuesta más que por las que salen; las diferencias están dentro de la variación entre corridas. Armar el índice cuesta entre un cuarto y un tercio de una búsqueda completa y se paga una vez por partida.
+- La reutilización de la ruta y la parada anticipada no cambian ninguna decisión: lo comprueban pruebas de equivalencia, no mediciones (ver Pruebas).
+- **La cripta de referencia de §6.1 no está en el paquete sin conexión.** El grupo supo el 2026-11-17 que es cripta-06, de 300 salas (plan 002, «Remedición»), pero la única cripta real disponible para medir tiene 6 salas. 300 salas queda entre las cuadrículas de 100 y de 400 de la tabla; no se midió una de 300 ni la cripta real, así que no se puede afirmar si FR-036 se cumple en la condición exacta de §6.1.
+
+### Límites conocidos
+
+- **FR-036 no se cumple en el primer paso de un viaje largo en mapas de 400 salas o más.** Los pasos siguientes del mismo viaje sí. La cripta de referencia tiene 300 salas y no se midió (ver Evidencia), así que queda sin comprobar. Lo que queda por probar es aligerar la búsqueda misma, que es compartida con el cazador.
+- **«ir a» todavía no respeta las salidas de un solo sentido.** `entrantes_conocidas` está escrita y probada, y una prueba de equivalencia sobre 300 mapas asimétricos muestra que la búsqueda compartida con ese proveedor da el mismo primer paso que una referencia propia, con parada y sin ella. Falta conectarla en `model/viaje.py`, y eso espera a que la búsqueda compartida acepte la parada anticipada junto con el proveedor de salidas. Hasta entonces, las pruebas de los escenarios 7 y 8 de la Historia 4 están marcadas como fallo esperado.
+- **El resumen de un instante pasado puede salir mal con copias espaciadas.** Si entre la copia de la línea de tiempo y el instante consultado el jugador entró a una sala cuyo contenido no estaba cargado cuando se tomó la copia, la reconstrucción no puede repetir ese movimiento y el resumen entero, incluido el mapa conocido, queda en la sala anterior, sin ningún error. Es de la reconstrucción de la línea de tiempo, no del mapa conocido. Las pruebas de FR-016 usan una copia por acción, que es el caso en que funciona.
+- Explorar, consultar y revertir dependen de que el motor avise de cada entrada y de cada cambio de puerta. Un camino nuevo del motor que cambie una puerta sin avisar dejaría el recuerdo desactualizado sin ningún error. La prueba de SC-002 compara, después de cada acción, el recuerdo contra el estado real de las puertas de la sala del jugador.
+
+### Pruebas
+
+| Archivo | Qué cubre | Pruebas |
+| --- | --- | ---: |
+| `tests/test_mapa_conocido.py` | Tres estados, memoria de puertas y recuerdo por lado, antorcha, reversión, vecinas y entrantes conocidas, exportar e importar | 59 |
+| `tests/test_viaje.py` | Reglas del viaje en el modelo: aceptar la orden, siguiente paso, motivos de parada | 26 |
+| `tests/test_ir_a.py` | Viaje completo por el controlador, bitácora y reproducción, paradas, pergamino | 23 |
+| `tests/test_niebla.py` | Con el motor real: memoria de puertas y SC-002, antorcha, reversión, determinismo, no interferencia y los casos del Apéndice B de «ir a» | 14 |
+| `tests/test_niebla_guardado.py` | Guardar y cargar conserva el conocimiento; lo explorado después de cargar se revierte | 2 |
+| `tests/test_ir_a_sentido.py` | Escenarios 7 y 8 de la Historia 4. Dos de las tres están marcadas como fallo esperado hasta conectar las salidas entrantes | 3 |
+| `tests/test_equivalencia_sentido.py` | En 300 mapas asimétricos, mismo primer paso con salidas entrantes, con parada y sin ella, y distancias iguales a Bellman-Ford | 2 |
+| `tests/test_parada_anticipada.py` | En 300 mapas, la búsqueda con parada da el mismo paso que la completa | 4 |
+| `tests/test_reutilizar_ruta.py` | Reutilizar la búsqueda da el mismo viaje que recalcular | 6 |
+| `tests/test_comando_mapa.py` | El comando `mapa` en la aplicación, sin mapa y con una partida real | 5 |
+| `tests/test_vista_mapa_conocido.py`, `tests/test_vista_sala_actual.py` | Vista del mapa conocido y de la sala actual según el conocimiento, y la marca del cazador | 16 |
+| `tests/test_historia_mapa_conocido.py` | El resumen de `historia` trae el mapa conocido de ese instante | 2 |
+
+---
+
+## 5.4 Verificación de resolubilidad (segunda parte)
+
+Todavía no está escrita, porque la capacidad todavía no tiene dueño confirmado. Lo que le
+falta: el problema de §5.4, las alternativas al recorrido por llave, el reporte de la
+frontera bloqueada y la detección del ciclo de dependencias, y las mediciones contra la
+alternativa ingenua de repetir el recorrido por cada llave.
+
+---
+
+## 5.5 Línea de tiempo y puntos de control (segunda parte)
+
+Estado: implementado, probado y medido a escala de la cripta de referencia.
+
+Proviene de la especificación [`specs/003-linea-de-tiempo/spec.md`](../../specs/003-linea-de-tiempo/spec.md) y del plan [`specs/003-linea-de-tiempo/plan.md`](../../specs/003-linea-de-tiempo/plan.md).
+
+### Problema
+
+Hay que poder consultar el estado de la partida en **cualquier** instante desde el inicio,
+sin modificar la partida y sin guardar una copia del mundo por cada acción.
+
+El pergamino de retroceso de §4.6 resuelve algo parecido pero distinto: **cambia** la
+partida y solo alcanza cinco acciones atrás. La línea de tiempo **no cambia nada** y
+alcanza hasta el instante 0. Son dos problemas que se parecen y tienen respuestas
+diferentes; confundirlos es el error que esta sección tuvo que evitar.
+
+Lo que §5.5 exige:
+
+* una consulta no puede aplicar ni deshacer cambios de más de *K* acciones del jugador;
+* la memoria crece con los cambios ocurridos, más una copia cada *K* acciones, **nunca**
+  como acciones por tamaño del estado;
+* ubicar la copia más cercana a un instante pedido es una búsqueda frecuente y su costo
+  importa;
+* al usar un pergamino, la línea se recorta sin recorrer toda la historia;
+* hay que medir memoria y tiempo de consulta para al menos tres valores de *K* y justificar
+  el valor por omisión.
+
+### Alternativas consideradas
+
+| Alternativa | A favor | En contra |
+| --- | --- | --- |
+| **Hacia adelante desde una copia completa, repitiendo las acciones** | Todo lo necesario ya existe y está probado: el serializador de §4.10 guarda el estado completo **incluido el estado del generador aleatorio**, y el cargador construye objetos nuevos sin rehacer el trabajo de inicio de partida. Y como todo ocurre sobre objetos nuevos, «la consulta no altera la partida» sale **por construcción** | Depende de que la partida sea determinista, y había un punto donde no lo era |
+| Hacia atrás desde el estado actual, invirtiendo cambios | Reutilizaría las anotaciones de cambios inversos que ya están repartidas por todo el motor, que es el activo más grande de la primera parte | **No es viable con el historial que existe**, y la razón está en el código: los objetos de cambio guardan **referencias directas a los objetos vivos**, así que no se pueden aplicar a una copia reconstruida, que crea objetos nuevos. Y sin copia, la consulta cuesta toda la partida |
+| Una copia completa por cada acción | La consulta es inmediata | Es exactamente lo que §5.5 prohíbe. Medido: **19.5 MiB** en la cripta de referencia |
+
+El argumento decisivo es el de la segunda fila, y conviene decirlo así en la defensa: **el
+camino hacia atrás no se descartó por preferencia, se descartó porque el diseño de la
+primera parte lo impide.** Las anotaciones de cambios inversos sirven para deshacer sobre
+el mismo objeto, que es justo lo que el pergamino necesita, y no sirven para reconstruir
+sobre una copia, que es lo que la línea de tiempo necesita.
+
+### Decisión
+
+La línea guarda dos listas contiguas: las **acciones del jugador** —nombre, argumento y
+reloj— y las **copias completas del estado**, una cada *K* acciones. Está en
+[`structures/linea_de_tiempo.py`](../structures/linea_de_tiempo.py) y **no reconstruye
+nada**: no conoce el motor.
+
+Una copia completa es **el mismo bloque de bytes del archivo de partida de §4.10, armado
+en memoria**. Eso obligó a separar en el adaptador el armado del contenido de su escritura
+en disco; el refactor no cambió ningún comportamiento y las 54 pruebas del guardado
+siguieron pasando sin tocarlas.
+
+Responder una consulta, en [`model/consulta_historia.py`](../model/consulta_historia.py):
+se traduce el instante a un número de acción, se localiza la última copia en o antes de
+ese número, se reconstruye **en objetos nuevos**, se repiten a lo sumo *K* acciones y se
+devuelve el resumen **como dato, no como texto**. El motor reconstruido se arma **sin
+bitácora y sin repositorio**, de modo que repetir acciones no puede escribir en la
+bitácora de reproducción ni provocar ninguna solicitud al servicio.
+
+Localizar la copia y traducir un instante a número de acción son **búsquedas binarias
+escritas a mano**, sobre listas que ya están ordenadas porque se construyen en orden.
+`bisect` está prohibido.
+
+Para las acciones que actúan sobre «el objeto que se está viendo» —soltar, usar, equipar—
+se registra **el identificador del objeto**, no su posición ni el cursor. El cursor lo
+mueven comandos que no consumen tiempo y por lo tanto no son acciones, así que la posición
+no se podría repetir.
+
+**El valor por omisión de *K* es 50**, elegido con las mediciones.
+
+**¿Coincide con el `plan.md` original?** En lo central sí: reconstruir hacia adelante desde
+una copia. Cambiaron dos cosas, las dos por mediciones o pruebas y las dos documentadas en
+el plan:
+
+* el plan resolvía el problema del generador aleatorio anotando su estado en cada
+  pergamino, unos 5 KB. **La prueba de equivalencia lo tumbó** y hubo que pasar a forzar
+  una copia completa. Ver límites conocidos;
+* la justificación del valor de *K* se invirtió al medir a escala de la cripta de
+  referencia. Ver evidencia.
+
+### Complejidad
+
+Sea *A* la cantidad de acciones del jugador, *C* la de copias (*A/K*), y *E* el tamaño del
+estado.
+
+| Operación | Costo |
+| --- | --- |
+| Registrar una acción | O(1) |
+| Tomar una copia completa | O(E), una cada *K* acciones |
+| Localizar la copia de la que partir | O(log C), búsqueda binaria propia |
+| Traducir un instante a número de acción | O(log A), búsqueda binaria propia |
+| Responder una consulta | O(E + *K* · costo de una acción) |
+| Recortar por pergamino | O(1) |
+| Memoria | O(A + (A/K + pergaminos) · E) frente a O(A · E) de la alternativa ingenua |
+
+Lo que importa de esta tabla: **en el costo de una consulta no aparece *A***. Por eso se
+mide que consultar en una partida de 300 acciones cueste lo mismo que en una de 50.
+
+### Evidencia empírica
+
+Medido con `benchmark/bench_linea_de_tiempo.py`, registrado en `--bench`. En la cripta de
+referencia, de 300 salas, **una copia completa pesa 66.3 KiB**.
+
+**Memoria y tiempo de consulta según *K*** (40 consultas en puntos repartidos, 300
+acciones):
+
+| *K* | Copias | Memoria en copias | Memoria en acciones | Por consulta |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 (la alternativa ingenua) | 301 | **19 969.0 KiB (19.5 MiB)** | 7.32 KiB | 3.8696 ms |
+| 10 | 31 | 2 055.5 KiB | 7.32 KiB | 4.0941 ms |
+| **50 (el valor por omisión)** | 7 | **463.9 KiB** | 7.32 KiB | **4.3835 ms** |
+| 200 | 2 | 130.7 KiB | 7.32 KiB | 5.9304 ms |
+
+La columna de memoria en acciones es la que respalda el requisito del enunciado: **7.32 KiB
+para 300 acciones, y no cambia con *K***. Lo que crece con *K* son las copias, no el
+registro de lo que pasó.
+
+**Por qué el valor por omisión es 50, y por qué el argumento cambió.** Las primeras
+mediciones se hicieron en una cripta de 40 salas, donde una copia pesa 14 KiB, y ahí se
+razonó que «con 98 KiB la memoria ya es irrelevante, así que lo que queda por optimizar es
+la latencia». **A escala de la cripta de referencia eso se invierte**: la memoria varía
+**150 veces** entre los extremos y el tiempo de consulta varía **1.5 veces**.
+
+La causa está en los 66.3 KiB por copia: **el costo de una consulta pasó a estar dominado
+por deserializar la copia, no por repetir acciones.** Eso aplana la curva de latencia y
+hace que subir *K* compre memoria casi gratis.
+
+Se mantiene 50, con justificación nueva: 463.9 KiB es poco en términos absolutos y deja la
+consulta por debajo de 5 ms, mientras *K* = 200 cambia 1.5 ms de latencia por 3.5 veces
+menos memoria. Las dos son defendibles; 50 favorece la latencia, y la bandera
+`--checkpoint-cada` existe precisamente para subirlo. Lo que **sí** queda cerrado es la
+alternativa ingenua: **19.5 MiB** en la cripta de referencia, que es exactamente lo que
+§5.5 prohíbe.
+
+**El costo de una consulta no depende del largo de la partida** (*K* = 50, puntos
+repartidos): 5.14 ms a 50 acciones, 4.33 ms a 150 y 4.61 ms a 300. **No es monótono**, así
+que la dispersión es ruido de medición y no una tendencia; lo que la medición respalda es
+que no crece con el largo.
+
+**Esta medición hubo que corregirla.** La primera versión consultaba siempre la **última**
+acción, que cae justo después de una copia y casi no repite nada: salía plana por el caso
+más fácil y no probaba nada. Se cambió a puntos repartidos, de modo que el promedio pasa
+por reconstrucciones de 0 a *K* acciones. Es el mismo error que había aparecido en §5.1 con
+el corte por rango, y por eso queda anotado las dos veces.
+
+**El recorte por pergamino**: 0.216 µs en una partida de 50 acciones y 0.241 µs en una de
+300. Constante, como pide el enunciado.
+
+**El ciclo de eventos con la línea activa**, en 300 salas:
+
+| Escenario | Por ciclo | Del límite de 20 ms |
+| --- | ---: | ---: |
+| Sin copias | 0.0340 ms | 0.17 % |
+| Con la línea activa, *K* = 50 | 0.0646 ms | 0.32 % |
+
+La línea le cuesta al ciclo un **90 % más** a esta escala, frente al 16 % que costaba en
+una cripta de 40 salas, porque cada copia son 66 KiB que hay que serializar. En términos
+absolutos son 0.03 ms y el 0.32 % del límite, así que se cumple de sobra, pero el número se
+reporta tal cual: **el costo de la línea sobre el ciclo crece con el tamaño de la cripta.**
+
+### Límites conocidos
+
+**Un pergamino fuerza una copia completa, y la primera solución era insuficiente.** El
+pergamino devuelve el reloj a su valor anterior pero **no** devuelve el estado del
+generador aleatorio: es una decisión deliberada de la primera parte, documentada en «El
+reloj virtual y la numeración de eventos». Re-simular habría divergido después de cada
+pergamino y los resúmenes de los instantes posteriores habrían sido **falsos sin que nada
+se viera raro**.
+
+El plan resolvía eso anotando el estado del generador en cada pergamino, unos 5 KB frente
+a una copia completa. **La prueba de equivalencia tumbó esa idea**: un pergamino además
+**consume un pergamino del inventario**, y ese consumo no es una acción del jugador, así
+que no está en la lista que la re-simulación repite. El anclaje alineaba el azar y dejaba
+el inventario mal.
+
+La respuesta correcta es más simple de explicar: **un pergamino es un punto donde el estado
+vivo no se puede derivar de la lista de acciones, así que la línea se re-ancla con una copia
+completa.** Es corrección, no optimización. El mecanismo del anclaje se retiró del código en
+vez de dejarlo sin uso.
+
+**Esto es una desviación declarada del presupuesto de memoria.** El enunciado permite «no
+más de una copia cada *K* acciones», y una copia forzada por pergamino puede caer dentro de
+las *K* de la anterior. Se declara en vez de esconderla: sin esa copia el programa
+informaría una historia **falsa**, y el enunciado exige que el estado consultado sea el
+real. Entre correcto y dentro del presupuesto, manda correcto. La cantidad de copias extra
+está acotada por los pergaminos que la cripta contenga, porque cada uso consume uno.
+
+**Una copia guarda la cripta entera, incluido el esqueleto, que no cambia nunca.** Es
+desperdicio, y a escala de la cripta de referencia es **la mejora evidente de la
+capacidad**: guardar solo el estado mutable mejoraría **las dos** cosas a la vez, menos
+memoria y consultas más rápidas, porque hay menos que deserializar. Y también reduciría el
+90 % que la línea le cuesta al ciclo.
+
+No se hizo, y la razón es explícita: reutilizar el serializador completo de §4.10, que ya
+estaba escrito y probado, valía más que escribir un segundo serializador a un día de la
+entrega. Es una decisión consciente con su costo medido, no un descuido.
+
+**Una copia no puede contener la línea.** Si la contuviera, cada copia incluiría las
+anteriores y el tamaño crecería de forma **exponencial** con la cantidad de copias. Por eso
+el bloque global se arma con la línea cuando es un archivo de partida y sin ella cuando es
+una copia, y hay una prueba que comprueba que los tamaños de las copias no se disparan.
+
+**El mapa conocido del jugador depende de otra capacidad.** El resumen de un instante debe
+incluirlo (§3.6) y la niebla de guerra es de §5.3. La línea lo lee por duck typing del
+colaborador del motor; una partida sin niebla lleva un objeto nulo que se declara no
+disponible, y el resumen lo informa así en vez de fallar. El archivo de partida ya guarda y
+recupera ese conocimiento por el contrato `exportar`/`importar`, así que entra en las copias
+sin trabajo extra.
+
+**Lo que no se midió:** partidas de más de 300 acciones del jugador. Con *K* = 50 y 1 000
+acciones serían 20 copias, unos 1.3 MiB, que sigue siendo poco, pero es una extrapolación y
+no una medición.
+
+---
+
+## 5.6 Revisión de decisiones de la primera parte (segunda parte)
+
+Estado: medido. Ninguna decisión de la primera parte dejó de ser adecuada; dos
+implementaciones tuvieron defectos y se corrigieron.
+
+El enunciado pide repetir las mediciones de la primera parte con la carga nueva y mostrar
+el antes y el después de cualquier decisión modificada.
+
+> **Nota de alcance.** Esta sección cubre lo que medimos y cambiamos en las capacidades de
+> §5.1, §5.2 y §5.5. El historial reversible de §4.6 es de otro integrante; acá se anota lo
+> que la línea de tiempo descubrió sobre él, no se cambia su decisión.
+
+### El costo de moverse: de un valor fijo al costo de la salida
+
+| | Antes (primera parte) | Después (§3.1) |
+| --- | --- | --- |
+| Costo base de moverse | constante fija 100 para toda salida | el costo declarado por la salida, 100 si no lo declara |
+| Dónde vive el dato | una constante en el motor | un atributo de la **puerta** |
+| Fórmula del intervalo | `max(1, costo * 100 // velocidad)` | **sin cambio** |
+
+El costo se guarda en la puerta y no en la salida porque la puerta ya era un único objeto
+compartido por las dos salas que conecta: así «el costo es el mismo en ambos sentidos» se
+cumple **por construcción** y no por una validación que haya que acordarse de escribir.
+
+Se descartaron guardarlo en la salida, que obligaría a validar a mano que las dos
+direcciones coincidan, y guardarlo en una estructura aparte indexada por par de salas, que
+sería un índice y §7 lo prohíbe.
+
+**La constante del costo de movimiento del motor se eliminó.** Quedaba repitiendo el mismo
+100 que ya define el modelo, que era exactamente el riesgo anotado en el propio plan de la
+capacidad. Se comprobó que nadie más la usaba.
+
+**Dos requisitos resultaron ya satisfechos por el diseño de la primera parte:** el intervalo
+mínimo de una unidad y el reescalado al cambiar de velocidad. Sus tareas fueron demostrarlo
+con pruebas, no implementarlo.
+
+Proviene de [`specs/001-terreno-costo-salidas/spec.md`](../../specs/001-terreno-costo-salidas/spec.md) y su [plan](../../specs/001-terreno-costo-salidas/plan.md). La decisión final coincide con la del plan original.
+
+**Medición del ciclo de eventos**, de la propia capacidad:
+
+| Escenario | Por ciclo | Del límite de 20 ms |
+| --- | ---: | ---: |
+| Costos uniformes, la carga de la primera parte | 0.1912 ms | 0.96 % |
+| Costos variables, la carga de la segunda | 0.1897 ms | 0.95 % |
+
+Dentro del ruido: **leer un atributo en vez de una constante no cuesta nada medible.**
+
+### La agenda de eventos (§4.1) con la carga nueva
+
+La carga cambió en tres cosas: los costos de movimiento ya no son uniformes, hay decenas
+de cazadores decidiendo a la vez, y la línea de tiempo serializa el estado cada *K*
+acciones.
+
+Se repitió la medición de §4.1 con esa carga, con `benchmark/scheduler_bench.py`:
+
+| Estructura | 300 eventos, 50 000 extracciones |
+| --- | ---: |
+| **Montículo binario mínimo** | **0.1337 s** |
+| Lista sin ordenar | 0.8680 s |
+
+**La decisión de la primera parte sigue siendo la adecuada: el montículo es 6.5 veces más
+rápido que la alternativa que se había descartado.** No hay nada que cambiar.
+
+Y la frecuencia de operaciones no se movió de lo que decía §4.1: una inserción por
+extracción, y un tamaño máximo de agenda de 17 con 5 enemigos. Los cazadores no agregan
+eventos a la agenda, solo cambian a dónde se mueven, así que la carga sobre la agenda crece
+con la cantidad de actores y no con el terreno. Eso también era lo esperado.
+
+### El guardado binario (§4.10): dos campos que faltaban y la versión del formato
+
+| | Antes | Después |
+| --- | --- | --- |
+| Versión del formato | 1 | **3** |
+| Costo de las salidas | **no se guardaba** | se guarda en el bloque de la puerta |
+| Rango de los cazadores | no existía | se guarda en el bloque del enemigo |
+| Línea de tiempo | no existía | se guarda completa |
+| Mapa conocido del jugador | no existía | se guarda por el contrato `exportar`/`importar` |
+
+**El defecto que importa: el archivo de partida nunca guardaba el costo de las salidas.** La
+capacidad de §3.1 agregó el costo al modelo y no al guardado, así que guardar y cargar
+devolvía **todas** las salidas a costo 100 en silencio. No había prueba que lo cubriera,
+porque el costo se agregó después del guardado y nadie volvió a mirar ese bloque.
+
+Lo destapó la prueba de equivalencia de la línea de tiempo, y vale como argumento a favor de
+esa capacidad: **reconstruir el pasado obliga a que el estado se serialice completo, y eso
+delata cualquier campo que falte.** Un campo que no se guarda no se nota jugando; se nota
+cuando hay que reproducir la partida exactamente.
+
+La versión subió **una sola vez** de cara al grupo, de 1 a 3, cubriendo los cuatro cambios.
+Los archivos de la primera parte se rechazan con el mensaje que el módulo ya daba, que es
+lo que pide §4.3 del enunciado.
+
+### El historial reversible (§4.6) y el generador aleatorio
+
+No se cambió nada de §4.6. Lo que la línea de tiempo descubrió, y que conviene que quede
+escrito porque es un supuesto del que depende otra capacidad:
+
+**El pergamino devuelve el reloj pero no el estado del generador aleatorio.** Es deliberado
+y estaba documentado. Para el pergamino es correcto: deshace una acción y sigue jugando, y
+el azar posterior no tiene por qué repetirse.
+
+Para la línea de tiempo no alcanza, porque re-simular desde una copia anterior consumiría
+números distintos de los que consumió la partida viva. **No es un defecto de la primera
+parte: es que la línea de tiempo le pide algo que el pergamino no necesitaba.** La línea lo
+compensa forzando una copia completa en cada pergamino, y eso está en los límites conocidos
+de §5.5.
+
+**Y el historial solo guarda las últimas cinco acciones, en un buffer circular.** Eso también
+es correcto para el pergamino y es exactamente lo que impide reconstruir hacia atrás con sus
+anotaciones: la línea de tiempo necesita toda la historia, así que lleva su propia lista.
+Las dos estructuras coexisten y no se estorban.
+
+### El contrato del servicio: salidas de un solo sentido
+
+| | Antes | Después |
+| --- | --- | --- |
+| Supuesto sobre el grafo | simétrico: toda salida tiene vuelta | puede ser asimétrico |
+| Búsqueda del cazador | expandía por las salidas que salen | expande por las que **entran**, y el primer paso usa las que salen |
+| Salida sin vuelta en el esqueleto | se aceptaba en silencio | se acepta y **se avisa** |
+
+El contrato 1.1.0 describe cada salida como «One **directed** exit from a room» y no exige
+la vuelta. El detalle está en los límites conocidos de §5.1. Se anota acá porque **cambió un
+supuesto de la primera parte**, no solo una decisión de la segunda: el traductor ya producía
+mapas asimétricos desde la primera parte, y nadie lo estaba mirando.
+
+### Lo que sigue pendiente de medir
+
+* El comportamiento con la cripta de referencia **real**, `cripta-06`. Todas las mediciones
+  de arriba usan criptas sintéticas a su escala —300 salas, 36 cazadores— porque el paquete
+  sin conexión que la incluye todavía no está. Las criptas sintéticas son deterministas por
+  semilla, pero no son la cripta de la revisión.
+* La carga combinada de las cuatro capacidades a la vez. Cada una se midió con las que ya
+  estaban integradas, pero la niebla de guerra y la resolubilidad no estaban en esta rama
+  cuando se midió.
+
 ---
 
 ## El reloj virtual y la numeración de eventos
@@ -2884,14 +3719,42 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 | `tests/test_inventory_actions.py` | 34 |
 | `tests/test_rewind.py` | 28 |
 | `tests/test_save_load.py` | 20 |
-| `tests/test_almacen_partida.py` | 51 |
+| `tests/test_almacen_partida.py` | 54 |
 | `tests/test_bench_almacen_partida.py` | 8 |
 | `tests/test_guardado_en_la_aplicacion.py` | 18 |
-| **Total del motor** | **350** |
+| **Total del motor, primera parte** | **353** |
 
-Con las del bloque 2 integradas, el proyecto tiene 861 pruebas y todas pasan en
-Python 3.14.6. Se corren con `python -m unittest discover -s tests -t . -v` desde
-`cripta/`, con las dependencias de `requirements.txt` instaladas.
+### Lo que agregaron las capacidades de la segunda parte
+
+| Archivo | Pruebas | Capacidad |
+| --- | ---: | --- |
+| `tests/test_rutas_mas_baratas.py` | 18 | §5.1, la búsqueda, probada sin el motor |
+| `tests/test_cazador.py` | 40 | §5.1 y §5.2, incluidas 5 de salidas de un solo sentido |
+| `tests/test_parada_anticipada.py` | 4 | §5.1, equivalencia contra un cálculo de referencia independiente |
+| `tests/test_linea_de_tiempo.py` | 69 | §5.5 |
+
+Las pruebas del terreno (§3.1) no están en archivos nuevos: quedaron repartidas en
+`test_room.py`, `test_traductor.py`, `test_movement.py` y `test_actor.py`, porque son
+cambios a reglas que ya existían.
+
+**El proyecto tiene 1 026 pruebas y todas pasan** en Python 3.14.6, al cerrar las
+capacidades de §5.1, §5.2, §5.5 y el terreno. Eran 861 al terminar la primera parte. Se
+corren con `python -m unittest discover -s tests -t . -v` desde `cripta/`, con las
+dependencias de `requirements.txt` instaladas.
+
+Esa cifra **no** incluye la niebla de guerra ni la resolubilidad, que están en otras ramas
+o sin empezar; el número volverá a subir al juntarlas. Por eso ni este documento ni la
+constitución fijan un total: lo que no cambia es que ninguna prueba deje de pasar, y cada
+capacidad reporta su total en su propio plan.
+
+Las tres pruebas que respaldan las decisiones más delicadas, por si hay que mostrarlas en
+la defensa:
+
+| Qué garantiza | Dónde |
+| --- | --- |
+| La invalidación de rutas no cambia ninguna decisión: misma partida en modo compartido y en modo recalcular siempre, idénticas turno por turno | `test_cazador.py`, `test_sharing_matches_always_recomputing_turn_by_turn` |
+| El resumen de un instante coincide con el estado real: se juega guardando el estado de antes de cada acción y después se consultan **todas** | `test_linea_de_tiempo.py`, `test_todos_los_instantes_coinciden_con_el_estado_real` |
+| El desempate del cazador no depende del orden de expansión del montículo | `test_rutas_mas_baratas.py`, `test_el_desempate_no_depende_del_orden_de_expansion` |
 
 El motor se probó además contra los datos reales de `cripta-01`: se recorre la cripta
 desde la sala inicial hasta la de salida, disparando la trampa de la sala 2, abriendo

@@ -55,9 +55,17 @@ class ConsoleView:
             exits = []
 
             for exit_ in room.exits:
-                state = "" if exit_.is_open else " (cerrada)"
+                # Lo que el jugador conoce (FR-020): una puerta abierta no se
+                # anota, y un destino solo avistado no muestra su id (FR-005).
+                state = "" if exit_.door_state == "abierta" else f" ({exit_.door_state})"
+
+                if exit_.destination is None:
+                    destination = "hay algo en esa direccion"
+                else:
+                    destination = exit_.destination
+
                 exits.append(
-                    f"{exit_.direction}->{exit_.destination} (costo {exit_.cost}){state}"
+                    f"{exit_.direction}->{destination} (costo {exit_.cost}){state}"
                 )
 
             self._print("Salidas: " + ", ".join(exits))
@@ -69,6 +77,59 @@ class ConsoleView:
 
             for position, item in enumerate(room.floor):
                 self._print(f"  {position}. {item.name} ({item.item_class})")
+
+    def show_known_map(self, rooms):
+        """El mapa conocido: salas exploradas con sus salidas (FR-018).
+
+        Una salida hacia una sala avistada se muestra sin id, como algo que
+        hay en esa direccion (FR-005).
+        """
+        if not rooms:
+            self._print("Todavia no conoces ninguna sala.")
+            return
+
+        self._print("Mapa conocido:")
+
+        for room in rooms:
+            self._print(f"Sala {room.room_id}: {room.name}")
+
+            for exit_ in room.exits:
+                if exit_.destination is None:
+                    destination = "hay algo en esa direccion"
+                else:
+                    destination = str(exit_.destination)
+
+                self._print(
+                    f"  {exit_.direction} -> {destination} (costo {exit_.cost}) "
+                    f"{exit_.door_state}"
+                )
+
+    TRAVEL_REASONS = (
+        ("llegada", "Llegaste a la sala {destination}."),
+        ("enemigos", "Hay enemigos en esta sala."),
+        ("daño", "Recibiste daño."),
+        ("sin_ruta", "No hay una ruta conocida hacia la sala {destination}."),
+        ("partida_terminada", "La partida terminó."),
+        ("contenido_no_disponible", "{message}"),
+    )
+
+    def show_travel_result(self, result, destination):
+        """Por que se rechazo o se detuvo un viaje «ir a» (FR-029).
+
+        Si se cumplieron varios motivos se muestran todos, en el orden en que
+        llegan, que es el de FR-028.
+        """
+        if not result.accepted:
+            self._print(result.message)
+            return
+
+        if result.steps:
+            self._print(f"Viaje: {result.steps} paso(s).")
+
+        for reason in result.reasons:
+            for name, text in self.TRAVEL_REASONS:
+                if name == reason:
+                    self._print(text.format(destination=destination, message=result.message))
 
     def show_inventory(self, items, criterion=None):
         if not items:
@@ -86,48 +147,9 @@ class ConsoleView:
             )
 
     def show_history(self, resumen):
-        """Imprime el resumen de un instante pasado (seccion 3.6).
-
-        El resumen llega como dato desde el modelo: la vista decide como se
-        ve, y no decide que va adentro.
-        """
-        self._print(
-            f"Instante {resumen.instante} "
-            f"(antes de la accion {resumen.acciones_del_jugador + 1}):"
-        )
-
-        nombre = resumen.nombre_de_la_sala or "desconocida"
-        self._print(f"  Sala: {resumen.sala}, {nombre}")
-        self._print(
-            f"  Vida: {resumen.vida}/{resumen.vida_maxima}  "
-            f"ataque {resumen.ataque}, defensa {resumen.defensa}, "
-            f"velocidad {resumen.velocidad}"
-        )
-
-        if resumen.inventario:
-            objetos = ", ".join(
-                f"{nombre} ({clase})" for nombre, clase in resumen.inventario
-            )
-            self._print(f"  Inventario: {objetos}")
-        else:
-            self._print("  Inventario: vacio")
-
-        if resumen.efectos:
-            efectos = ", ".join(
-                nombre if termina is None else f"{nombre} hasta {termina}"
-                for nombre, termina in resumen.efectos
-            )
-            self._print(f"  Efectos: {efectos}")
-        else:
-            self._print("  Efectos: ninguno")
-
-        if resumen.enemigos:
-            for actor_id, nombre_enemigo, vida in resumen.enemigos:
-                self._print(f"  Enemigo {actor_id}: {nombre_enemigo}, vida {vida}")
-        else:
-            self._print("  Enemigos en la sala: ninguno")
-
-        self._print(f"  Mapa conocido: {resumen.mapa_conocido}")
+        """Imprime el resumen de un instante pasado (seccion 3.6)."""
+        for linea in lineas_de_historia(resumen):
+            self._print(linea)
 
     def show_scores(self, entries, crypt_id=None):
         title = "Puntajes" if crypt_id is None else f"Puntajes de {crypt_id}"
@@ -183,8 +205,12 @@ class ConsoleView:
         self._print("Enemigos:")
 
         for enemy in enemies:
+            # El cazador se marca porque la decision que le conviene al jugador
+            # es la opuesta: de un guardian puede alejarse y olvidarlo, de un
+            # cazador no (FR-019 de la capacidad 002, §7.3 del enunciado).
+            marca = "[cazador] " if enemy.is_hunter else ""
             self._print(
-                f"  {enemy.name} [{enemy.actor_id}] "
+                f"  {marca}{enemy.name} [{enemy.actor_id}] "
                 f"vida {enemy.health}/{enemy.max_health}"
             )
 
@@ -199,3 +225,60 @@ class ConsoleView:
 
     def _print(self, text):
         self.output.write(text + "\n")
+
+
+def lineas_de_historia(resumen):
+    """Las lineas del resumen de un instante pasado (seccion 3.6).
+
+    Es una funcion y no un metodo para que --replay --hasta imprima el mismo
+    resumen sin instanciar la vista.
+
+    El resumen llega como dato desde el modelo: la vista decide como se
+    ve, y no decide que va adentro.
+    """
+    lineas = []
+
+    lineas.append(
+        f"Instante {resumen.instante} "
+        f"(antes de la accion {resumen.acciones_del_jugador + 1}):"
+    )
+
+    nombre = resumen.nombre_de_la_sala or "desconocida"
+    lineas.append(f"  Sala: {resumen.sala}, {nombre}")
+    lineas.append(
+        f"  Vida: {resumen.vida}/{resumen.vida_maxima}  "
+        f"ataque {resumen.ataque}, defensa {resumen.defensa}, "
+        f"velocidad {resumen.velocidad}"
+    )
+
+    if resumen.inventario:
+        objetos = ", ".join(
+            f"{nombre} ({clase})" for nombre, clase in resumen.inventario
+        )
+        lineas.append(f"  Inventario: {objetos}")
+    else:
+        lineas.append("  Inventario: vacio")
+
+    if resumen.efectos:
+        efectos = ", ".join(
+            nombre if termina is None else f"{nombre} hasta {termina}"
+            for nombre, termina in resumen.efectos
+        )
+        lineas.append(f"  Efectos: {efectos}")
+    else:
+        lineas.append("  Efectos: ninguno")
+
+    if resumen.enemigos:
+        for actor_id, nombre_enemigo, vida in resumen.enemigos:
+            lineas.append(f"  Enemigo {actor_id}: {nombre_enemigo}, vida {vida}")
+    else:
+        lineas.append("  Enemigos en la sala: ninguno")
+
+    if isinstance(resumen.mapa_conocido, str):
+        lineas.append(f"  Mapa conocido: {resumen.mapa_conocido}")
+    else:
+        cuantas = len(resumen.mapa_conocido)
+        salas = ", ".join(str(sala) for sala in resumen.mapa_conocido)
+        lineas.append(f"  Mapa conocido: {cuantas} salas exploradas ({salas})")
+
+    return lineas

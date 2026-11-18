@@ -27,8 +27,10 @@ from controller.commands import (
     HELP,
     LOAD,
     HISTORY,
+    MAP,
     QUIT,
     SAVE,
+    TRAVEL,
     VIEW,
     CommandError,
     is_game_action,
@@ -36,6 +38,7 @@ from controller.commands import (
 )
 from controller.game_controller import GameController
 from structures.linea_de_tiempo import COPIAS_CADA, LineaDeTiempo
+from structures.mapa_conocido import ABIERTA, CERRADA, MapaConocido
 from model.consulta_historia import (
     ConsultaRechazada,
     consultar_accion,
@@ -56,11 +59,15 @@ from repository.repositorio_cripta import VersionesIncompatibles
 from repository.traductor import ErrorDatosCripta
 from structures.history import History, ReversibleEventQueue
 from structures.inventory import Inventory
+from structures.sorting import sort
 from structures.tabla_hash import TablaHash
+from view.console_view import lineas_de_historia
 from structures.trail import PlayerTrail
 
 
 LOG_DIRECTORY = "partidas"
+
+NO_KNOWN_MAP = "Todavia no se puede ver el mapa: la partida no tiene el mapa conocido."
 
 # Errores de datos que el programa reporta con su mensaje en vez de caerse
 # (§3.1). Todos traen un texto listo para mostrar.
@@ -121,6 +128,8 @@ def build_game(repository, seed, player_name=None, in_use=None,
     room_map = repository.crear_mapa()
     enemies = repository.cargar_contenido_de_sala(room_map.room(player.room_id))
 
+    # El mapa conocido comparte el historial, para que el pergamino revierta
+    # tambien lo explorado y lo observado (FR-015).
     game = Game(
         state,
         player,
@@ -132,10 +141,32 @@ def build_game(repository, seed, player_name=None, in_use=None,
         event_queue=ReversibleEventQueue(history),
         timeline=LineaDeTiempo(copias_cada=copias_cada),
         snapshot=tomar_copia_del_estado,
+        known_map=MapaConocido(room_map, history),
     )
 
     if in_use is not None:
         in_use.game = game
+
+    return game
+
+
+def build_saved_game(partida):
+    """El Game de una partida leida de un archivo, con su mapa conocido.
+
+    El mapa se arma con el mapa de salas de la partida y el adaptador le
+    importa el conocimiento guardado (FR-014). El historial lo crea el
+    adaptador, asi que se le entrega al mapa despues, para que el pergamino
+    revierta lo que se explore desde ahi (FR-015).
+
+    Un archivo sin conocimiento guardado deja el mapa vacio; entonces el
+    jugador explora la sala en la que esta, como al empezar una partida.
+    """
+    known_map = MapaConocido(partida.room_map)
+    game = construir_juego_reversible(partida, known_map=known_map)
+    known_map.usar_historial(game.history)
+
+    if partida.known_map is None:
+        known_map.jugador_entro(game.player.room_id)
 
     return game
 
@@ -161,9 +192,15 @@ def new_log_path(crypt_id, directory=LOG_DIRECTORY):
 
 @dataclass
 class ExitView:
+    """Una salida de la sala del jugador, para mostrar.
+
+    destination es None si el destino solo esta avistado: no se revela su id
+    (FR-005, FR-020). door_state es abierta, cerrada o desconocida.
+    """
+
     direction: str
-    destination: int
-    is_open: bool
+    destination: int | None
+    door_state: str
     cost: int = 100
 
 
@@ -184,16 +221,86 @@ class RoomView:
     floor: list
 
 
-def room_view(game):
-    """Salidas y suelo de la sala del jugador, solo para mostrar."""
+def room_view(game, known_map=None):
+    """Salidas y suelo de la sala del jugador, solo para mostrar.
+
+    Con mapa conocido, las salidas salen del conocimiento del jugador
+    (FR-012, FR-020): el estado de la puerta es el recordado y el destino solo
+    lleva id si esta explorado. Sin mapa conocido, que es una partida sin
+    niebla de guerra, se muestra el estado real.
+    """
     room = game.room_map.room(game.player.room_id)
-    exits = [
-        ExitView(exit_.direction, exit_.destination, exit_.door.is_open, exit_.cost)
-        for exit_ in room.exits()
-    ]
+    exits = []
+
+    for exit_ in room.exits():
+        if known_map is None:
+            state = ABIERTA if exit_.door.is_open else CERRADA
+            destination = exit_.destination
+        else:
+            state = known_map.puerta_recordada(exit_.door)
+            destination = (
+                exit_.destination if known_map.esta_explorada(exit_.destination) else None
+            )
+
+        exits.append(ExitView(exit_.direction, destination, state, exit_.cost))
+
     floor = [_item_view(game.player, item) for item in room.floor_items]
 
     return RoomView(room.name, exits, floor)
+
+
+@dataclass
+class KnownExitView:
+    """Una salida de una sala explorada, tal como la conoce el jugador.
+
+    destination es el id del destino si esta explorado, o None si solo esta
+    avistado: de una avistada no se revela el id (FR-005). door_state es el
+    estado recordado: abierta, cerrada o desconocida.
+    """
+
+    direction: str
+    cost: int
+    door_state: str
+    destination: int | None
+
+
+@dataclass
+class KnownRoomView:
+    room_id: int
+    name: str
+    exits: list
+
+
+def known_map_view(known_map, room_map):
+    """Las salas exploradas, ordenadas por id, con sus salidas (FR-018).
+
+    Todo sale del conocimiento del jugador (FR-012): las salas son las
+    exploradas, el estado de cada puerta es el recordado, y el destino de una
+    salida solo lleva id si el jugador exploro esa sala. Las desconocidas no
+    aparecen.
+    """
+    rooms = []
+
+    for room_id in sort(known_map.salas_exploradas()):
+        room = room_map.room(room_id)
+        exits = []
+
+        for exit_ in room.exits():
+            destination = (
+                exit_.destination if known_map.esta_explorada(exit_.destination) else None
+            )
+            exits.append(
+                KnownExitView(
+                    exit_.direction,
+                    exit_.cost,
+                    known_map.puerta_recordada(exit_.door),
+                    destination,
+                )
+            )
+
+        rooms.append(KnownRoomView(room_id, room.name, exits))
+
+    return rooms
 
 
 def inventory_view(game, criterion=None):
@@ -276,7 +383,7 @@ def load_saved_game(repository, view, load_path, in_use=None):
 
     repository.iniciar_partida(partida.id_cripta)
     comprobar_versiones_vigentes(partida, repository)
-    game = construir_juego_reversible(partida)
+    game = build_saved_game(partida)
 
     if in_use is not None:
         in_use.game = game
@@ -290,7 +397,8 @@ def load_saved_game(repository, view, load_path, in_use=None):
 
 
 def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
-         log_directory=LOG_DIRECTORY, scoreboard=None, load_path=None):
+         log_directory=LOG_DIRECTORY, scoreboard=None, load_path=None,
+         copias_cada=COPIAS_CADA):
     """Juega una partida completa con la vista de consola.
 
     Devuelve el Game al terminar, o None si no se llego a empezar. Si la
@@ -327,7 +435,7 @@ def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
                 return None
 
             repository.iniciar_partida(crypt_id)
-            game = build_game(repository, seed, player_name, in_use)
+            game = build_game(repository, seed, player_name, in_use, copias_cada)
 
         crypt, crypt_version, catalog_version = repository.versiones_de_la_partida()
         header = ReplayHeader(
@@ -384,7 +492,7 @@ def _command_loop(controller, view):
     while not controller.is_over:
         if show:
             view.show_state(controller.visible_state())
-            view.show_room(room_view(game))
+            view.show_room(room_view(game, controller.known_map))
 
         show = True
         text = view.read_command()
@@ -452,6 +560,30 @@ def _command_loop(controller, view):
             show = False
             continue
 
+        if command.name == TRAVEL:
+            try:
+                travel = controller.travel(command.argument)
+            except DATA_ERRORS as error:
+                view.show_message(str(error))
+                continue
+
+            view.show_travel_result(travel, command.argument)
+            show = travel.steps > 0
+            continue
+
+        if command.name == MAP:
+            # Solo lee el conocimiento: no pasa por el modelo ni por la
+            # bitacora, no consume tiempo ni cambia nada (FR-019).
+            known_map = controller.known_map
+
+            if known_map is None:
+                view.show_message(NO_KNOWN_MAP)
+            else:
+                view.show_known_map(known_map_view(known_map, game.room_map))
+
+            show = False
+            continue
+
         if not is_game_action(command):
             view.show_message(f"Comando sin atender: '{command.name}'.")
             continue
@@ -479,12 +611,23 @@ def _consultar_historia(game, argumento):
     empieza con # para un numero de accion, asi que no hay que volver a
     interpretar el texto aca.
     """
+    if isinstance(argumento, str) and argumento.startswith("#"):
+        return consultar_accion(game, int(argumento[1:]), reconstruir_con_mapa_conocido)
+
+    return consultar_instante(game, argumento, reconstruir_con_mapa_conocido)
+
+
+def reconstruir_con_mapa_conocido(bloque):
+    """Reconstruye una copia de la linea de tiempo con su mapa conocido.
+
+    reconstruir_desde_copia acepta quien cree un mapa conocido vacio sobre el
+    mapa de salas reconstruido e importa en el el conocimiento de la copia;
+    al repetir acciones, el motor reconstruido sigue avisandole. Asi el
+    resumen de un instante informa lo que el jugador sabia entonces (FR-016).
+    """
     from adapters.almacen_partida import reconstruir_desde_copia
 
-    if isinstance(argumento, str) and argumento.startswith("#"):
-        return consultar_accion(game, int(argumento[1:]), reconstruir_desde_copia)
-
-    return consultar_instante(game, argumento, reconstruir_desde_copia)
+    return reconstruir_desde_copia(bloque, MapaConocido)
 
 
 def _saved_game_problem(path, repository):
@@ -537,8 +680,14 @@ def _ending_text(game):
 # ----------------------------------------------------------------------
 
 
-def replay(repository, log_path, output=print, in_use=None, verbose=True):
+def replay(repository, log_path, output=print, in_use=None, verbose=True,
+           copias_cada=COPIAS_CADA, hasta=None):
     """Reproduce un log sin interaccion (§4.11). Devuelve el Game o None.
+
+    Con hasta, al terminar imprime el resumen del instante hasta, el mismo
+    que da el comando historia, sin instanciar la vista (FR-014 de la linea
+    de tiempo). copias_cada son las acciones entre dos copias completas del
+    estado de la partida nueva (FR-015); una partida cargada trae su linea.
 
     Si la fuente no tiene las versiones del log lo informa y no reproduce:
     nunca reproduce en silencio contra datos distintos.
@@ -566,7 +715,7 @@ def replay(repository, log_path, output=print, in_use=None, verbose=True):
         if in_use is not None:
             in_use.game = game
     else:
-        game = build_game(repository, header.seed, in_use=in_use)
+        game = build_game(repository, header.seed, in_use=in_use, copias_cada=copias_cada)
 
     controller = GameController(game, repository=repository)
 
@@ -591,7 +740,25 @@ def replay(repository, log_path, output=print, in_use=None, verbose=True):
 
     output(_ending_text(game))
 
+    if hasta is not None:
+        show_instant(game, hasta, output)
+
     return game
+
+
+def show_instant(game, instant, output=print):
+    """Imprime con output el resumen de un instante pasado, o por que no se
+    puede. No usa la vista interactiva: solo su formato de lineas."""
+    try:
+        resumen = consultar_instante(game, instant, reconstruir_con_mapa_conocido)
+    except ConsultaRechazada as error:
+        output(str(error))
+        return None
+
+    for line in lineas_de_historia(resumen):
+        output(line)
+
+    return resumen
 
 
 def _game_from_logged_save(header, output):
@@ -627,4 +794,4 @@ def _game_from_logged_save(header, output):
         output(f"{cannot}, que es de otra cripta ({partida.id_cripta}).")
         return None
 
-    return construir_juego_reversible(partida)
+    return build_saved_game(partida)

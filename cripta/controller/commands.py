@@ -19,6 +19,8 @@ SAVE = "guardar"
 LOAD = "cargar"
 HELP = "ayuda"
 QUIT = "salir"
+MAP = "mapa"
+TRAVEL = "ir a"
 
 DIRECTIONS = ("N", "S", "E", "O")
 SORT_CRITERIA = ("peso", "valor", "nombre")
@@ -35,6 +37,8 @@ HELP_LINES = (
     "sig | ant          ver el objeto siguiente o el anterior del inventario",
     "ver [peso|valor|nombre]  mostrar el inventario, ordenado si se indica",
     "retroceder         usar un pergamino de retroceso",
+    "mapa               ver las salas exploradas y avistadas",
+    "ir a <sala>        viajar a una sala explorada, por ejemplo ir a 7",
     "historia <t>       ver como estaba la partida en el instante t",
     "historia #k        ver como estaba antes de la accion numero k",
     "guardar <archivo>  guardar la partida",
@@ -74,8 +78,9 @@ class Command:
 def is_game_action(command):
     """True si el comando lo ejecuta el modelo y puede quedar en la bitacora.
 
-    Los demas (ver, guardar, cargar, ayuda, salir) no cambian el estado de la
-    partida o los atiende la aplicacion, no el modelo.
+    Los demas (ver, guardar, cargar, ayuda, salir, mapa, ir a) no cambian el
+    estado de la partida o los atiende la aplicacion, no el modelo. «ir a» no
+    queda en la bitacora como tal: se registra cada uno de sus pasos.
     """
     return command.name in (
         MOVE,
@@ -124,9 +129,12 @@ def parse_command(text):
     if name in (SAVE, LOAD):
         return Command(name, _single_word(name, arguments, "el nombre del archivo"))
 
-    if name in (WAIT, DROP, USE, EQUIP, NEXT, PREVIOUS, REWIND, HELP, QUIT):
+    if name in (WAIT, DROP, USE, EQUIP, NEXT, PREVIOUS, REWIND, HELP, QUIT, MAP):
         _no_arguments(name, arguments)
         return Command(name)
+
+    if name == "ir":
+        return Command(TRAVEL, _travel_destination(arguments))
 
     raise CommandError(f"Comando desconocido: '{words[0]}'. Escriba ayuda.")
 
@@ -174,6 +182,19 @@ def _floor_position(arguments):
         raise CommandError(
             f"'{text}' no es una posicion valida. Use un numero desde 0."
         )
+
+    return int(text)
+
+
+def _travel_destination(arguments):
+    """«ir a <sala>»: la sala es el id numerico (supuesto del grupo)."""
+    if len(arguments) != 2 or arguments[0].lower() != "a":
+        raise CommandError(f"'{TRAVEL}' necesita el numero de una sala, por ejemplo ir a 7.")
+
+    text = arguments[1]
+
+    if not text.isdigit():
+        raise CommandError(f"'{text}' no es el numero de una sala.")
 
     return int(text)
 
