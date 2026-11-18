@@ -686,7 +686,8 @@ def replay(repository, log_path, output=print, in_use=None, verbose=True,
 
     Con hasta, al terminar imprime el resumen del instante hasta, el mismo
     que da el comando historia, sin instanciar la vista (FR-014 de la linea
-    de tiempo). copias_cada son las acciones entre dos copias completas del
+    de tiempo); si hasta es posterior al final, el del estado final con un
+    aviso (FR-025). copias_cada son las acciones entre dos copias completas del
     estado de la partida nueva (FR-015); una partida cargada trae su linea.
 
     Si la fuente no tiene las versiones del log lo informa y no reproduce:
@@ -741,9 +742,29 @@ def replay(repository, log_path, output=print, in_use=None, verbose=True,
     output(_ending_text(game))
 
     if hasta is not None:
-        show_instant(game, hasta, output)
+        show_instant(game, _instante_reproducido(game, hasta, output), output)
 
     return game
+
+
+def _instante_reproducido(game, hasta, output):
+    """El instante que se muestra al reproducir hasta hasta.
+
+    Un instante posterior al reloj final no se rechaza como en la partida en
+    curso (FR-009): la partida reproducida ya no puede llegar a el. Se
+    muestra el estado final y se avisa que la partida termino antes (FR-025
+    de la linea de tiempo, Apendice B).
+    """
+    final = game.state.clock
+
+    if isinstance(hasta, int) and not isinstance(hasta, bool) and hasta > final:
+        output(
+            f"La partida termino en el instante {final}, antes del instante "
+            f"{hasta}: se muestra el estado final."
+        )
+        return final
+
+    return hasta
 
 
 def show_instant(game, instant, output=print):

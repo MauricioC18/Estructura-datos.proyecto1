@@ -1,4 +1,4 @@
-"""Banderas --checkpoint-cada y --replay --hasta (FR-014 y FR-015 de specs/003-linea-de-tiempo).
+"""Banderas --checkpoint-cada y --replay --hasta (FR-014, FR-015 y FR-025 de specs/003-linea-de-tiempo).
 
 Usan los datos offline con la primera cripta que se lista, sin depender de su
 id ni de su tamaño. Cada prueba cita en su docstring los requisitos que
@@ -128,15 +128,50 @@ class TestConPartidaReal(unittest.TestCase):
         self.assertIn("Instante 0 (antes de la accion 1):", texto)
         self.assertIn("Mapa conocido: 1 salas exploradas", texto)
 
-    def test_replay_hasta_despues_del_final_se_rechaza(self):
-        """FR-014: un instante posterior al reloj final se informa y no falla."""
+    def test_replay_hasta_despues_del_final_muestra_el_estado_final(self):
+        """FR-025 (Historia 6, escenario 1, Apéndice B): un instante posterior
+        al reloj final muestra el estado final e indica que la partida
+        terminó antes, sin instanciar la vista."""
         cripta, _ = self.primera_cripta_y_salida()
         original = self.jugar(["esperar", "salir"], cripta)
+        final = original.state.clock
+        pedido = final + 1000
 
-        _, salida = self.reproducir(hasta=original.state.clock + 1000)
+        juego, salida = self.reproducir(hasta=pedido)
+
+        aviso = (f"La partida termino en el instante {final}, antes del instante "
+                 f"{pedido}: se muestra el estado final.")
+        self.assertIn(aviso, salida)
+        instantes = [linea for linea in salida if linea.startswith("Instante ")]
+        self.assertEqual(len(instantes), 1)
+        self.assertTrue(instantes[0].startswith(f"Instante {final} "))
+        self.assertLess(salida.index(aviso), salida.index(instantes[0]))
+        self.assertEqual(juego.state.clock, final, "consultar no cambia la partida")
+
+    def test_replay_hasta_el_instante_final_no_avisa(self):
+        """FR-025, caso borde: el instante final exacto no es posterior al
+        final, así que se muestra sin el aviso."""
+        cripta, _ = self.primera_cripta_y_salida()
+        original = self.jugar(["esperar", "salir"], cripta)
+        final = original.state.clock
+
+        _, salida = self.reproducir(hasta=final)
+
+        self.assertFalse([linea for linea in salida if linea.startswith("La partida termino")])
+        instantes = [linea for linea in salida if linea.startswith("Instante ")]
+        self.assertEqual(len(instantes), 1)
+        self.assertTrue(instantes[0].startswith(f"Instante {final} "))
+
+    def test_replay_hasta_un_instante_negativo_se_sigue_rechazando(self):
+        """FR-009, FR-025: solo un instante posterior al final cambia; uno
+        negativo se sigue rechazando con un mensaje."""
+        cripta, _ = self.primera_cripta_y_salida()
+        self.jugar(["esperar", "salir"], cripta)
+
+        _, salida = self.reproducir(hasta=-1)
 
         self.assertFalse([linea for linea in salida if linea.startswith("Instante ")])
-        self.assertFalse(salida[-1].startswith("Partida"))
+        self.assertIn("No existe el instante -1: el reloj empieza en 0.", salida)
 
     def test_replay_hasta_despues_de_moverse_con_una_copia_por_accion(self):
         """FR-014, FR-015: con una copia por acción, el resumen del instante
