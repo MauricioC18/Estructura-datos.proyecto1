@@ -59,7 +59,7 @@ python -m unittest discover -s tests -t . -v
 
 En Windows también funciona `py` en lugar de `python`.
 
-Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1231 pruebas, todas pasan**, medido con Python 3.12.3. Dos de ellas se cuentan como *fallos esperados* (ver «Lo que todavía no funciona»).
+Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1279 pruebas, todas pasan**, medido con Python 3.12.3, sin fallos esperados. Incluye lo unido de `main` y de la rama de datos nuevos del servicio (`specs/004-datos-nuevos-servicio`).
 
 ### Pruebas de aceptación por capacidad
 
@@ -122,7 +122,7 @@ Comandos dentro de la partida (con `ayuda` se ven en pantalla):
 | `guardar <archivo>` | Guardar la partida en el archivo binario indicado |
 | `cargar <archivo>` | Deja la partida actual y continúa la guardada, con una bitácora nueva. Si el archivo no sirve, se sigue en la partida actual |
 | `mapa` | Ver las salas exploradas, sus salidas, el estado recordado de cada puerta y las salas avistadas (niebla de guerra, §3.3). No consume tiempo |
-| `ir a <sala>` | Viajar a una sala explorada por la ruta conocida más barata, un movimiento por paso (§3.4); al detenerse dice por qué. **Todavía no respeta las salidas de un solo sentido**: ver la nota más abajo |
+| `ir a <sala>` | Viajar a una sala explorada por la ruta conocida más barata, un movimiento por paso (§3.4); al detenerse dice por qué. Respeta las salidas de un solo sentido: solo las recorre en su sentido |
 | `historia <t>`, `historia #k` | Ver el estado de la partida en el instante `t` o antes de la acción `k`, incluido el mapa conocido de ese momento. **Ver la nota sobre la línea de tiempo más abajo** |
 | `salir` | Terminar la sesión |
 
@@ -134,8 +134,6 @@ El log de una sesión que empezó cargando un guardado, con `--cargar` o con `ca
 
 ## Lo que todavía no funciona
 
-- **«ir a» con salidas de un solo sentido.** La búsqueda todavía recorre cada salida en los dos sentidos, así que con una salida sin vuelta puede declarar «no hay ruta» teniendo una salida directa, o no ver una ruta válida. La corrección está escrita (`MapaConocido.entrantes_conocidas`) y probada por equivalencia, pero conectarla necesita que la búsqueda compartida (`structures/rutas_mas_baratas.py`) acepte la parada anticipada junto con el proveedor de salidas. Las dos pruebas de los escenarios 7 y 8 de la Historia 4 (`tests/test_ir_a_sentido.py`) están marcadas como fallo esperado hasta entonces (tarea T052 de `specs/005-niebla-ir-a/tasks.md`).
-- **`historia` y `--replay --hasta` con copias espaciadas.** Para un instante posterior a un movimiento hacia una sala cuyo contenido no estaba cargado cuando se tomó la copia, la reconstrucción repite el movimiento, el motor lo rechaza porque esa sala no tiene contenido, y el resumen entero sale en la sala anterior, sin ningún error. Con `--checkpoint-cada 1` no pasa. Es un defecto de la reconstrucción de la línea de tiempo, reportado a su responsable.
 - **La cripta de referencia de §6.1** (cripta-06, de 300 salas) no está en el paquete sin conexión, así que el límite de 5 ms por paso de «ir a» no está comprobado sobre ella. En las cuadrículas sintéticas, el primer paso de un viaje entre los extremos pasa de 5 ms desde 400 salas (`docs/DECISIONES.md`, §5.3).
 - `--verificar` y `--forzar` (resolubilidad) no están implementadas.
 

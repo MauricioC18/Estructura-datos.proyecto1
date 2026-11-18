@@ -2430,8 +2430,8 @@ Lo que muestran:
 ### Límites conocidos
 
 - **FR-036 no se cumple en el primer paso de un viaje largo en mapas de 400 salas o más.** Los pasos siguientes del mismo viaje sí. La cripta de referencia tiene 300 salas y no se midió (ver Evidencia), así que queda sin comprobar. Lo que queda por probar es aligerar la búsqueda misma, que es compartida con el cazador.
-- **«ir a» todavía no respeta las salidas de un solo sentido.** `entrantes_conocidas` está escrita y probada, y una prueba de equivalencia sobre 300 mapas asimétricos muestra que la búsqueda compartida con ese proveedor da el mismo primer paso que una referencia propia, con parada y sin ella. Falta conectarla en `model/viaje.py`, y eso espera a que la búsqueda compartida acepte la parada anticipada junto con el proveedor de salidas. Hasta entonces, las pruebas de los escenarios 7 y 8 de la Historia 4 están marcadas como fallo esperado.
-- **El resumen de un instante pasado puede salir mal con copias espaciadas.** Si entre la copia de la línea de tiempo y el instante consultado el jugador entró a una sala cuyo contenido no estaba cargado cuando se tomó la copia, la reconstrucción no puede repetir ese movimiento y el resumen entero, incluido el mapa conocido, queda en la sala anterior, sin ningún error. Es de la reconstrucción de la línea de tiempo, no del mapa conocido. Las pruebas de FR-016 usan una copia por acción, que es el caso en que funciona.
+- **Salidas de un solo sentido: resuelto el 2026-11-17 (T052).** Cuando la búsqueda compartida aceptó la parada anticipada junto con el proveedor de salidas (arreglo de §5.1), `model/viaje.py` pasó a expandir por `entrantes_conocidas` y a dar el primer paso por `vecinas_conocidas`. Las pruebas de los escenarios 7 y 8 de la Historia 4 dejaron de ser fallos esperados. La medición 5 de arriba se tomó antes de este cambio; no se repitió.
+- **Resumen de un instante con copias espaciadas: resuelto en la línea de tiempo.** El resumen salía en la sala anterior si entre la copia y el instante el jugador entraba a una sala sin contenido cargado. Lo corrigió la línea de tiempo (§5.5): cargar contenido fuerza una copia. Se comprobó también con `--replay --hasta` y *K* = 50.
 - Explorar, consultar y revertir dependen de que el motor avise de cada entrada y de cada cambio de puerta. Un camino nuevo del motor que cambie una puerta sin avisar dejaría el recuerdo desactualizado sin ningún error. La prueba de SC-002 compara, después de cada acción, el recuerdo contra el estado real de las puertas de la sala del jugador.
 
 ### Pruebas
@@ -2443,7 +2443,7 @@ Lo que muestran:
 | `tests/test_ir_a.py` | Viaje completo por el controlador, bitácora y reproducción, paradas, pergamino | 23 |
 | `tests/test_niebla.py` | Con el motor real: memoria de puertas y SC-002, antorcha, reversión, determinismo, no interferencia y los casos del Apéndice B de «ir a» | 14 |
 | `tests/test_niebla_guardado.py` | Guardar y cargar conserva el conocimiento; lo explorado después de cargar se revierte | 2 |
-| `tests/test_ir_a_sentido.py` | Escenarios 7 y 8 de la Historia 4. Dos de las tres están marcadas como fallo esperado hasta conectar las salidas entrantes | 3 |
+| `tests/test_ir_a_sentido.py` | Escenarios 7 y 8 de la Historia 4, con las salidas entrantes conectadas (T052) | 3 |
 | `tests/test_equivalencia_sentido.py` | En 300 mapas asimétricos, mismo primer paso con salidas entrantes, con parada y sin ella, y distancias iguales a Bellman-Ford | 2 |
 | `tests/test_parada_anticipada.py` | En 300 mapas, la búsqueda con parada da el mismo paso que la completa | 4 |
 | `tests/test_reutilizar_ruta.py` | Reutilizar la búsqueda da el mismo viaje que recalcular | 6 |
