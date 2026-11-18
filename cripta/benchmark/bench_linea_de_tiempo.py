@@ -14,6 +14,10 @@ Que se mide y por que
        plano (SC-008).
     4. El ciclo completo de eventos con la linea activa, contra el limite de
        20 ms (FR-024, SC-009).
+    5. Una partida de 5 000 acciones con K por omision: promedio y peor
+       consulta contra el limite de 50 ms de la seccion 6.1. Y la alternativa
+       sin puntos de control (solo la copia inicial), que pide la seccion
+       6.3, en partidas de 300 y 5 000 acciones.
 
 El valor por omision de K sale de la medicion 1, como exige la seccion 3.6:
 se busca la rodilla de la curva, donde bajar mas K ya casi no acelera la
@@ -36,7 +40,7 @@ from model.game_state import GameState
 from model.player import Player
 from structures.history import History, ReversibleEventQueue
 from structures.inventory import Inventory
-from structures.linea_de_tiempo import LineaDeTiempo
+from structures.linea_de_tiempo import COPIAS_CADA, LineaDeTiempo
 from structures.trail import PlayerTrail
 
 
@@ -187,9 +191,41 @@ def measure_event_cycle(copias_cada, decisions):
     return seconds, timeline.cantidad_de_acciones()
 
 
+# ----------------------------------------------------------------------
+# 5. Partida larga y alternativa sin puntos de control (6.1 y 6.3)
+# ----------------------------------------------------------------------
+
+def measure_queries_one_by_one(copias_cada, decisions, queries):
+    """Promedio y peor consulta, en puntos repartidos de la partida.
+
+    El limite de 6.1 es por consulta (50 ms con al menos 5 000 acciones y K
+    por omision), asi que se reporta tambien la peor, no solo el promedio.
+    """
+    game, timeline = build_game(copias_cada)
+    play(game, decisions)
+
+    cuantas = timeline.cantidad_de_acciones()
+    puntos = [cuantas * numero // max(1, queries - 1) for numero in range(queries)]
+    total = 0.0
+    peor = 0.0
+
+    for numero in puntos:
+        start = time.perf_counter()
+        consultar_accion(game, numero, reconstruir_desde_copia)
+        seconds = time.perf_counter() - start
+        total += seconds
+        peor = max(peor, seconds)
+
+    return total / len(puntos), peor, cuantas, timeline.cantidad_de_copias()
+
+
 VALORES_DE_K = (1, 10, 50, 200)
 DECISIONES = 300
 CONSULTAS = 40
+DECISIONES_PARTIDA_LARGA = 5000
+# Sin puntos de control solo existe la copia inicial: K mayor que cualquier partida.
+SIN_PUNTOS_DE_CONTROL = 10 ** 9
+CONSULTAS_SIN_PUNTOS = 5
 
 
 def run():
@@ -221,6 +257,32 @@ def run():
                 seconds,
                 f"{CONSULTAS} consultas, "
                 f"{seconds / CONSULTAS * 1000:.4f} ms por consulta",
+            )
+        )
+
+    promedio, peor, cuantas, copias = measure_queries_one_by_one(
+        COPIAS_CADA, DECISIONES_PARTIDA_LARGA, CONSULTAS
+    )
+    measurements.append(
+        Measurement(
+            f"Consulta en una partida de {cuantas} acciones (K={COPIAS_CADA})",
+            peor,
+            f"{CONSULTAS} consultas, promedio {promedio * 1000:.2f} ms, peor "
+            f"{peor * 1000:.2f} ms ({peor * 1000 / 50 * 100:.0f}% del limite de "
+            f"50 ms); {copias} copias",
+        )
+    )
+
+    for decisiones in (DECISIONES, DECISIONES_PARTIDA_LARGA):
+        promedio, peor, cuantas, copias = measure_queries_one_by_one(
+            SIN_PUNTOS_DE_CONTROL, decisiones, CONSULTAS_SIN_PUNTOS
+        )
+        measurements.append(
+            Measurement(
+                f"Consulta sin puntos de control, partida de {cuantas} acciones",
+                peor,
+                f"{CONSULTAS_SIN_PUNTOS} consultas, promedio {promedio * 1000:.2f} ms, "
+                f"peor {peor * 1000:.2f} ms; {copias} copia (la inicial)",
             )
         )
 
