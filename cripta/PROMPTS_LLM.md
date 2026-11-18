@@ -2188,6 +2188,24 @@ Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md` (escenario 9 de la Histo
 
 Cambios realizados por el estudiante: Antes de escribir la prueba se comprobó, con una partida real, qué respondía la consulta para un instante entre dos decisiones del jugador. Apareció un defecto: la consulta repite completa la última acción anterior al instante, con todos los eventos hasta la siguiente decisión, también los posteriores al instante. En una partida de prueba falló en 6 de 32 instantes de ese tipo. Varios eventos en el mismo instante sí se cuentan todos. Por eso la prueba se partió en dos: el caso del Apéndice B, que pasa, y el de un evento posterior antes de la siguiente decisión, que queda como fallo esperado hasta que se corrija (T023). Ambas comparan contra el estado real registrado durante la partida y no contra valores escritos a mano, y una prueba de control comprueba que la partida produce los dos tipos de instante. Corregirlo exige tocar la consulta y el motor de la línea de tiempo, que quedaron fuera por decisión del grupo. Las mediciones se tomaron tres veces antes de anotarlas. Con *K* = 50, la peor consulta de 5000 acciones queda entre 13.7 y 17.0 ms. Sin puntos de control pasa de 300 ms, que muestra por qué hacen falta. Pruebas: 1282 en WSL con Python 3.12.3, con un fallo esperado.
 
+### 2.56 Unir el trabajo paralelo de Carlos en la línea de tiempo sin duplicados
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Antes de subir la rama, traer los dos commits nuevos de `main` en los que Carlos cubrió, en paralelo, lo mismo que las entradas 2.53 y 2.55: `--hasta` después del final, varios eventos en el mismo instante y las mediciones con 5000 acciones y sin puntos de control.
+
+Prompts utilizados:
+
+```text
+Resolvamos lo que podemos hacer en este momento para terminar rapido el proyecto
+```
+
+Uso en el proyecto: el commit de unión con `origin/main`, `cripta/controller/application.py` (`show_instant` con `consultar_hasta`), `cripta/tests/test_banderas_linea_de_tiempo.py`, `cripta/tests/test_eventos_mismo_instante.py`, `cripta/docs/DECISIONES.md` §5.3 y §5.5, `specs/003-linea-de-tiempo/tasks.md` (T023) y `cripta/README.md`.
+
+Cambios realizados por el estudiante: Unir sin revisar habría dejado la spec 003 con dos FR-025 de texto distinto, dos escenarios para el mismo caso, tareas con el mismo número y dos mediciones iguales. La spec 003, sus tareas y su banco son de Carlos, así que quedaron sus versiones y se descartó lo equivalente de esta rama. Se conservó lo que él no tenía: la bandera `--hasta`, que ahora usa su `consultar_hasta` en vez de una función propia, y la prueba del defecto de los eventos posteriores al instante, que pasó a citar su FR-026 y quedó anotada como T023 en sus tareas. En DECISIONES §5.5 se quitó la tabla de mediciones de esta rama, porque la suya ya las cubre, y se restauró su párrafo original. Quedó solo el párrafo del defecto. Las entradas 2.53 y 2.55 de este registro quedan como estaban, porque cuentan lo que se hizo en su momento. También se corrigió una frase de §5.3 que seguía diciendo que las salidas entrantes no estaban conectadas al viaje. Pruebas: 1289 en WSL con Python 3.12.3, con un fallo esperado (T023).
+
 ### 5.30 Arranque de la segunda parte: análisis del enunciado, del contrato 1.1.0 y de las criptas publicadas
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
