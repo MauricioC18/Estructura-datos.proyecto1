@@ -1,0 +1,14 @@
+{
+  "sala": 28,
+  "enemigos": [
+    {
+      "instancia": "e-cripta-03-15",
+      "tipo": "ent_rata_gigante",
+      "vida": 8
+    }
+  ],
+  "objetos": [
+    "itm_pocion_menor"
+  ],
+  "trampas": []
+}

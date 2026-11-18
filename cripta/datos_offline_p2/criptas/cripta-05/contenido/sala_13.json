@@ -1,0 +1,13 @@
+{
+  "sala": 13,
+  "enemigos": [
+    {
+      "instancia": "e-cripta-05-6",
+      "tipo": "ent_guardian_oseo"
+    }
+  ],
+  "objetos": [
+    "itm_pocion_menor"
+  ],
+  "trampas": []
+}

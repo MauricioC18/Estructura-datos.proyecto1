@@ -1,0 +1,13 @@
+{
+  "sala": 92,
+  "enemigos": [
+    {
+      "instancia": "e-cripta-06-2",
+      "tipo": "ent_guardian_oseo"
+    }
+  ],
+  "objetos": [
+    "itm_llave_plata"
+  ],
+  "trampas": []
+}

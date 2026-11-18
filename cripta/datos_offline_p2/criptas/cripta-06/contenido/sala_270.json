@@ -1,0 +1,12 @@
+{
+  "sala": 270,
+  "enemigos": [
+    {
+      "instancia": "e-cripta-06-33",
+      "tipo": "ent_rata_gigante",
+      "vida": 8
+    }
+  ],
+  "objetos": [],
+  "trampas": []
+}

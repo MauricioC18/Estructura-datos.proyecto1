@@ -1,0 +1,14 @@
+{
+  "id": "ent_carcelero_errante",
+  "nombre": "Carcelero errante",
+  "clase": "enemigo",
+  "vida_max": 10,
+  "ataque": 3,
+  "defensa": 1,
+  "velocidad": 90,
+  "comportamiento": "errante",
+  "suelta": [
+    "itm_llave_hierro",
+    "itm_pocion_menor"
+  ]
+}

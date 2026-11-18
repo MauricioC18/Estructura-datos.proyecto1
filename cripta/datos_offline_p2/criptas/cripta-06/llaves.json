@@ -1,0 +1,21 @@
+{
+  "llaves": [
+    {
+      "id": "itm_llave_bronce",
+      "sala": 22
+    },
+    {
+      "id": "itm_llave_plata",
+      "sala": 92
+    },
+    {
+      "id": "itm_llave_negra",
+      "sala": 136
+    },
+    {
+      "id": "itm_llave_hierro",
+      "sala": 247,
+      "enemigo": "e-cripta-06-1"
+    }
+  ]
+}

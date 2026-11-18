@@ -1,0 +1,9 @@
+{
+  "sala": 40,
+  "enemigos": [],
+  "objetos": [
+    "itm_pocion_menor",
+    "itm_pocion_menor"
+  ],
+  "trampas": []
+}

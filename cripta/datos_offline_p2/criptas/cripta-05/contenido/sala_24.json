@@ -1,0 +1,9 @@
+{
+  "sala": 24,
+  "enemigos": [],
+  "objetos": [
+    "itm_antorcha",
+    "itm_llave_hierro"
+  ],
+  "trampas": []
+}

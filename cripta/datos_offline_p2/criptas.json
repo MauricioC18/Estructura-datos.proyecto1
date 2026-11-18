@@ -1,0 +1,34 @@
+{
+  "criptas": [
+    {
+      "id": "cripta-02",
+      "nombre": "Catacumbas menores",
+      "salas": 20,
+      "dificultad": 2
+    },
+    {
+      "id": "cripta-03",
+      "nombre": "Catacumbas medias",
+      "salas": 40,
+      "dificultad": 3
+    },
+    {
+      "id": "cripta-04",
+      "nombre": "Catacumbas profundas",
+      "salas": 50,
+      "dificultad": 4
+    },
+    {
+      "id": "cripta-05",
+      "nombre": "Cripta sellada",
+      "salas": 24,
+      "dificultad": 3
+    },
+    {
+      "id": "cripta-06",
+      "nombre": "Cripta de referencia",
+      "salas": 300,
+      "dificultad": 5
+    }
+  ]
+}

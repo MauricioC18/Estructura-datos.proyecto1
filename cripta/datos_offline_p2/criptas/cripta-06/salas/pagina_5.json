@@ -1,0 +1,774 @@
+{
+  "pagina": 5,
+  "total_paginas": 6,
+  "salas": [
+    {
+      "id": 201,
+      "nombre": "Galería 11-1",
+      "salidas": {
+        "N": {
+          "sala": 181,
+          "costo": 300
+        },
+        "S": {
+          "sala": 221
+        }
+      }
+    },
+    {
+      "id": 202,
+      "nombre": "Galería 11-2",
+      "salidas": {
+        "E": {
+          "sala": 203
+        }
+      }
+    },
+    {
+      "id": 203,
+      "nombre": "Galería 11-3",
+      "salidas": {
+        "O": {
+          "sala": 202
+        },
+        "E": {
+          "sala": 204,
+          "costo": 80
+        },
+        "S": {
+          "sala": 223
+        }
+      }
+    },
+    {
+      "id": 204,
+      "nombre": "Galería 11-4",
+      "salidas": {
+        "N": {
+          "sala": 184,
+          "costo": 200
+        },
+        "O": {
+          "sala": 203,
+          "costo": 80
+        },
+        "S": {
+          "sala": 224,
+          "costo": 80
+        }
+      }
+    },
+    {
+      "id": 205,
+      "nombre": "Galería 11-5",
+      "salidas": {
+        "N": {
+          "sala": 185,
+          "costo": 120
+        },
+        "S": {
+          "sala": 225
+        }
+      }
+    },
+    {
+      "id": 206,
+      "nombre": "Galería 11-6",
+      "salidas": {
+        "N": {
+          "sala": 186,
+          "costo": 200
+        },
+        "E": {
+          "sala": 207
+        }
+      }
+    },
+    {
+      "id": 207,
+      "nombre": "Galería 11-7",
+      "salidas": {
+        "O": {
+          "sala": 206
+        },
+        "S": {
+          "sala": 227
+        },
+        "E": {
+          "sala": 208,
+          "cerrada": true,
+          "llave": "itm_llave_bronce",
+          "cierre_automatico": 500
+        }
+      }
+    },
+    {
+      "id": 208,
+      "nombre": "Galería 11-8",
+      "salidas": {
+        "N": {
+          "sala": 188,
+          "costo": 80
+        },
+        "S": {
+          "sala": 228,
+          "costo": 200
+        },
+        "O": {
+          "sala": 207,
+          "cerrada": true,
+          "llave": "itm_llave_bronce",
+          "cierre_automatico": 500
+        }
+      }
+    },
+    {
+      "id": 209,
+      "nombre": "Galería 11-9",
+      "salidas": {
+        "N": {
+          "sala": 189,
+          "costo": 300
+        },
+        "E": {
+          "sala": 210
+        },
+        "S": {
+          "sala": 229,
+          "costo": 120
+        }
+      }
+    },
+    {
+      "id": 210,
+      "nombre": "Galería 11-10",
+      "salidas": {
+        "N": {
+          "sala": 190
+        },
+        "O": {
+          "sala": 209
+        }
+      }
+    },
+    {
+      "id": 211,
+      "nombre": "Galería 11-11",
+      "salidas": {
+        "N": {
+          "sala": 191,
+          "costo": 300
+        },
+        "S": {
+          "sala": 231
+        }
+      }
+    },
+    {
+      "id": 212,
+      "nombre": "Galería 11-12",
+      "salidas": {
+        "E": {
+          "sala": 213
+        }
+      }
+    },
+    {
+      "id": 213,
+      "nombre": "Galería 11-13",
+      "salidas": {
+        "N": {
+          "sala": 193,
+          "costo": 120
+        },
+        "O": {
+          "sala": 212
+        },
+        "E": {
+          "sala": 214
+        }
+      }
+    },
+    {
+      "id": 214,
+      "nombre": "Galería 11-14",
+      "salidas": {
+        "N": {
+          "sala": 194,
+          "costo": 80
+        },
+        "E": {
+          "sala": 215
+        },
+        "O": {
+          "sala": 213
+        },
+        "S": {
+          "sala": 234,
+          "costo": 20
+        }
+      }
+    },
+    {
+      "id": 215,
+      "nombre": "Galería 11-15",
+      "salidas": {
+        "N": {
+          "sala": 195,
+          "costo": 200
+        },
+        "O": {
+          "sala": 214
+        },
+        "S": {
+          "sala": 235
+        }
+      }
+    },
+    {
+      "id": 216,
+      "nombre": "Galería 11-16",
+      "salidas": {
+        "E": {
+          "sala": 217
+        },
+        "S": {
+          "sala": 236,
+          "costo": 80
+        },
+        "N": {
+          "sala": 196,
+          "cerrada": true,
+          "llave": "itm_llave_bronce",
+          "cierre_automatico": 500
+        }
+      }
+    },
+    {
+      "id": 217,
+      "nombre": "Galería 11-17",
+      "salidas": {
+        "N": {
+          "sala": 197,
+          "costo": 120
+        },
+        "O": {
+          "sala": 216
+        }
+      }
+    },
+    {
+      "id": 218,
+      "nombre": "Galería 11-18",
+      "salidas": {
+        "E": {
+          "sala": 219
+        },
+        "S": {
+          "sala": 238
+        }
+      }
+    },
+    {
+      "id": 219,
+      "nombre": "Galería 11-19",
+      "salidas": {
+        "N": {
+          "sala": 199
+        },
+        "O": {
+          "sala": 218
+        },
+        "S": {
+          "sala": 239
+        }
+      }
+    },
+    {
+      "id": 220,
+      "nombre": "Galería 11-20",
+      "salidas": {
+        "N": {
+          "sala": 200,
+          "costo": 150
+        },
+        "S": {
+          "sala": 240,
+          "costo": 80
+        }
+      }
+    },
+    {
+      "id": 221,
+      "nombre": "Galería 12-1",
+      "salidas": {
+        "N": {
+          "sala": 201
+        },
+        "E": {
+          "sala": 222,
+          "costo": 300
+        },
+        "S": {
+          "sala": 241,
+          "costo": 50
+        }
+      }
+    },
+    {
+      "id": 222,
+      "nombre": "Galería 12-2",
+      "salidas": {
+        "O": {
+          "sala": 221,
+          "costo": 300
+        },
+        "E": {
+          "sala": 223
+        }
+      }
+    },
+    {
+      "id": 223,
+      "nombre": "Galería 12-3",
+      "salidas": {
+        "O": {
+          "sala": 222
+        },
+        "E": {
+          "sala": 224
+        },
+        "S": {
+          "sala": 243,
+          "costo": 50
+        },
+        "N": {
+          "sala": 203
+        }
+      }
+    },
+    {
+      "id": 224,
+      "nombre": "Galería 12-4",
+      "salidas": {
+        "O": {
+          "sala": 223
+        },
+        "S": {
+          "sala": 244
+        },
+        "N": {
+          "sala": 204,
+          "costo": 80
+        }
+      }
+    },
+    {
+      "id": 225,
+      "nombre": "Galería 12-5",
+      "salidas": {
+        "N": {
+          "sala": 205
+        },
+        "S": {
+          "sala": 245
+        },
+        "E": {
+          "sala": 226,
+          "cerrada": true,
+          "llave": "itm_llave_bronce",
+          "cierre_automatico": 500
+        }
+      }
+    },
+    {
+      "id": 226,
+      "nombre": "Galería 12-6",
+      "salidas": {
+        "O": {
+          "sala": 225,
+          "cerrada": true,
+          "llave": "itm_llave_bronce",
+          "cierre_automatico": 500
+        },
+        "E": {
+          "sala": 227
+        },
+        "S": {
+          "sala": 246,
+          "costo": 120
+        }
+      }
+    },
+    {
+      "id": 227,
+      "nombre": "Galería 12-7",
+      "salidas": {
+        "N": {
+          "sala": 207
+        },
+        "O": {
+          "sala": 226
+        },
+        "S": {
+          "sala": 247,
+          "costo": 120
+        }
+      }
+    },
+    {
+      "id": 228,
+      "nombre": "Galería 12-8",
+      "salidas": {
+        "N": {
+          "sala": 208,
+          "costo": 200
+        },
+        "E": {
+          "sala": 229
+        }
+      }
+    },
+    {
+      "id": 229,
+      "nombre": "Galería 12-9",
+      "salidas": {
+        "O": {
+          "sala": 228
+        },
+        "E": {
+          "sala": 230,
+          "costo": 300
+        },
+        "N": {
+          "sala": 209,
+          "costo": 120
+        }
+      }
+    },
+    {
+      "id": 230,
+      "nombre": "Galería 12-10",
+      "salidas": {
+        "O": {
+          "sala": 229,
+          "costo": 300
+        },
+        "S": {
+          "sala": 250
+        }
+      }
+    },
+    {
+      "id": 231,
+      "nombre": "Galería 12-11",
+      "salidas": {
+        "N": {
+          "sala": 211
+        },
+        "E": {
+          "sala": 232
+        },
+        "S": {
+          "sala": 251,
+          "costo": 150
+        }
+      }
+    },
+    {
+      "id": 232,
+      "nombre": "Galería 12-12",
+      "salidas": {
+        "O": {
+          "sala": 231
+        },
+        "E": {
+          "sala": 233
+        },
+        "S": {
+          "sala": 252,
+          "cerrada": true,
+          "llave": "itm_llave_bronce",
+          "cierre_automatico": 500
+        }
+      }
+    },
+    {
+      "id": 233,
+      "nombre": "Galería 12-13",
+      "salidas": {
+        "O": {
+          "sala": 232
+        },
+        "E": {
+          "sala": 234
+        }
+      }
+    },
+    {
+      "id": 234,
+      "nombre": "Galería 12-14",
+      "salidas": {
+        "O": {
+          "sala": 233
+        },
+        "S": {
+          "sala": 254,
+          "costo": 200
+        },
+        "N": {
+          "sala": 214,
+          "costo": 20
+        }
+      }
+    },
+    {
+      "id": 235,
+      "nombre": "Galería 12-15",
+      "salidas": {
+        "N": {
+          "sala": 215
+        },
+        "S": {
+          "sala": 255,
+          "costo": 120
+        }
+      }
+    },
+    {
+      "id": 236,
+      "nombre": "Galería 12-16",
+      "salidas": {
+        "N": {
+          "sala": 216,
+          "costo": 80
+        },
+        "S": {
+          "sala": 256,
+          "costo": 50
+        }
+      }
+    },
+    {
+      "id": 237,
+      "nombre": "Galería 12-17",
+      "salidas": {
+        "E": {
+          "sala": 238
+        },
+        "S": {
+          "sala": 257,
+          "costo": 300
+        }
+      }
+    },
+    {
+      "id": 238,
+      "nombre": "Galería 12-18",
+      "salidas": {
+        "N": {
+          "sala": 218
+        },
+        "O": {
+          "sala": 237
+        },
+        "E": {
+          "sala": 239,
+          "costo": 200
+        }
+      }
+    },
+    {
+      "id": 239,
+      "nombre": "Galería 12-19",
+      "salidas": {
+        "E": {
+          "sala": 240,
+          "costo": 20
+        },
+        "S": {
+          "sala": 259
+        },
+        "O": {
+          "sala": 238,
+          "costo": 200
+        },
+        "N": {
+          "sala": 219
+        }
+      }
+    },
+    {
+      "id": 240,
+      "nombre": "Galería 12-20",
+      "salidas": {
+        "N": {
+          "sala": 220,
+          "costo": 80
+        },
+        "O": {
+          "sala": 239,
+          "costo": 20
+        },
+        "S": {
+          "sala": 260
+        }
+      }
+    },
+    {
+      "id": 241,
+      "nombre": "Galería 13-1",
+      "salidas": {
+        "E": {
+          "sala": 242,
+          "costo": 120
+        },
+        "S": {
+          "sala": 261,
+          "costo": 200
+        },
+        "N": {
+          "sala": 221,
+          "costo": 50
+        }
+      }
+    },
+    {
+      "id": 242,
+      "nombre": "Galería 13-2",
+      "salidas": {
+        "O": {
+          "sala": 241,
+          "costo": 120
+        },
+        "E": {
+          "sala": 243
+        }
+      }
+    },
+    {
+      "id": 243,
+      "nombre": "Galería 13-3",
+      "salidas": {
+        "O": {
+          "sala": 242
+        },
+        "N": {
+          "sala": 223,
+          "costo": 50
+        }
+      }
+    },
+    {
+      "id": 244,
+      "nombre": "Galería 13-4",
+      "salidas": {
+        "N": {
+          "sala": 224
+        },
+        "S": {
+          "sala": 264
+        },
+        "E": {
+          "sala": 245
+        }
+      }
+    },
+    {
+      "id": 245,
+      "nombre": "Galería 13-5",
+      "salidas": {
+        "N": {
+          "sala": 225
+        },
+        "S": {
+          "sala": 265
+        },
+        "O": {
+          "sala": 244
+        }
+      }
+    },
+    {
+      "id": 246,
+      "nombre": "Galería 13-6",
+      "salidas": {
+        "N": {
+          "sala": 226,
+          "costo": 120
+        },
+        "S": {
+          "sala": 266
+        }
+      }
+    },
+    {
+      "id": 247,
+      "nombre": "Galería 13-7",
+      "salidas": {
+        "N": {
+          "sala": 227,
+          "costo": 120
+        },
+        "E": {
+          "sala": 248,
+          "cerrada": true,
+          "llave": "itm_llave_bronce",
+          "cierre_automatico": 500
+        },
+        "S": {
+          "sala": 267,
+          "costo": 20
+        }
+      }
+    },
+    {
+      "id": 248,
+      "nombre": "Galería 13-8",
+      "salidas": {
+        "E": {
+          "sala": 249,
+          "costo": 120
+        },
+        "S": {
+          "sala": 268
+        },
+        "O": {
+          "sala": 247,
+          "cerrada": true,
+          "llave": "itm_llave_bronce",
+          "cierre_automatico": 500
+        }
+      }
+    },
+    {
+      "id": 249,
+      "nombre": "Galería 13-9",
+      "salidas": {
+        "O": {
+          "sala": 248,
+          "costo": 120
+        },
+        "E": {
+          "sala": 250
+        },
+        "S": {
+          "sala": 269,
+          "costo": 150
+        }
+      }
+    },
+    {
+      "id": 250,
+      "nombre": "Galería 13-10",
+      "salidas": {
+        "N": {
+          "sala": 230
+        },
+        "O": {
+          "sala": 249
+        }
+      }
+    }
+  ]
+}

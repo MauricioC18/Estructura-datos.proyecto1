@@ -1,0 +1,538 @@
+{
+  "pagina": 1,
+  "total_paginas": 1,
+  "salas": [
+    {
+      "id": 1,
+      "nombre": "Sala 1",
+      "salidas": {
+        "N": {
+          "sala": 2,
+          "costo": 60
+        }
+      }
+    },
+    {
+      "id": 2,
+      "nombre": "Sala 2",
+      "salidas": {
+        "S": {
+          "sala": 1,
+          "costo": 60
+        },
+        "N": {
+          "sala": 3
+        }
+      }
+    },
+    {
+      "id": 3,
+      "nombre": "Sala 3",
+      "salidas": {
+        "S": {
+          "sala": 2
+        },
+        "N": {
+          "sala": 4,
+          "costo": 150
+        }
+      }
+    },
+    {
+      "id": 4,
+      "nombre": "Sala 4",
+      "salidas": {
+        "S": {
+          "sala": 3,
+          "costo": 150
+        },
+        "N": {
+          "sala": 5
+        }
+      }
+    },
+    {
+      "id": 5,
+      "nombre": "Sala 5",
+      "salidas": {
+        "S": {
+          "sala": 4
+        },
+        "N": {
+          "sala": 6,
+          "costo": 80
+        },
+        "E": {
+          "sala": 35,
+          "costo": 150,
+          "cerrada": true,
+          "llave": "itm_llave_bronce",
+          "cierre_automatico": 500
+        }
+      }
+    },
+    {
+      "id": 6,
+      "nombre": "Sala 6",
+      "salidas": {
+        "S": {
+          "sala": 5,
+          "costo": 80
+        },
+        "N": {
+          "sala": 7,
+          "costo": 250
+        }
+      }
+    },
+    {
+      "id": 7,
+      "nombre": "Sala 7",
+      "salidas": {
+        "S": {
+          "sala": 6,
+          "costo": 250
+        },
+        "N": {
+          "sala": 8
+        }
+      }
+    },
+    {
+      "id": 8,
+      "nombre": "Sala 8",
+      "salidas": {
+        "S": {
+          "sala": 7
+        },
+        "N": {
+          "sala": 9,
+          "costo": 120
+        }
+      }
+    },
+    {
+      "id": 9,
+      "nombre": "Sala 9",
+      "salidas": {
+        "S": {
+          "sala": 8,
+          "costo": 120
+        },
+        "N": {
+          "sala": 10
+        },
+        "E": {
+          "sala": 12,
+          "costo": 490
+        }
+      }
+    },
+    {
+      "id": 10,
+      "nombre": "Sala 10",
+      "salidas": {
+        "S": {
+          "sala": 9
+        },
+        "N": {
+          "sala": 11,
+          "costo": 40
+        }
+      }
+    },
+    {
+      "id": 11,
+      "nombre": "Sala 11",
+      "salidas": {
+        "S": {
+          "sala": 10,
+          "costo": 40
+        },
+        "N": {
+          "sala": 12,
+          "costo": 200
+        }
+      }
+    },
+    {
+      "id": 12,
+      "nombre": "Sala 12",
+      "salidas": {
+        "S": {
+          "sala": 11,
+          "costo": 200
+        },
+        "N": {
+          "sala": 13
+        },
+        "O": {
+          "sala": 9,
+          "costo": 490
+        }
+      }
+    },
+    {
+      "id": 13,
+      "nombre": "Sala 13",
+      "salidas": {
+        "S": {
+          "sala": 12
+        },
+        "N": {
+          "sala": 14,
+          "costo": 60
+        }
+      }
+    },
+    {
+      "id": 14,
+      "nombre": "Sala 14",
+      "salidas": {
+        "S": {
+          "sala": 13,
+          "costo": 60
+        },
+        "N": {
+          "sala": 15
+        }
+      }
+    },
+    {
+      "id": 15,
+      "nombre": "Sala 15",
+      "salidas": {
+        "S": {
+          "sala": 14
+        },
+        "N": {
+          "sala": 16,
+          "costo": 150
+        }
+      }
+    },
+    {
+      "id": 16,
+      "nombre": "Sala 16",
+      "salidas": {
+        "S": {
+          "sala": 15,
+          "costo": 150
+        },
+        "N": {
+          "sala": 17
+        }
+      }
+    },
+    {
+      "id": 17,
+      "nombre": "Sala 17",
+      "salidas": {
+        "S": {
+          "sala": 16
+        },
+        "N": {
+          "sala": 18,
+          "costo": 80
+        }
+      }
+    },
+    {
+      "id": 18,
+      "nombre": "Sala 18",
+      "salidas": {
+        "S": {
+          "sala": 17,
+          "costo": 80
+        },
+        "N": {
+          "sala": 19,
+          "costo": 250
+        }
+      }
+    },
+    {
+      "id": 19,
+      "nombre": "Sala 19",
+      "salidas": {
+        "S": {
+          "sala": 18,
+          "costo": 250
+        },
+        "N": {
+          "sala": 20
+        }
+      }
+    },
+    {
+      "id": 20,
+      "nombre": "Sala 20",
+      "salidas": {
+        "S": {
+          "sala": 19
+        },
+        "N": {
+          "sala": 21,
+          "costo": 120
+        },
+        "E": {
+          "sala": 38,
+          "costo": 150,
+          "cerrada": true,
+          "llave": "itm_llave_hierro",
+          "cierre_automatico": 500
+        }
+      }
+    },
+    {
+      "id": 21,
+      "nombre": "Sala 21",
+      "salidas": {
+        "S": {
+          "sala": 20,
+          "costo": 120
+        },
+        "N": {
+          "sala": 22
+        }
+      }
+    },
+    {
+      "id": 22,
+      "nombre": "Sala 22",
+      "salidas": {
+        "S": {
+          "sala": 21
+        },
+        "N": {
+          "sala": 23,
+          "costo": 40
+        }
+      }
+    },
+    {
+      "id": 23,
+      "nombre": "Sala 23",
+      "salidas": {
+        "S": {
+          "sala": 22,
+          "costo": 40
+        },
+        "N": {
+          "sala": 24,
+          "costo": 200
+        }
+      }
+    },
+    {
+      "id": 24,
+      "nombre": "Sala 24",
+      "salidas": {
+        "S": {
+          "sala": 23,
+          "costo": 200
+        },
+        "N": {
+          "sala": 25
+        }
+      }
+    },
+    {
+      "id": 25,
+      "nombre": "Sala 25",
+      "salidas": {
+        "S": {
+          "sala": 24
+        },
+        "N": {
+          "sala": 26,
+          "costo": 60
+        }
+      }
+    },
+    {
+      "id": 26,
+      "nombre": "Sala 26",
+      "salidas": {
+        "S": {
+          "sala": 25,
+          "costo": 60
+        },
+        "N": {
+          "sala": 27
+        }
+      }
+    },
+    {
+      "id": 27,
+      "nombre": "Sala 27",
+      "salidas": {
+        "S": {
+          "sala": 26
+        },
+        "N": {
+          "sala": 28,
+          "costo": 150
+        }
+      }
+    },
+    {
+      "id": 28,
+      "nombre": "Sala 28",
+      "salidas": {
+        "S": {
+          "sala": 27,
+          "costo": 150
+        },
+        "N": {
+          "sala": 29
+        }
+      }
+    },
+    {
+      "id": 29,
+      "nombre": "Sala 29",
+      "salidas": {
+        "S": {
+          "sala": 28
+        },
+        "N": {
+          "sala": 30,
+          "costo": 80
+        }
+      }
+    },
+    {
+      "id": 30,
+      "nombre": "Sala 30",
+      "salidas": {
+        "S": {
+          "sala": 29,
+          "costo": 80
+        },
+        "N": {
+          "sala": 31,
+          "costo": 250
+        }
+      }
+    },
+    {
+      "id": 31,
+      "nombre": "Sala 31",
+      "salidas": {
+        "S": {
+          "sala": 30,
+          "costo": 250
+        },
+        "N": {
+          "sala": 32
+        }
+      }
+    },
+    {
+      "id": 32,
+      "nombre": "Sala 32",
+      "salidas": {
+        "S": {
+          "sala": 31
+        },
+        "N": {
+          "sala": 33,
+          "costo": 120
+        }
+      }
+    },
+    {
+      "id": 33,
+      "nombre": "Sala 33",
+      "salidas": {
+        "S": {
+          "sala": 32,
+          "costo": 120
+        },
+        "N": {
+          "sala": 34,
+          "cerrada": true,
+          "llave": "itm_llave_negra"
+        }
+      }
+    },
+    {
+      "id": 34,
+      "nombre": "Sala 34",
+      "salidas": {
+        "S": {
+          "sala": 33
+        }
+      }
+    },
+    {
+      "id": 35,
+      "nombre": "Cámara oculta 35",
+      "salidas": {
+        "O": {
+          "sala": 5,
+          "costo": 150
+        },
+        "N": {
+          "sala": 36
+        }
+      }
+    },
+    {
+      "id": 36,
+      "nombre": "Cámara oculta 36",
+      "salidas": {
+        "O": {
+          "sala": 35
+        },
+        "N": {
+          "sala": 37
+        }
+      }
+    },
+    {
+      "id": 37,
+      "nombre": "Cámara oculta 37",
+      "salidas": {
+        "O": {
+          "sala": 36
+        }
+      }
+    },
+    {
+      "id": 38,
+      "nombre": "Cámara oculta 38",
+      "salidas": {
+        "O": {
+          "sala": 20,
+          "costo": 150
+        },
+        "N": {
+          "sala": 39
+        }
+      }
+    },
+    {
+      "id": 39,
+      "nombre": "Cámara oculta 39",
+      "salidas": {
+        "O": {
+          "sala": 38
+        },
+        "N": {
+          "sala": 40
+        }
+      }
+    },
+    {
+      "id": 40,
+      "nombre": "Cámara oculta 40",
+      "salidas": {
+        "O": {
+          "sala": 39
+        }
+      }
+    }
+  ]
+}
