@@ -2354,7 +2354,7 @@ Cada cambio anota su inversa en el historial reversible que ya existía, como el
 
 «ir a» tiene sus reglas en el modelo (`model/viaje.py`) y su bucle de pasos en el controlador. Cada paso pasa por el mismo camino que un `mover` escrito a mano. La búsqueda de la ruta se detiene al asentar la sala del jugador y se reutiliza durante el viaje mientras no cambie la versión del conocimiento.
 
-Para las salidas de un solo sentido, el mapa ofrece `entrantes_conocidas(u)`: las salidas que el jugador sabe que llevan a *u*. Filtra un índice de salidas entrantes que se arma una vez desde la topología, así que no hay nada que mantener al explorar ni al revertir. **Todavía no está conectado al viaje**: la búsqueda compartida rechaza la parada anticipada junto con el proveedor de salidas (ver Límites).
+Para las salidas de un solo sentido, el mapa ofrece `entrantes_conocidas(u)`: las salidas que el jugador sabe que llevan a *u*. Filtra un índice de salidas entrantes que se arma una vez desde la topología, así que no hay nada que mantener al explorar ni al revertir. El viaje lo usa desde T052: expande la búsqueda por `entrantes_conocidas` y da el primer paso por `vecinas_conocidas`, con la parada anticipada (ver Límites).
 
 **¿Coincide con el `plan.md` original?** En las estructuras, sí. **En la ruta, no, dos veces.**
 - El plan elegía recalcular la búsqueda completa en cada paso. Las mediciones mostraron que no cumplía los 5 ms desde 400 salas. El plan se revisó antes de cambiar el código y se aplicaron tres mejoras, cada una medida antes y después: **(a)** el recuerdo de las puertas por lado; **(b)** la búsqueda se detiene en la sala del jugador; **(c)** la búsqueda se reutiliza mientras no cambie el conocimiento.

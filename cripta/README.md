@@ -59,7 +59,7 @@ python -m unittest discover -s tests -t . -v
 
 En Windows también funciona `py` en lugar de `python`.
 
-Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1282 pruebas, todas pasan**, medido con Python 3.12.3. Una se cuenta como *fallo esperado* (ver «Lo que todavía no funciona»). Incluye lo unido de `main` y de la rama de datos nuevos del servicio (`specs/004-datos-nuevos-servicio`).
+Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1289 pruebas, todas pasan**, medido con Python 3.12.3. Una se cuenta como *fallo esperado* (ver «Lo que todavía no funciona»). Incluye lo unido de `main` y de la rama de datos nuevos del servicio (`specs/004-datos-nuevos-servicio`).
 
 ### Pruebas de aceptación por capacidad
 

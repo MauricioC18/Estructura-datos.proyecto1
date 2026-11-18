@@ -50,6 +50,7 @@ Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porqu
 - [x] T020 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
 - [x] T021 Cubrir los cuatro casos del Apéndice B que faltaban, en `spec.md` y `model/consulta_historia.py`
 - [x] T022 Medir los dos extremos y una partida de 5 000 acciones, en `benchmark/bench_linea_de_tiempo.py`
+- [ ] T023 Una consulta entre dos decisiones del jugador no debe incluir eventos posteriores al instante, en `cripta/model/consulta_historia.py` y `cripta/model/game.py` — FR-002
 
 ---
 
@@ -387,6 +388,20 @@ Faltaban las dos mediciones que mejor defienden el diseño, y las pidió Steven 
 **Verificable cuando**: los dos números están en el plan y en el Documento de Decisiones, con la conclusión que se saca de ellos.
 
 **Depende de**: T016
+
+---
+
+## T023 — Los eventos posteriores al instante no cuentan
+
+**Requisitos**: FR-002 (Historia 1, escenario 6)
+
+**Archivos**: `cripta/model/consulta_historia.py`, `cripta/model/game.py`
+
+Encontrado al probar el caso del Apéndice B de varios eventos en el mismo instante. Para un instante *t* que no es una decisión del jugador, la consulta repite completa la última acción anterior a *t*, con todos los eventos hasta la siguiente decisión, también los de tiempo mayor que *t*. Hay que repetir esa última acción deteniendo los eventos en *t*. La prueba que lo muestra, `test_un_evento_posterior_al_instante_no_cuenta` en `cripta/tests/test_eventos_mismo_instante.py`, está marcada como fallo esperado.
+
+**Verificable cuando**: esa prueba pasa sin la marca de fallo esperado y la de equivalencia sigue pasando.
+
+**Depende de**: T005
 
 ---
 
