@@ -18,6 +18,9 @@ Qué se mide y contra qué
        el promedio por paso de un viaje entero. Se comparan con la búsqueda
        completa sin mejoras, que queda fija como referencia, y con una
        búsqueda que escoge el mínimo recorriendo una lista, sin montículo.
+       El viaje va de la primera sala del esqueleto a la última; si con el
+       mapa conocido no hay ruta entre ellas, va hacia la sala más lejana que
+       se alcanza desde la primera, por costo mínimo, y la fila lo dice.
        FR-036.
     6. Salidas de un solo sentido (plan, alternativa 9). Tiempo y memoria de
        armar el índice de salidas entrantes, cuántas salidas entran a cada
@@ -362,6 +365,60 @@ def viaje_del_programa(mapa, destino, camino):
         viaje.siguiente_paso(partida, mapa, destino, ruta)
 
 
+ENTRE_EXTREMOS = "entre los extremos"
+HACIA_LA_MAS_LEJANA = "hacia la mas lejana"
+SIN_ALCANZABLES = "sin salas alcanzables"
+
+
+class RecorridoMedido:
+    """Partida y destino del viaje que se mide, y por qué se escogió ese destino.
+
+    motivo es ENTRE_EXTREMOS, HACIA_LA_MAS_LEJANA o SIN_ALCANZABLES; costo es
+    el costo mínimo de la partida al destino, o None si no lo alcanza.
+    """
+
+    def __init__(self, partida, destino, motivo, costo):
+        self.partida = partida
+        self.destino = destino
+        self.motivo = motivo
+        self.costo = costo
+
+
+def elegir_recorrido(mapa, room_map):
+    """El viaje entre los extremos del esqueleto; si con el mapa conocido no
+    hay ruta de la primera sala a la última, el viaje hacia la sala más lejana
+    que sí se alcanza desde la primera, por costo mínimo.
+
+    La búsqueda va desde la primera sala y se expande por las salidas que
+    SALEN de cada sala, así que la distancia que da es la de ir de la primera
+    sala a cada una, también con salidas de un solo sentido. Entre dos salas
+    igual de lejanas gana la de menor id, para que la medición se repita.
+    """
+    partida, ultima = recorrido_de_prueba(room_map)
+    desde_partida = RutasMasBaratas(mapa.vecinas_conocidas, partida)
+
+    if ultima != partida and desde_partida.alcanza(ultima):
+        return RecorridoMedido(partida, ultima, ENTRE_EXTREMOS, desde_partida.distancia_a(ultima))
+
+    lejana = None
+    costo_lejana = None
+
+    for id_sala in room_map.room_ids():
+        if id_sala == partida or not desde_partida.alcanza(id_sala):
+            continue
+
+        costo = desde_partida.distancia_a(id_sala)
+
+        if lejana is None or costo > costo_lejana or (costo == costo_lejana and id_sala < lejana):
+            lejana = id_sala
+            costo_lejana = costo
+
+    if lejana is None:
+        return RecorridoMedido(partida, ultima, SIN_ALCANZABLES, None)
+
+    return RecorridoMedido(partida, lejana, HACIA_LA_MAS_LEJANA, costo_lejana)
+
+
 def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True):
     """Un paso de «ir a» con el mapa conocido completo.
 
@@ -370,9 +427,11 @@ def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True):
     completa: la búsqueda completa desde el destino, sin ninguna mejora,
         como referencia fija entre una mejora y otra.
     lineal: la alternativa sin montículo.
+    recorrido: el RecorridoMedido, que dice hacia dónde fue el viaje.
     """
     mapa = conocimiento_completo(room_map)
-    partida, destino = recorrido_de_prueba(room_map)
+    recorrido = elegir_recorrido(mapa, room_map)
+    partida, destino = recorrido.partida, recorrido.destino
 
     camino = []
     sala = partida
@@ -396,7 +455,7 @@ def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True):
             lambda: primer_paso_sin_monticulo(mapa.vecinas_conocidas, destino, partida), 1
         )
 
-    return primero, por_paso, completa, lineal, len(camino)
+    return primero, por_paso, completa, lineal, len(camino), recorrido
 
 
 # ----------------------------------------------------------------------
@@ -533,7 +592,7 @@ def run(carpeta_sin_conexion=CARPETA_SIN_CONEXION):
         ))
 
     for salas, room_map in cuadriculas:
-        primero, por_paso, completa, lineal, largo = medir_paso_de_ir_a(room_map)
+        primero, por_paso, completa, lineal, largo, _ = medir_paso_de_ir_a(room_map)
         mediciones.append(Measurement(
             f"5. Paso de ir a, mapa completo de {salas} salas", primero,
             f"primer paso {_ms(primero)}; por paso en un viaje de {largo} pasos "
@@ -579,19 +638,33 @@ def mediciones_de_criptas_reales(carpeta_sin_conexion=CARPETA_SIN_CONEXION):
         ))
 
     for id_cripta, room_map in reales:
-        primero, por_paso, completa, lineal, largo = medir_paso_de_ir_a(room_map)
+        primero, por_paso, completa, lineal, largo, recorrido = medir_paso_de_ir_a(room_map)
         if largo == 0:
-            # Sin ruta entre los extremos no hay viaje que promediar.
-            promedio = "por paso: sin ruta entre los extremos"
+            # Un viaje sin pasos no tiene nada que promediar.
+            promedio = "por paso: el viaje no dio pasos"
         else:
             promedio = f"por paso en un viaje de {largo} pasos {_ms(por_paso)}"
         mediciones.append(Measurement(
             f"5. Paso de ir a, mapa completo de {id_cripta} ({len(room_map)} salas)", primero,
-            f"primer paso {_ms(primero)}; {promedio}; "
+            f"{descripcion_del_recorrido(recorrido)}: primer paso {_ms(primero)}; {promedio}; "
             f"busqueda completa {_ms(completa)}; sin monticulo {_ms(lineal)}",
         ))
 
     return mediciones
+
+
+def descripcion_del_recorrido(recorrido):
+    """Hacia dónde fue el viaje medido, para la fila de una cripta real."""
+    if recorrido.motivo == ENTRE_EXTREMOS:
+        return (f"de la sala {recorrido.partida} a la {recorrido.destino} "
+                f"(extremos, costo {recorrido.costo})")
+
+    if recorrido.motivo == HACIA_LA_MAS_LEJANA:
+        return (f"sin ruta entre los extremos; de la sala {recorrido.partida} a la "
+                f"{recorrido.destino}, la mas lejana alcanzable (costo {recorrido.costo})")
+
+    return (f"sin ruta desde la sala {recorrido.partida} a ninguna otra; "
+            f"medido hacia la {recorrido.destino}")
 
 
 if __name__ == "__main__":
