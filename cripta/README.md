@@ -59,7 +59,7 @@ python -m unittest discover -s tests -t . -v
 
 En Windows también funciona `py` en lugar de `python`.
 
-Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1223 pruebas, todas pasan**, medido con Python 3.12.3. Dos de ellas se cuentan como *fallos esperados* (ver «Lo que todavía no funciona»).
+Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1229 pruebas, todas pasan**, medido con Python 3.12.3. Dos de ellas se cuentan como *fallos esperados* (ver «Lo que todavía no funciona»).
 
 ### Pruebas de aceptación por capacidad
 
@@ -71,7 +71,7 @@ Cada prueba cita en su docstring el requisito (`FR-xxx`) de la especificación q
 
 Las mediciones de esta capacidad están en la suite «Mapa conocido y viaje ir a» de `python main.py --bench`. Al final de la suite hay una fila por cada cripta del paquete sin conexión, con el id que traen sus datos y su número de salas. Para medir otro paquete, como el de la segunda parte, se usa `python main.py --bench --offline CARPETA`; sin `--offline` se mide `datos_offline/`. La fila mide «ir a» con todo el mapa conocido explorado y muestra:
 
-- hacia dónde fue el viaje: de la primera sala del esqueleto a la última, con su costo mínimo. Si con el mapa conocido no hay ruta entre ellas, la fila lo dice y mide el viaje hacia la sala más lejana que se alcanza desde la primera por costo mínimo (si empatan, la de menor id). Si desde la primera no se alcanza ninguna sala, también lo dice;
+- hacia dónde fue el viaje: de la sala inicial de la cripta (la `sala_inicial` de sus datos generales) a la última sala del esqueleto, con su costo mínimo. Si con el mapa conocido no hay ruta entre ellas, o la sala inicial ya es la última, la fila lo dice y mide el viaje hacia la sala más lejana que se alcanza desde la inicial por costo mínimo (si empatan, la de menor id). Si desde la sala inicial no se alcanza ninguna otra, también lo dice;
 - el primer paso del viaje, como lo calcula el programa;
 - el promedio por paso del viaje entero y cuántos pasos tuvo. Si el viaje no dio ningún paso, la fila lo dice en vez de mostrar un promedio;
 - la búsqueda completa sin mejoras y la búsqueda sin montículo, como referencias.
