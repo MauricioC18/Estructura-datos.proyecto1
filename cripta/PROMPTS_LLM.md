@@ -2037,3 +2037,21 @@ Haz dos cosas, en commits separados, sin push, sin atribución de Claude: 1. REA
 Uso en el proyecto: `cripta/benchmark/bench_mapa_conocido.py` (`elegir_recorrido`, `RecorridoMedido`, `descripcion_del_recorrido`), `tests/test_bench_paquete_sin_conexion.py` y `cripta/README.md`.
 
 Cambios realizados por el estudiante: Se tomó como «sala inicial» la partida del viaje que ya medía la suite, que es la primera sala del esqueleto. En cripta-01 coincide con la `sala_inicial` de sus datos generales, pero eso no está garantizado en otras criptas. Para saber qué salas se alcanzan, la búsqueda va desde esa sala y se expande por las salidas que salen de cada sala. Así la distancia es la de ir desde ella, y una sala que solo tiene salida hacia la primera no cuenta como alcanzable; hay una prueba para ese caso. Si dos salas están igual de lejos, gana la de menor id, para que la medición dé lo mismo en cada corrida. Las cuadrículas sintéticas no cambian, porque en ellas siempre hay ruta entre los extremos. Con cripta-01, la fila ahora dice que no hay ruta entre los extremos y mide un viaje de 3 pasos de la sala 1 a la 4, que es la más lejana (costo 300). En la sesión anterior, dos `with` de una prueba habían quedado unidos en una sola línea, porque la barra de continuación se perdió al escribir el archivo desde la terminal. Seguía siendo Python válido; se separaron en este commit y desde entonces las pruebas se editan con la herramienta de edición. Pruebas: 1223 en WSL con Python 3.12.3, con los dos fallos esperados de los escenarios 7 y 8.
+
+### 2.51 La medición de «ir a» en criptas reales parte de la sala inicial de sus datos
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Que el viaje medido en cada cripta del paquete sin conexión parta de la `sala_inicial` de sus datos generales y no de la primera sala del esqueleto, que en otras criptas puede no ser donde empieza el jugador.
+
+Prompts utilizados:
+
+```text
+Cambia la suite del mapa conocido para que la sala de partida de la medición salga de la sala_inicial de los datos de la cripta, no de la primera sala del esqueleto. Un commit de código aparte, con prueba que cubra una cripta cuya sala inicial no sea la primera del esqueleto. Sin ids ni tamaños de cripta en el código, sin tocar archivos de Carlos, sin atribución de Claude, sin push. [...]
+```
+
+Uso en el proyecto: `cripta/benchmark/bench_mapa_conocido.py` (`criptas_sin_conexion`, `elegir_recorrido`, `medir_paso_de_ir_a`, `descripcion_del_recorrido`), `tests/test_bench_paquete_sin_conexion.py` y `cripta/README.md`.
+
+Cambios realizados por el estudiante: El destino sigue siendo la última sala del esqueleto. Hubo que decidir qué pasa si la sala inicial ya es esa última: se mide hacia la más lejana alcanzable, y la fila dice el motivo. Las cuadrículas sintéticas no tienen datos generales, así que siguen partiendo de la primera sala y sus filas no cambian. Una `sala_inicial` que no está en el esqueleto es un error y no se mide en silencio desde otra sala. Para que el nombre no engañara, el motivo `ENTRE_EXTREMOS` pasó a llamarse `HACIA_LA_ULTIMA`. La prueba pedida copia el paquete de `datos_offline/` a una carpeta temporal y le cambia la sala inicial por la segunda sala de su propio esqueleto. Así pasa por la misma fuente sin conexión que el juego, sin escribir ningún id en la prueba. Hay otra con un mapa en el que partir de la primera sala o de la inicial da un viaje distinto (3 pasos contra 1), para comprobar que el camino medido de verdad sale de la inicial. En cripta-01 las dos salas coinciden y la medición no cambió. El README se actualizó en un commit de documentos aparte, porque describía la partida anterior. Pruebas: 1229 en WSL con Python 3.12.3, con los dos fallos esperados de los escenarios 7 y 8.
