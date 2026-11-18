@@ -4,7 +4,7 @@
 
 Cada tarea referencia los requisitos que atiende. No hay tareas sin requisito.
 
-Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porque tocan archivos distintos. Las etiquetas **[H1]**–**[H5]** remiten a las historias de la especificación.
+Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porque tocan archivos distintos. Las etiquetas **[H1]**–**[H6]** remiten a las historias de la especificación.
 
 ## Lista
 
@@ -48,6 +48,10 @@ Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porqu
 - [x] T018 No romper nada: la suite completa
 - [x] T019 Dejarle la interfaz lista a la Persona 4 para las dos banderas nuevas
 - [x] T020 Registrar las invocaciones de spec-kit de esta capacidad, en `cripta/PROMPTS_LLM.md`
+
+### Fase 8 — Historia 6: consultar una partida registrada sin jugarla (P3)
+
+- [x] T021 [H6] `--replay --hasta` con un instante posterior al final muestra el estado final y avisa, en `cripta/controller/application.py` y `cripta/tests/test_banderas_linea_de_tiempo.py`
 
 ---
 
@@ -363,6 +367,18 @@ Incluir el aviso de que el formato del archivo de partida subió a la versión 3
 Las entradas de las capacidades anteriores van de 2.25 a 2.29; estas continúan la numeración.
 
 **Depende de**: T018
+
+---
+
+## T021 — `--replay --hasta` después del final [H6]
+
+**Requisitos**: FR-025 (Historia 6, escenario 1, Apéndice B), FR-009 sin cambios
+
+**Archivos**: `cripta/controller/application.py`, `cripta/tests/test_banderas_linea_de_tiempo.py`
+
+Agregada después del cierre, cuando una auditoría encontró que este caso del Apéndice B no tenía escenario y que el programa rechazaba el instante. La especificación se corrigió primero, en un commit aparte. La bandera es de la integración, así que el arreglo vive en `replay()` y no toca la línea, la consulta ni el archivo de partida: si el instante pedido es posterior al reloj final, avisa y consulta el reloj final, que ya es consultable. El instante final exacto se muestra sin aviso y un instante negativo se sigue rechazando.
+
+**Depende de**: T019
 
 ---
 

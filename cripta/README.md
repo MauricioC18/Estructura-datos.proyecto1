@@ -19,7 +19,7 @@ El juego se puede jugar completo desde la consola, contra el API o sin conexión
 
 ## Requisitos
 
-Python 3.11 o superior. El desarrollo se está realizando sobre Python 3.14.6.
+Python 3.11 o superior.
 
 Las dependencias están en `requirements.txt`. Se instalan con:
 
@@ -59,7 +59,7 @@ python -m unittest discover -s tests -t . -v
 
 En Windows también funciona `py` en lugar de `python`.
 
-Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1229 pruebas, todas pasan**, medido con Python 3.12.3. Dos de ellas se cuentan como *fallos esperados* (ver «Lo que todavía no funciona»).
+Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1231 pruebas, todas pasan**, medido con Python 3.12.3. Dos de ellas se cuentan como *fallos esperados* (ver «Lo que todavía no funciona»).
 
 ### Pruebas de aceptación por capacidad
 
@@ -90,7 +90,7 @@ Desde la carpeta `cripta/`:
 | `python main.py --offline` | Juega sin red, con el paquete de `datos_offline/`. Con `--offline CARPETA` usa otro paquete |
 | `python main.py --cargar ARCHIVO` | Continúa una partida guardada con el comando `guardar` |
 | `python main.py --replay partidas/ARCHIVO.log` | Reproduce una partida completa, sin interacción y sin la vista interactiva (§4.11). Funciona también con `--offline` |
-| `python main.py --replay partidas/ARCHIVO.log --hasta T` | Reproduce la partida y al final imprime el estado del instante `T`, el mismo resumen que el comando `historia`, sin la vista interactiva. **Ver la nota sobre la línea de tiempo más abajo** |
+| `python main.py --replay partidas/ARCHIVO.log --hasta T` | Reproduce la partida y al final imprime el estado del instante `T`, el mismo resumen que el comando `historia`, sin la vista interactiva. Si `T` es posterior al final de la partida, muestra el estado final y avisa que la partida terminó antes. **Ver la nota sobre la línea de tiempo más abajo** |
 | `python main.py --bench` | Corre las mediciones de todos los subsistemas (§5.3). Tarda alrededor de un minuto |
 | `python main.py --bench --offline CARPETA` | Igual, pero la medición de «ir a» en criptas reales usa las criptas del paquete de `CARPETA` en vez de `datos_offline/`. Las demás suites no cambian |
 | `python main.py --puntajes [CRIPTA]` | Muestra la tabla de puntajes, de todas las criptas o de una |

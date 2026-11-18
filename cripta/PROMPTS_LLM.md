@@ -2055,3 +2055,39 @@ Cambia la suite del mapa conocido para que la sala de partida de la medición sa
 Uso en el proyecto: `cripta/benchmark/bench_mapa_conocido.py` (`criptas_sin_conexion`, `elegir_recorrido`, `medir_paso_de_ir_a`, `descripcion_del_recorrido`), `tests/test_bench_paquete_sin_conexion.py` y `cripta/README.md`.
 
 Cambios realizados por el estudiante: El destino sigue siendo la última sala del esqueleto. Hubo que decidir qué pasa si la sala inicial ya es esa última: se mide hacia la más lejana alcanzable, y la fila dice el motivo. Las cuadrículas sintéticas no tienen datos generales, así que siguen partiendo de la primera sala y sus filas no cambian. Una `sala_inicial` que no está en el esqueleto es un error y no se mide en silencio desde otra sala. Para que el nombre no engañara, el motivo `ENTRE_EXTREMOS` pasó a llamarse `HACIA_LA_ULTIMA`. La prueba pedida copia el paquete de `datos_offline/` a una carpeta temporal y le cambia la sala inicial por la segunda sala de su propio esqueleto. Así pasa por la misma fuente sin conexión que el juego, sin escribir ningún id en la prueba. Hay otra con un mapa en el que partir de la primera sala o de la inicial da un viaje distinto (3 pasos contra 1), para comprobar que el camino medido de verdad sale de la inicial. En cripta-01 las dos salas coinciden y la medición no cambió. El README se actualizó en un commit de documentos aparte, porque describía la partida anterior. Pruebas: 1229 en WSL con Python 3.12.3, con los dos fallos esperados de los escenarios 7 y 8.
+
+### 2.52 Auditoría de solo lectura de la segunda parte antes de la entrega
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Saber qué falta antes de la entrega del 18 de noviembre, revisando todas las ramas remotas sin modificar nada.
+
+Prompts utilizados:
+
+```text
+Haz una AUDITORÍA DE SOLO LECTURA de todo el proyecto CRIPTA (segunda parte) para saber qué falta antes de la entrega del miércoles 18 de noviembre. LÍMITES: no modifiques archivos, no hagas commit, merge, rebase, checkout de ramas ni push, y no ejecutes ningún comando de spec-kit. [...] INFORME, en este orden: A. Mapa de ramas [...] M. Preguntas que necesitas que yo responda. [...] Registra la entrada en cripta/PROMPTS_LLM.md SOLO si el límite de "no modificar archivos" lo permite: si no, dímelo y dame el texto de la entrada para que la agregue yo.
+```
+
+Uso en el proyecto: ninguno directo; el informe orienta el trabajo pendiente. Esta entrada se agregó en la sesión siguiente, porque la auditoría no podía modificar archivos.
+
+Cambios realizados por el estudiante: No se cambió ningún archivo. La auditoría encontró que la verificación de resolubilidad no existe en ninguna rama (ni spec 006, ni código, ni `--verificar`/`--forzar`); que `parte-2-Erick` contiene copias de archivos de `Parte_2-niebla-ir-a` y no arranca porque le falta `structures/mapa_conocido.py`; que `mauricio-logica-juego` ya está contenida en `Parte_2-niebla-ir-a`; y que unir esta rama con `Parte_2-API-cache-persistencia` solo choca en `PROMPTS_LLM.md` (simulado con `git merge-tree`, sin tocar la rama: 1266 pruebas pasan con Python 3.12.3). También encontró que `--replay --hasta` con un instante posterior al final rechazaba la consulta cuando el Apéndice B pide mostrar el estado final, que falta el escenario de varios eventos en el mismo instante, y que la consulta con 5000 acciones no está medida. No se pudo probar con Python 3.11 porque no hay uno instalado.
+
+### 2.53 --replay --hasta con un instante posterior al final de la partida
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Cubrir el caso del Apéndice B «`--replay partida.log --hasta t` con t posterior al final de la partida: muestra el estado final e indica que la partida terminó antes», que la auditoría encontró sin escenario y con el comportamiento contrario.
+
+Prompts utilizados:
+
+```text
+Haz tres cosas, en este orden, con commits pequeños y separados (spec aparte del código, código aparte de documentos) [...] 1. SPEC PRIMERO. Agrega en specs/003-linea-de-tiempo/spec.md un escenario de aceptación (y un caso borde) [...] No reenumeres FR existentes; si hace falta un FR nuevo, va al final. [...] 2. CÓDIGO. Corrige --hasta para ese caso. test_banderas_linea_de_tiempo.py:131 fija el comportamiento equivocado [...] NO toques la línea de tiempo de Carlos [...] 3. DOCUMENTOS (commit aparte): README con el conteo de pruebas actual y la versión de Python [...]
+```
+
+Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md` (Historia 6, un caso borde y FR-025), `specs/003-linea-de-tiempo/tasks.md` (T021), `cripta/controller/application.py` (`_instante_reproducido`), `cripta/tests/test_banderas_linea_de_tiempo.py` y `cripta/README.md`.
+
+Cambios realizados por el estudiante: Ninguna historia de la especificación 003 hablaba de consultar sin interacción, y el caso no encajaba en la Historia 2, que es la del rechazo. Por eso se agregó una Historia 6 corta. Hacía falta un requisito nuevo, porque FR-014 no dice qué pasa después del final: FR-025 quedó al final de los requisitos funcionales, sin reenumerar ninguno, y deja dicho que FR-009 (el rechazo en la partida en curso) no cambia. La diferencia se justifica en la historia: la partida en curso todavía puede llegar a ese instante, y la reproducida ya no. El arreglo quedó en `replay()` sin tocar la línea de tiempo: si el instante es posterior al reloj final, avisa y consulta el reloj final, que ya era consultable. La prueba que fijaba el rechazo se reemplazó por tres. Una comprueba el aviso, que viene antes del resumen, y el resumen del instante final, sin la vista. Otra comprueba que el instante final exacto no avisa (el caso borde). La tercera, que un instante negativo se sigue rechazando. Como el resumen final se obtiene con la misma reconstrucción, le alcanza el defecto ya reportado de las copias espaciadas. El README dejó de citar Python 3.14.6, que nadie del grupo usa para medir, y quedó en 3.11 o superior. Pruebas: 1231 en WSL con Python 3.12.3, con los dos fallos esperados de T052.
