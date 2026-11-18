@@ -56,7 +56,7 @@ from replay.replay_log import (
 )
 from repository.gestor_catalogo import FichaNoDisponible
 from repository.gestor_contenido import ContenidoNoDisponible
-from repository.repositorio_cripta import VersionesIncompatibles
+from repository.repositorio_cripta import CriptaNoResoluble, VersionesIncompatibles
 from repository.traductor import ErrorDatosCripta
 from structures.history import History, ReversibleEventQueue
 from structures.inventory import Inventory
@@ -399,7 +399,7 @@ def load_saved_game(repository, view, load_path, in_use=None):
 
 def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
          log_directory=LOG_DIRECTORY, scoreboard=None, load_path=None,
-         copias_cada=COPIAS_CADA):
+         copias_cada=COPIAS_CADA, forzar=False):
     """Juega una partida completa con la vista de consola.
 
     Devuelve el Game al terminar, o None si no se llego a empezar. Si la
@@ -415,6 +415,11 @@ def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
     El comando cargar a media partida cierra la sesion actual, cuya bitacora
     queda completa y reproducible hasta ahi, y abre una sesion nueva con su
     propia bitacora, igual que --cargar. Una bitacora nunca mezcla dos partidas.
+
+    Una partida nueva se verifica antes de empezar (specs/006-resolubilidad):
+    si la cripta no es resoluble no inicia, salvo con forzar (--forzar), y el
+    reporte se muestra antes de la primera accion (FR-016, FR-017, FR-020).
+    Una partida cargada no se verifica (FR-019).
     """
     while True:
         repository.empezar_conteo_de_partida()
@@ -435,7 +440,9 @@ def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
             if crypt_id is None:
                 return None
 
-            repository.iniciar_partida(crypt_id)
+            if not _start_verified(repository, view, crypt_id, forzar):
+                return None
+
             game = build_game(repository, seed, player_name, in_use, copias_cada)
 
         crypt, crypt_version, catalog_version = repository.versiones_de_la_partida()
@@ -466,6 +473,33 @@ def play(repository, view, seed, crypt_id=None, player_name=None, in_use=None,
         record_score(scoreboard, game, crypt, crypt_version, view)
 
     return game
+
+
+def _start_verified(repository, view, crypt_id, forzar):
+    """Inicia la cripta exigiendo la resolubilidad salvo con forzar, y muestra
+    el reporte. Devuelve False si la partida no debe empezar (FR-016 de
+    specs/006-resolubilidad); en ese caso todavia no hay bitacora."""
+    try:
+        repository.iniciar_partida(crypt_id, exigir_resolubilidad=not forzar)
+    except CriptaNoResoluble as error:
+        _show_lines(view, error.reporte.lineas_de_texto())
+        view.show_message(
+            "La partida no inicia porque la cripta no es resoluble. "
+            "Para jugarla igual, use --forzar."
+        )
+        return False
+
+    report = repository.reporte_de_resolubilidad()
+
+    if report is not None:
+        _show_lines(view, report.lineas_de_texto())
+
+    return True
+
+
+def _show_lines(view, lines):
+    for line in lines:
+        view.show_message(line)
 
 
 def record_score(scoreboard, game, crypt_id, crypt_version, view, limit=10):

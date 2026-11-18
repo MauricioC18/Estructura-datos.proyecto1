@@ -12,6 +12,9 @@ Uso, desde la carpeta cripta/:
     python main.py --bench --offline CARPETA
                                             medir con las criptas de otro paquete sin conexion
 
+    python main.py --verificar CRIPTA       solo verificar si la cripta se puede ganar
+    python main.py --forzar                 jugar aunque la cripta no sea resoluble
+
     python main.py --puntajes [CRIPTA]      mostrar la tabla de puntajes
 
 Otras opciones: --cripta ID, --semilla N, --nombre TEXTO, --cache-size N,
@@ -75,6 +78,16 @@ def parse_arguments(argv=None):
              f"(por defecto {COPIAS_CADA})",
     )
     parser.add_argument("--bench", action="store_true", help="medir los subsistemas")
+    parser.add_argument(
+        "--verificar",
+        metavar="CRIPTA",
+        help="solo verificar si la cripta se puede ganar y mostrar el reporte",
+    )
+    parser.add_argument(
+        "--forzar",
+        action="store_true",
+        help="empezar la partida aunque la cripta no sea resoluble",
+    )
     parser.add_argument("--cripta", metavar="ID", help="id de la cripta, sin preguntar")
     parser.add_argument("--semilla", type=int, help="semilla de la partida")
     parser.add_argument("--nombre", help="nombre del jugador")
@@ -99,6 +112,14 @@ def parse_arguments(argv=None):
 
     if arguments.checkpoint_cada < 1:
         parser.error("--checkpoint-cada debe ser al menos 1.")
+
+    # --forzar y --verificar (FR-016 y FR-018 de specs/006-resolubilidad).
+    if arguments.forzar and (arguments.replay or arguments.bench or arguments.cargar
+                             or arguments.verificar):
+        parser.error("--forzar solo se usa al empezar una partida nueva.")
+
+    if arguments.verificar and (arguments.replay or arguments.bench or arguments.cargar):
+        parser.error("--verificar no se combina con --replay, --bench ni --cargar.")
 
     return arguments
 
@@ -150,6 +171,32 @@ def run_bench(arguments):
 
     bench_main(carpeta_sin_conexion=arguments.offline)
     return 0
+
+
+# Codigo de salida de --verificar cuando la cripta no se pudo leer. FR-018 de
+# specs/006-resolubilidad reserva 0, 1 y 2 para los resultados de la
+# verificacion, y un error de datos no es ninguno de ellos.
+VERIFY_DATA_ERROR = 3
+
+
+def run_verify(arguments):
+    """--verificar CRIPTA: solo la verificacion y su reporte (FR-018 de
+    specs/006-resolubilidad). No instancia la vista, no pide nombre, no abre
+    bitacora ni crea el motor; el codigo de salida es el del reporte."""
+    from controller.application import DATA_ERRORS, InUseIds
+
+    try:
+        repository = make_repository(arguments, InUseIds())
+        repository.empezar_conteo_de_partida()
+        report = repository.verificar_cripta(arguments.verificar)
+    except DATA_ERRORS as error:
+        print(f"Error: {error}")
+        return VERIFY_DATA_ERROR
+
+    for line in report.lineas_de_texto():
+        print(line)
+
+    return report.codigo_de_salida()
 
 
 def run_replay(arguments):
@@ -209,6 +256,7 @@ def run_game(arguments):
             scoreboard=Scoreboard(DEFAULT_SCORES_PATH),
             load_path=arguments.cargar,
             copias_cada=arguments.checkpoint_cada,
+            forzar=arguments.forzar,
         )
     except DATA_ERRORS as error:
         print(f"Error: {error}")
@@ -237,6 +285,9 @@ def main(argv=None):
 
     if arguments.bench:
         return run_bench(arguments)
+
+    if arguments.verificar:
+        return run_verify(arguments)
 
     if arguments.replay:
         return run_replay(arguments)
