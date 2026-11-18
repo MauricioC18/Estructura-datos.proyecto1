@@ -18,8 +18,7 @@ Las secciones están en el orden de los problemas del §4 del enunciado. Despué
 las decisiones que no corresponden a un problema del §4 pero que condicionan al resto
 del grupo, y al final el estado de las pruebas.
 
-Las secciones 4.2, 4.3, 4.4 y 4.10 todavía no están escritas. Cada una dice de quién es
-y qué le falta.
+Todas las secciones del §4, de la 4.1 a la 4.11, están escritas.
 
 Después de las del §4 vienen las de los problemas del §5 del enunciado de la **segunda
 parte**, con los mismos seis apartados. Cada una enlaza a la especificación y al plan de
@@ -27,8 +26,7 @@ spec-kit de los que proviene, y dice si la decisión final coincide con la del p
 original; cuando no coincide, dice qué medición o qué prueba motivó el cambio. La §5.6
 muestra el antes y el después de las decisiones de la primera parte que cambiaron.
 
-De las secciones del §5 están escritas la 5.1, la 5.2, la 5.5 y la 5.6. La 5.3 y la 5.4
-dicen de quién son y qué les falta.
+Las seis secciones del §5, de la 5.1 a la 5.6, están escritas.
 
 ---
 
@@ -2199,7 +2197,10 @@ que es el escenario que más margen tiene, pero no está medido.
 
 Estado: implementado, probado y medido.
 
-Proviene de la misma especificación y plan que §5.1, en particular de su requisito FR-011.
+Proviene de la misma especificación y plan que §5.1,
+[`specs/002-cazador-ruta-mas-barata/spec.md`](../../specs/002-cazador-ruta-mas-barata/spec.md)
+y [`specs/002-cazador-ruta-mas-barata/plan.md`](../../specs/002-cazador-ruta-mas-barata/plan.md),
+en particular de su requisito FR-011.
 
 ### Problema
 
@@ -2584,7 +2585,14 @@ ingenua es unas 110 veces más lenta.
 **La cripta de referencia.** `--bench` busca la cripta más grande del paquete
 `datos_offline_p2` (descargado del servicio con la ubicación de llaves) y la verifica: en
 `cripta-06` (300 salas, 760 salidas, 4 llaves) tardó 0.9 ms, el mejor de 5 corridas, contra
-el límite de 200 ms de §6.1. Dos pruebas automatizadas lo vigilan: una con esa misma cripta
+el límite de 200 ms de §6.1. En la corrida de `--bench --offline datos_offline_p2` del
+2026-11-18, en un clon limpio de `main` con Python 3.12.3 en WSL, la misma fila dio 1.26 ms.
+**Esa fila mide solo la verificación**, sobre el mapa ya armado: no incluye leer las páginas
+del esqueleto ni la ubicación de llaves, ni traducirlas. La verificación completa que hace
+`--verificar` (leer el paquete, traducirlo y verificar), medida aparte con un script
+temporal fuera del repositorio, tardó de 73 a 78 ms con la caché vacía y de 18 a 28 ms con
+la caché en disco, en tres corridas; también debajo de 200 ms. Dos pruebas automatizadas
+vigilan la verificación sola: una con esa misma cripta
 del paquete y otra con una cripta sintética de 301 salas; las dos exigen menos de 200 ms.
 
 **Resultados sobre las criptas publicadas**, con su ubicación de llaves descargada del
@@ -3035,12 +3043,15 @@ mapas asimétricos desde la primera parte, y nadie lo estaba mirando.
 ### Lo que sigue pendiente de medir
 
 * El comportamiento con la cripta de referencia **real**, `cripta-06`. Todas las mediciones
-  de arriba usan criptas sintéticas a su escala —300 salas, 36 cazadores— porque el paquete
-  sin conexión que la incluye todavía no está. Las criptas sintéticas son deterministas por
-  semilla, pero no son la cripta de la revisión.
+  de arriba usan criptas sintéticas a su escala —300 salas, 36 cazadores—, porque cuando se
+  tomaron el paquete sin conexión que la incluye no existía. Desde el 2026-11-18 cripta-06
+  está en `datos_offline_p2/`, y `--bench --offline datos_offline_p2` ya la usa para «ir a»
+  (§5.3) y para la resolubilidad (§5.4), pero las mediciones de esta sección no se
+  repitieron con ella. Las criptas sintéticas son deterministas por semilla, pero no son la
+  cripta de la revisión.
 * La carga combinada de las cuatro capacidades a la vez. Cada una se midió con las que ya
   estaban integradas, pero la niebla de guerra y la resolubilidad no estaban en esta rama
-  cuando se midió.
+  cuando se midió. Hoy las cuatro están en `main`; la medición combinada no se hizo.
 
 ---
 

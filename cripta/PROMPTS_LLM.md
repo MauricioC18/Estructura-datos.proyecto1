@@ -1708,6 +1708,8 @@ Es la cuarta vez en esta capacidad que un hueco de pruebas deja pasar algo, y la
 
 También se corrigieron los números de escenario 7 y 8, que habían quedado repetidos en la Historia 1 al agregar los casos del Apéndice B, y se dejó anotado que la cripta de referencia todavía no está disponible en ninguna rama, así que las mediciones siguen siendo con criptas sintéticas a su escala.
 
+**Nota sobre `/speckit.clarify` en las especificaciones 001 a 003 (agregada el 2026-11-18, en la revisión final de la entrega).** En este registro no hay ninguna invocación de `/speckit.clarify` para `specs/001-terreno-costo-salidas`, `specs/002-cazador-ruta-mas-barata` ni `specs/003-linea-de-tiempo`, y esas tres especificaciones no tienen sección `## Clarifications`. No se agrega ninguna sesión que no ocurrió. Las decisiones que el grupo tomó sobre esas especificaciones están en sus secciones de supuestos y en las correcciones registradas en las entradas 2.28, 2.32 y 2.33. La única aclaración posterior es la de la especificación 003 sobre cómo se numeran las acciones en `historia #k` (FR-003, 2026-11-18), escrita a mano en la especificación y registrada en la entrada 2.60.
+
 ### 2.30 Niebla de guerra e «ir a»: análisis del repositorio, /speckit.specify y /speckit.clarify
 
 Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
@@ -2271,6 +2273,42 @@ Prompts utilizados:
 Uso en el proyecto: `specs/005-niebla-ir-a/plan.md` («Conexión de la resolubilidad» y «Resultado con la cripta de referencia»), `specs/005-niebla-ir-a/tasks.md` (Fase 9, T054 a T056, y cierre de T044), `cripta/tests/test_banderas_resolubilidad.py`, `cripta/main.py`, `cripta/controller/application.py`, `cripta/docs/DECISIONES.md` §5.3 y `cripta/README.md`.
 
 Cambios realizados por el estudiante: La especificación 005 deja las banderas fuera de su alcance y la 006 deja su conexión a la 005, así que no hubo que cambiar ninguna especificación: el plan y las tareas de la 005 citan los FR de la 006, y se confirmaron en Git antes de las pruebas, y estas, fallando, antes del código. Hubo una decisión que la especificación no cubre: FR-018 reserva los códigos 0, 1 y 2 para los resultados de la verificación, y una cripta que no se puede leer no es ninguno; se usó 3 y quedó escrito en el plan. Las pruebas eligen la cripta por el resultado de su verificación y no por su id. La revisión de la parte de Mauricio encontró los cuatro casos del Apéndice B con escenario y prueba, comprobó con los datos reales que la llave del carcelero errante de cripta-03 se ubica en su sala inicial, y midió la verificación de cripta-06 en 1.27 a 1.43 ms, y de 73 a 78 ms contando leer y traducir el paquete sin caché, ambos debajo de 200 ms. Las observaciones se dejaron para él sin tocar su código. En la medición de «ir a», cripta-06 dio de 0.39 a 0.45 ms en el primer paso. Como las puertas cerradas dejaban un viaje de solo 10 pasos, se midió aparte el mismo mapa con todas las puertas abiertas: de 3.00 a 3.19 ms. FR-036 se cumple en la cripta de referencia. Ninguna cripta del paquete tiene salidas de un solo sentido. Pruebas: 1341 en WSL con Python 3.12.3, con un fallo esperado (T023).
+
+### 2.59 Revisión final de la entrega, de solo lectura
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-18
+
+Objetivo: Revisar main contra lo que se entrega y se evalúa en la segunda parte, sin modificar el repositorio, y verificarlo en un clon limpio.
+
+Prompts utilizados:
+
+```text
+CIERRE FINAL: revisa el proyecto CRIPTA (segunda parte) contra lo que se evalúa y lo que se entrega. Hoy es la entrega (miércoles 18 de noviembre, 11:59 pm). LÍMITES: SOLO LECTURA. [...] 7. VERIFICACIÓN EN UN CLON LIMPIO (fuera del repo) [...] SALIDA FINAL, en este orden: A. VEREDICTO [...] E. ENTRADA PARA PROMPTS_LLM.md [...]
+```
+
+Uso en el proyecto: ninguno directo; las correcciones de documentación se hicieron en la entrada 2.60.
+
+Cambios realizados por el estudiante: No se cambió ningún archivo. En un clon de main (`dd75587`), con Python 3.12.3 en WSL, pasaron 1341 pruebas con un fallo esperado, y funcionaron `--verificar` (códigos 0 y 1), `--forzar`, `--bench --offline datos_offline_p2` y `--replay --hasta`. Las cuatro capacidades tienen su especificación confirmada antes que su código y los 23 casos del Apéndice B tienen escenario y prueba. Se cumplen los cuatro límites de §6.1. Se encontraron, para corregir o declarar: la introducción de DECISIONES y la nota de §5.6 desactualizadas; ningún registro de clarify en las especificaciones 001 a 003; §5.2 sin enlace a su especificación; y que `historia #k` cuenta desde 0 mientras la especificación 003, la ayuda y la vista cuentan desde 1 (`historia #1` muestra «antes de la accion 2»). Python 3.11 no se pudo probar porque no hay uno instalado.
+
+### 2.60 Correcciones de documentación de la revisión final
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-18
+
+Objetivo: Aplicar las correcciones de documentación que encontró la revisión final (entrada 2.59), sin cambiar código de producción.
+
+Prompts utilizados:
+
+```text
+Aplica las correcciones de DOCUMENTACIÓN de la revisión final, en commits separados, sin push. [...] NO cambies código de producción [...] NO arregles el desfase de historia #k en el código. [...] COMMIT 1, SOLO specs/003-linea-de-tiempo/spec.md: Fija que "historia #k" cuenta las acciones desde 1 [...] COMMIT 2, SOLO documentos [...] COMMIT 3, SOLO docstrings en pruebas [...]
+```
+
+Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md` (FR-003, escenario 10 de la Historia 1 y un caso borde), `cripta/docs/DECISIONES.md` (introducción, §5.2, §5.4 y §5.6), `cripta/README.md` (introducción, «Desde cero» y «Lo que todavía no funciona»), `README.md` en la raíz, este registro, y los docstrings de cuatro pruebas en `cripta/tests/test_cazador.py` y `cripta/tests/test_linea_de_tiempo.py`.
+
+Cambios realizados por el estudiante: La especificación se corrigió primero y en su propio commit: FR-003 ahora dice que las acciones se numeran desde 1, sin reenumerar ningún requisito, y un caso borde dice qué pasa con `#k` igual a las acciones tomadas según FR-010. El código no se tocó, así que el programa y la especificación quedan con un desfase conocido, y el README lo dice tal cual en vez de esconderlo. En DECISIONES, la cifra de 1.26 ms de §5.4 se dejó acompañada de lo que no mide (leer y traducir el paquete) y de la medición de esa parte tomada en la entrada 2.58; no se agregó ninguna medición nueva. La nota sobre `/speckit.clarify` en 001 a 003 dice que no hubo sesión, en vez de reconstruir una. En las pruebas solo cambió el texto de cuatro docstrings, que ahora citan su FR; las pruebas dieron lo mismo antes y después.
 
 ### 5.30 Arranque de la segunda parte: análisis del enunciado, del contrato 1.1.0 y de las criptas publicadas
 

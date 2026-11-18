@@ -4,6 +4,8 @@ Juego de mazmorra dirigido por eventos, desarrollado como primer proyecto del cu
 
 El proyecto consiste en diseñar, implementar y evaluar las estructuras de datos necesarias para resolver los problemas planteados en el enunciado: selección del siguiente evento, precarga de contenido, resolución del catálogo, caché persistente, inventario, historial reversible, rastro del jugador, bitácora en pantalla, ordenamiento y guardado binario.
 
+La **segunda parte** (`docs/SegundoProyecto-EDII-2026.md`) agrega cuatro capacidades, cada una con su especificación de spec-kit en `../specs/`: el terreno y el cazador, con su ruta más barata y la invalidación de rutas (001 y 002); la línea de tiempo con puntos de control (003); los datos nuevos del servicio (004); la niebla de guerra y el viaje «ir a» (005); y la verificación de resolubilidad (006). Las decisiones de diseño de cada problema están en `docs/DECISIONES.md`, §5.1 a §5.6.
+
 El enunciado oficial está en `docs/proyecto_cripta.md` y es la referencia para cualquier duda sobre las reglas del juego.
 
 ## Estado actual
@@ -26,6 +28,25 @@ Las dependencias están en `requirements.txt`. Se instalan con:
 ```
 pip install -r requirements.txt
 ```
+
+### Desde cero
+
+En una máquina sin nada instalado del proyecto, con Python 3.11 o superior:
+
+```
+git clone https://github.com/MauricioC18/Estructura-datos.proyecto1.git
+cd Estructura-datos.proyecto1/cripta
+python -m venv .venv
+.venv\Scripts\activate            (en Windows)
+source .venv/bin/activate           (en Linux o macOS)
+pip install -r requirements.txt
+python -m unittest discover -s tests -t .
+python main.py --verificar cripta-06 --offline datos_offline_p2
+python main.py --verificar cripta-05 --offline datos_offline_p2
+python main.py --bench --offline datos_offline_p2
+```
+
+El primer `--verificar` termina con código 0 (resoluble) y el segundo con 1 (no resoluble). `--bench` tarda uno o dos minutos. Las partidas jugadas dejan su bitácora en `partidas/`, que no se versiona.
 
 ### Desarrollo dirigido por especificaciones (segunda parte)
 
@@ -141,7 +162,8 @@ El log de una sesión que empezó cargando un guardado, con `--cargar` o con `ca
 - **«ir a» en mapas mucho más grandes que la cripta de referencia.** En cripta-06 (300 salas) un paso tarda como máximo 0.45 ms, y 3.19 ms con todas las puertas abiertas, debajo del límite de 5 ms. En las cuadrículas sintéticas de 400 y 1600 salas, el primer paso de un viaje largo pasa de 5 ms (5.59 y 30.31 ms en la última corrida); los pasos siguientes no (`docs/DECISIONES.md`, §5.3).
 - **Salidas de un solo sentido en criptas reales.** «ir a» y la verificación de resolubilidad las respetan, pero ninguna cripta del paquete `datos_offline_p2/` tiene una, así que solo lo comprueban las pruebas con mapas sintéticos.
 - **La verificación de resolubilidad con salidas de un solo sentido** supone que una llave obtenida sirve en toda la región alcanzable, aunque el jugador no siempre pueda volver a la puerta que abre. Es un límite declarado en `specs/006-resolubilidad/spec.md` (Assumptions) y en `docs/DECISIONES.md` §5.4.
-- Todas las pruebas y mediciones de la entrega se corrieron con Python 3.12.3 en WSL; no se repitieron con Python 3.11 ni en Windows.
+- **`historia #k` cuenta las acciones desde 0 en el programa, y la especificación dice desde 1.** La spec 003 (FR-003) fija que `historia #1` es el estado justo antes de la primera acción, igual que `historia 0`. El modelo (`model/consulta_historia.py`) toma `#k` como el estado después de *k* acciones, así que hoy `historia #1` muestra «antes de la accion 2», y `historia #k` con *k* igual a las acciones tomadas se acepta y muestra el presente en vez de la última acción. Es un desfase conocido, pendiente de corregir en el código. Mientras tanto, `historia <t>` con un instante del reloj responde bien.
+- **Python 3.11 no se probó en este equipo.** Todas las pruebas y mediciones de la entrega se corrieron con Python 3.12.3 en WSL, porque en el equipo no hay un Python 3.11 ni un Python de Windows instalado.
 
 ## Herramientas del bloque 2
 
