@@ -2693,9 +2693,36 @@ disponible, y el resumen lo informa así en vez de fallar. El archivo de partida
 recupera ese conocimiento por el contrato `exportar`/`importar`, así que entra en las copias
 sin trabajo extra.
 
-**Lo que no se midió:** partidas de más de 300 acciones del jugador. Con *K* = 50 y 1 000
-acciones serían 20 copias, unos 1.3 MiB, que sigue siendo poco, pero es una extrapolación y
-no una medición.
+**Lo que no se midió hasta el cierre:** partidas de más de 300 acciones del jugador. Se
+midió después; ver el apartado siguiente.
+
+**Partida de 5 000 acciones y alternativa sin puntos de control (agregado el 2026-11-17).**
+Medido con `--bench` (`benchmark/bench_linea_de_tiempo.py`, medición 5), en la misma cripta
+sintética de 300 salas, con Python 3.12.3 en WSL y tres corridas. No es comparable con las
+cifras de arriba, que son de otro equipo y otra versión de Python.
+
+| Escenario | Consultas | Promedio | Peor | Copias |
+| --- | ---: | ---: | ---: | ---: |
+| 5 000 acciones, *K* = 50 | 40 | 9.95 a 10.23 ms | 13.74 a 17.04 ms | 101 |
+| Sin puntos de control, 300 acciones | 5 | 16.35 a 17.19 ms | 25.54 a 28.00 ms | 1 |
+| Sin puntos de control, 5 000 acciones | 5 | 162.94 a 170.25 ms | 306.92 a 324.72 ms | 1 |
+
+Con *K* = 50, la peor consulta de una partida de 5 000 acciones queda entre el 27 y el 34 %
+del límite de 50 ms de §6.1. Sin puntos de control, la peor consulta pasa de 300 ms, seis
+veces el límite: la consulta tiene que repetir la partida desde el principio y su costo crece
+con el largo. Es la evidencia de que los puntos de control son necesarios.
+
+**Una consulta entre dos decisiones del jugador incluye eventos posteriores al instante.**
+Encontrado el 2026-11-17, al escribir la prueba del caso del Apéndice B «varios eventos en el
+mismo instante» (`tests/test_eventos_mismo_instante.py`). Para un instante *t* que no es una
+decisión del jugador, la consulta repite completa la última acción anterior a *t*, con todos
+los eventos hasta la siguiente decisión, también los de tiempo mayor que *t*. En la partida
+de esa prueba, con dos guardianes que atacan cada 100 y un jugador que decide cada 142, el
+resumen del instante 300 ya incluye los ataques del instante 400. Si no hay ningún evento
+entre *t* y la siguiente decisión, el resultado es correcto, y varios eventos en el mismo
+instante se cuentan todos. Contradice FR-002 y el escenario 6 de la Historia 1. La prueba que
+lo muestra está marcada como fallo esperado. Corregirlo es repetir esa última acción
+deteniendo los eventos en *t*, dentro de la línea de tiempo y del motor.
 
 ---
 

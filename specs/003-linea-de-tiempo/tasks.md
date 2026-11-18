@@ -53,6 +53,12 @@ Las tareas marcadas con **[P]** pueden hacerse en paralelo con la anterior porqu
 
 - [x] T021 [H6] `--replay --hasta` con un instante posterior al final muestra el estado final y avisa, en `cripta/controller/application.py` y `cripta/tests/test_banderas_linea_de_tiempo.py`
 
+### Fase 9 — Pendientes de la auditoría de cierre
+
+- [x] T022 [H1] Prueba del escenario 9 (varios eventos en el mismo instante, Apéndice B), en `cripta/tests/test_eventos_mismo_instante.py` — FR-002
+- [ ] T023 [H1] La consulta de un instante entre dos decisiones del jugador no debe incluir eventos posteriores al instante: repetir la última acción deteniendo los eventos en *t*, en `cripta/model/consulta_historia.py` y `cripta/model/game.py`; al hacerlo, quitar el fallo esperado de `test_un_evento_posterior_al_instante_no_cuenta` — FR-002
+- [x] T024 Medir la consulta con 5 000 acciones y *K* por omisión, y la alternativa sin puntos de control, en `cripta/benchmark/bench_linea_de_tiempo.py`; resultados en `cripta/docs/DECISIONES.md` §5.5 — FR-016, FR-017, §6.1 y §6.3
+
 ---
 
 ## T001 — La línea: acciones, copias, anclajes y búsqueda binaria

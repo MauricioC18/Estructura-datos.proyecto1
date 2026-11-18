@@ -59,7 +59,7 @@ python -m unittest discover -s tests -t . -v
 
 En Windows también funciona `py` en lugar de `python`.
 
-Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1279 pruebas, todas pasan**, medido con Python 3.12.3, sin fallos esperados. Incluye lo unido de `main` y de la rama de datos nuevos del servicio (`specs/004-datos-nuevos-servicio`).
+Estado al 2026-11-17, en la rama `Parte_2-niebla-ir-a`: **1282 pruebas, todas pasan**, medido con Python 3.12.3. Una se cuenta como *fallo esperado* (ver «Lo que todavía no funciona»). Incluye lo unido de `main` y de la rama de datos nuevos del servicio (`specs/004-datos-nuevos-servicio`).
 
 ### Pruebas de aceptación por capacidad
 
@@ -136,6 +136,7 @@ El log de una sesión que empezó cargando un guardado, con `--cargar` o con `ca
 
 - **La cripta de referencia de §6.1** (cripta-06, de 300 salas) no está en el paquete sin conexión, así que el límite de 5 ms por paso de «ir a» no está comprobado sobre ella. En las cuadrículas sintéticas, el primer paso de un viaje entre los extremos pasa de 5 ms desde 400 salas (`docs/DECISIONES.md`, §5.3).
 - `--verificar` y `--forzar` (resolubilidad) no están implementadas.
+- **`historia` de un instante entre dos decisiones del jugador.** Si entre ese instante y la siguiente decisión hubo otro evento, el resumen ya lo incluye, aunque sea posterior. Varios eventos en el mismo instante sí se cuentan todos. Está descrito en `docs/DECISIONES.md` §5.5 y su prueba (`tests/test_eventos_mismo_instante.py`) está marcada como fallo esperado hasta corregirlo (tarea T023 de `specs/003-linea-de-tiempo/tasks.md`).
 
 ## Herramientas del bloque 2
 

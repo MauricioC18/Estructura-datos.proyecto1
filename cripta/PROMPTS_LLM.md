@@ -2144,6 +2144,26 @@ Uso en el proyecto: dos commits de unión (`origin/main` y `origin/Parte_2-API-c
 
 Cambios realizados por el estudiante: Al revisar lo que dijo Erick se comprobó que `parte-2-Erick` no tiene trabajo propio: son copias de archivos de esta rama. Antes de tocar nada, la unión de las tres partes se simuló en una carpeta temporal: 1279 pruebas pasaron. Hubo dos conflictos. En `PROMPTS_LLM.md` cada lado solo había agregado entradas al final, así que se conservaron todas, en el orden en que llegaron, sin cambiar ninguna; las de Mauricio quedaron después de esta sección. En `repository/traductor.py`, Carlos y Mauricio habían arreglado lo mismo (un costo nulo vale 100) y se dejó la versión de `main`. Con la parada anticipada ya aceptada junto con `salidas_de`, `model/viaje.py` expande por `entrantes_conocidas` y da el primer paso por `vecinas_conocidas`; las pruebas de los escenarios 7 y 8 dejaron de ser fallos esperados. El arreglo de Carlos para la reconstrucción con copias espaciadas se comprobó aparte con `--replay --hasta` y *K* = 50 antes de quitar la nota del README. La medición 5 de §5.3 no se repitió después de conectar T052, y así quedó dicho. Pruebas: 1279 en WSL con Python 3.12.3, sin fallos esperados.
 
+### 2.55 Varios eventos en el mismo instante y mediciones de la línea de tiempo con 5000 acciones
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Cerrar lo que la auditoría encontró pendiente en la línea de tiempo y que no requería tocar su código: el caso del Apéndice B de varios eventos en el mismo instante, la consulta con al menos 5000 acciones (§6.1) y la alternativa sin puntos de control (§6.3).
+
+Prompts utilizados:
+
+```text
+Resolvamos lo que podemos hacer en este momento para terminar rapido el proyecto
+```
+
+Respuestas a las preguntas de Claude: subir la rama y abrir un pull request a main; la resolubilidad la tiene Mauricio; los pendientes de la línea de tiempo los hace Claude, sin tocar `structures/linea_de_tiempo.py`, `model/consulta_historia.py` ni `adapters/almacen_partida.py`.
+
+Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md` (escenario 9 de la Historia 1), `specs/003-linea-de-tiempo/tasks.md` (T022 a T024), `cripta/tests/test_eventos_mismo_instante.py`, `cripta/benchmark/bench_linea_de_tiempo.py` (medición 5), `cripta/docs/DECISIONES.md` §5.5 y `cripta/README.md`.
+
+Cambios realizados por el estudiante: Antes de escribir la prueba se comprobó, con una partida real, qué respondía la consulta para un instante entre dos decisiones del jugador. Apareció un defecto: la consulta repite completa la última acción anterior al instante, con todos los eventos hasta la siguiente decisión, también los posteriores al instante. En una partida de prueba falló en 6 de 32 instantes de ese tipo. Varios eventos en el mismo instante sí se cuentan todos. Por eso la prueba se partió en dos: el caso del Apéndice B, que pasa, y el de un evento posterior antes de la siguiente decisión, que queda como fallo esperado hasta que se corrija (T023). Ambas comparan contra el estado real registrado durante la partida y no contra valores escritos a mano, y una prueba de control comprueba que la partida produce los dos tipos de instante. Corregirlo exige tocar la consulta y el motor de la línea de tiempo, que quedaron fuera por decisión del grupo. Las mediciones se tomaron tres veces antes de anotarlas. Con *K* = 50, la peor consulta de 5000 acciones queda entre 13.7 y 17.0 ms. Sin puntos de control pasa de 300 ms, que muestra por qué hacen falta. Pruebas: 1282 en WSL con Python 3.12.3, con un fallo esperado.
+
 ### 5.30 Arranque de la segunda parte: análisis del enunciado, del contrato 1.1.0 y de las criptas publicadas
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
