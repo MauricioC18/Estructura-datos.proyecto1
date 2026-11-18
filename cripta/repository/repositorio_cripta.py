@@ -73,6 +73,7 @@ from repository.gestor_contenido import (
     tipos_de_la_sala,
 )
 from repository.traductor import NOMBRE_DEL_JUGADOR, ErrorDatosCripta, Traductor
+from model.resolubilidad import CODIGO_NO_RESOLUBLE, reporte_sin_verificar, verificar_resolubilidad
 
 UBICACION_DE_LLAVES_DESDE_DISCO = "recuperada de disco"
 UBICACION_DE_LLAVES_NO_DISPONIBLE = "no disponible"
@@ -81,6 +82,13 @@ UBICACION_DE_LLAVES_NO_OBTENIDA = "no se obtuvo en esta partida"
 
 class VersionesIncompatibles(Exception):
     """La fuente no tiene las versiones con que se grabó un log (§4.11)."""
+
+
+class CriptaNoResoluble(Exception):
+
+    def __init__(self, reporte):
+        super().__init__("La cripta no es resoluble.")
+        self.reporte = reporte
 
 
 class DatosDePartida:
@@ -172,6 +180,7 @@ class RepositorioCripta:
         self._enemigos_con_soltados_listos = None
         self._ubicacion_de_llaves = None
         self._origen_de_la_ubicacion_de_llaves = UBICACION_DE_LLAVES_NO_OBTENIDA
+        self._reporte_de_resolubilidad = None
         self._avisos = []
 
     # ------------------------------------------------------------------
@@ -188,7 +197,11 @@ class RepositorioCripta:
         """Lista de criptas publicadas: [{"id", "nombre", "salas", "dificultad"}, ...]."""
         return self._fuente.listar_criptas()["criptas"]
 
-    def iniciar_partida(self, id_cripta, versiones_requeridas=None, obtener_ubicacion_de_llaves=True):
+    def verificar_cripta(self, id_cripta):
+        return self.iniciar_partida(id_cripta, solo_verificar=True)
+
+    def iniciar_partida(self, id_cripta, versiones_requeridas=None, obtener_ubicacion_de_llaves=True,
+                        exigir_resolubilidad=False, solo_verificar=False):
         """Carga lo necesario para empezar y deja lista la sala inicial.
 
         versiones_requeridas: (version_cripta, version_catalogo) de un log
@@ -224,8 +237,15 @@ class RepositorioCripta:
 
         self._ubicacion_de_llaves = None
         self._origen_de_la_ubicacion_de_llaves = UBICACION_DE_LLAVES_NO_OBTENIDA
-        if obtener_ubicacion_de_llaves:
+        self._reporte_de_resolubilidad = None
+        if obtener_ubicacion_de_llaves or solo_verificar:
             self._obtener_ubicacion_de_llaves(id_cripta, copia_vigente)
+            self._reporte_de_resolubilidad = self._verificar_resolubilidad(salas)
+        if solo_verificar:
+            return self._reporte_de_resolubilidad
+        if (exigir_resolubilidad and self._reporte_de_resolubilidad is not None
+                and self._reporte_de_resolubilidad.codigo_de_salida() == CODIGO_NO_RESOLUBLE):
+            raise CriptaNoResoluble(self._reporte_de_resolubilidad)
 
         self._gestor_contenido = GestorContenido(
             self._fuente, id_cripta, self._grafo, self._gestor_catalogo,
@@ -357,6 +377,9 @@ class RepositorioCripta:
     # Reporte final (§5.1)
     # ------------------------------------------------------------------
 
+    def reporte_de_resolubilidad(self):
+        return self._reporte_de_resolubilidad
+
     def ubicacion_de_llaves(self):
         if self._ubicacion_de_llaves is None:
             return None
@@ -436,6 +459,14 @@ class RepositorioCripta:
         # Se marcan al final: si faltó presupuesto, se reintentará.
         for id_tipo in tipos_sin_revisar.elementos:
             self._enemigos_con_soltados_listos.agregar(id_tipo)
+
+    def _verificar_resolubilidad(self, salas):
+        if self._ubicacion_de_llaves is None:
+            return reporte_sin_verificar("la ubicación de las llaves no está disponible.")
+        mapa = Traductor(lambda id_ficha: None).crear_mapa(salas)
+        datos = self._datos_de_partida
+        return verificar_resolubilidad(mapa, datos.sala_inicial, datos.sala_salida, datos.llave_salida,
+                                       self._ubicacion_de_llaves)
 
     def _obtener_ubicacion_de_llaves(self, id_cripta, copia_vigente):
         existe_sala = self._salas_por_id.contiene

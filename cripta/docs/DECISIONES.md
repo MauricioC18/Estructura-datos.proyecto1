@@ -2328,10 +2328,142 @@ Es de Steven, junto con el viaje automático «ir a». Está escrita en su rama
 
 ## 5.4 Verificación de resolubilidad (segunda parte)
 
-Todavía no está escrita, porque la capacidad todavía no tiene dueño confirmado. Lo que le
-falta: el problema de §5.4, las alternativas al recorrido por llave, el reporte de la
-frontera bloqueada y la detección del ciclo de dependencias, y las mediciones contra la
-alternativa ingenua de repetir el recorrido por cada llave.
+Estado: implementado, probado y medido con criptas sintéticas y con la cripta de referencia, usando su ubicación de llaves descargada del servicio.
+
+Proviene de la especificación [`specs/006-resolubilidad/spec.md`](../../specs/006-resolubilidad/spec.md) y del plan [`specs/006-resolubilidad/plan.md`](../../specs/006-resolubilidad/plan.md); las alternativas están detalladas en [`research.md`](../../specs/006-resolubilidad/research.md). Los datos que usa (el esqueleto y la ubicación de llaves) los obtiene la especificación [`004-datos-nuevos-servicio`](../../specs/004-datos-nuevos-servicio/spec.md).
+
+### Problema
+
+Antes de iniciar una partida hay que decidir si la cripta se puede ganar: si desde la sala
+inicial se obtiene `llave_salida` y se llega a la sala de salida por una puerta que la pida,
+suponiendo que toda puerta se abre con su llave, que las llaves no se gastan y que todo
+enemigo se puede derrotar. Si se puede, hay que dar un orden de obtención de llaves que
+salga siempre igual. Si no, hay que decir qué llaves faltan, qué puertas de la frontera
+bloquean, dónde están esas llaves y si alguna está encerrada detrás de sus propias puertas.
+
+Lo difícil es que cada llave nueva abre puertas que llevan a salas nuevas, y esas salas
+pueden tener más llaves. La forma obvia de resolverlo es repetir el recorrido desde el
+principio cada vez que aparece una llave, y §5.4 pide justo lo contrario: un costo
+aproximadamente lineal en salas, salidas y llaves, con la frontera y las dependencias
+saliendo del mismo recorrido.
+
+| Operación | Cuándo ocurre | Escala |
+| --- | --- | ---: |
+| Verificar | una vez al iniciar cada partida nueva y con `--verificar` | 300 salas y 760 salidas en la cripta de referencia |
+| Repetir el recorrido (alternativa ingenua) | una vez por cada llave encadenada | hasta 400 llaves en las criptas sintéticas |
+
+### Alternativas consideradas
+
+| Alternativa | Costo | Por qué sí o por qué no |
+| --- | --- | --- |
+| Repetir el recorrido completo cada vez que se obtiene una llave | O(K · (S + E)) | Es simple, pero en una cadena de K llaves recorre K veces casi toda la cripta. Es la alternativa ingenua que se mide. |
+| Buscar sobre estados (sala, llaves que se tienen) | O(2^K · (S + E)) | Sería exacta incluso con salidas de un solo sentido, pero explota con pocas llaves. |
+| Recorrido por rondas con una lista de espera por llave | O(S + E + L + K log K) | Cada sala y cada salida se examinan una sola vez. **Elegida.** |
+| Explicar cada llave bloqueada con un recorrido propio («¿se alcanza abriendo todo menos sus puertas?») | O(K · (S + E)) | Es la definición exacta de «detrás de puertas que solo ella abre», pero repite el recorrido por llave. |
+| Seguir el mismo recorrido más allá de la frontera, abriendo en hipótesis una llave a la vez | O(S + E + K log K) | Da una dependencia por llave sin repetir nada. **Elegida.** |
+
+### Decisión
+
+**El recorrido por rondas.** Desde la sala inicial se recorre en anchura. Una salida se
+atraviesa si está abierta o si su llave se obtuvo en una ronda anterior; si no, se anota en
+la lista de espera de su llave, en una `TablaHash` propia. Al terminar la ronda, las llaves
+halladas se ordenan por id con el `merge_sort` del proyecto, se dan por obtenidas, y las
+salas de sus listas de espera forman la ronda siguiente. El orden del reporte es ese: por
+rondas y, dentro de cada ronda, por id. No depende del orden en que llegan las páginas, las
+salas ni las entradas de la ubicación de llaves, porque el conjunto de salas de cada ronda
+está definido sin ambigüedad.
+
+**La explicación sale del mismo recorrido.** Si quedan llaves sin obtener, el recorrido
+continúa más allá de la frontera. Un montículo binario propio (`heapq` está prohibido) da la
+siguiente llave pendiente: primero las que no tienen ubicación y, entre las demás, la de
+menor id. Se abren en hipótesis sus puertas en espera, ordenadas por sala y dirección, y cada
+sala alcanzada queda custodiada por la llave de la última puerta abierta en hipótesis. Una
+llave bloqueada depende de la llave que custodia su sala. Abrir primero las llaves sin
+ubicación hace que, cuando a una sala se llega también por una puerta imposible de abrir, el
+reporte señale esa causa de fondo y no un ciclo.
+
+**Los ciclos salen de las dependencias.** Cada llave depende de a lo sumo una, así que las
+dependencias forman un grafo funcional. Se recorren siguiendo los punteros en orden de id,
+marcando cada llave una sola vez; cuando el camino vuelve a una llave que ya está en él, ese
+tramo es el ciclo. El reporte lo muestra concreto, por ejemplo
+`itm_llave_hierro → itm_llave_negra → itm_llave_hierro`.
+
+**Dónde vive.** La verificación es del modelo (`model/resolubilidad.py`) y recibe el mismo
+`RoomMap` que arma el traductor. El repositorio la llama justo después de obtener la
+ubicación de llaves y antes de pedir contenido, para no gastar presupuesto en una cripta
+que no se puede ganar. `--verificar` y `--forzar` los conecta la especificación 005 con el
+contrato de [`INTERFAZ_RESOLUBILIDAD.md`](INTERFAZ_RESOLUBILIDAD.md).
+
+**¿Coincide con el `plan.md` original?** Sí. El plan se escribió después de probar el
+recorrido con las criptas publicadas, y las tres decisiones (rondas con listas de espera,
+continuación hipotética con montículo, ciclos sobre el grafo funcional) se mantuvieron. Lo
+único que se agregó durante la implementación fueron dos pruebas explícitas, para FR-002
+(el cierre automático no bloquea) y FR-021 (el reporte da líneas de texto), que la revisión
+de cobertura mostró que solo estaban cubiertas de forma indirecta.
+
+### Complejidad
+
+Con S salas, E salidas, L entradas de ubicación de llaves y K llaves:
+
+| Parte | Costo | Por qué |
+| --- | --- | --- |
+| Rondas | O(S + E + L) | Cada sala entra una vez al recorrido, cada salida se examina una vez y cada anotación en espera se libera una vez. |
+| Orden de las llaves | O(K log K) | Un `merge_sort` por ronda, sobre las llaves halladas en ella. |
+| Explicación | O(S + E + K log K) | Las salas y salidas que faltaban se examinan una vez; cada llave entra una vez al montículo. |
+| Puertas en espera ordenadas | O(F log F) | F ≤ E puertas anotadas, ordenadas por sala y dirección antes de abrirse en hipótesis. |
+| Ciclos | O(K) | Cada llave se marca una vez. |
+
+La alternativa ingenua cuesta O(K · (S + E)): con K llaves encadenadas hace K recorridos que
+crecen con la cadena, así que en una cadena el costo es cuadrático.
+
+### Evidencia empírica
+
+`python -m benchmark.bench_resolubilidad`, también incluido en `python main.py --bench`.
+Criptas sintéticas encadenadas: la zona i tiene 5 salas con la llave i, y una puerta que esa
+llave abre hacia la zona i+1; un cuarto de las llaves está en lo que suelta un enemigo. Se
+generan con `random.Random(semilla)`. Tiempo: el mejor de 3 corridas. El conteo de salas y
+salidas examinadas no depende de la máquina.
+
+Medido el 2026-11-18 con Python 3.13.18 en Linux x86_64 (el entorno de trabajo del asistente,
+no la computadora de un integrante):
+
+| Llaves encadenadas | Salas | Incremental | Ingenua | Examinadas, incremental | Examinadas, ingenua | Mismo reporte |
+| ---: | ---: | ---: | ---: | ---: | ---: | :---: |
+| 25 | 126 | 0.6 ms | 4.3 ms | 376 | 5 226 | sí |
+| 50 | 251 | 1.3 ms | 15.8 ms | 751 | 19 826 | sí |
+| 100 | 501 | 2.7 ms | 62.0 ms | 1 501 | 77 151 | sí |
+| 200 | 1 001 | 5.6 ms | 250.3 ms | 3 001 | 304 301 | sí |
+| 400 | 2 001 | 11.6 ms | 1 318.6 ms | 6 001 | 1 208 601 | sí |
+
+Cada vez que se duplica la cadena, la incremental examina el doble (crece en proporción al
+tamaño) y la ingenua casi cuatro veces más (crece con el cuadrado). Con 400 llaves, la
+ingenua es unas 110 veces más lenta.
+
+**La cripta de referencia.** `--bench` busca la cripta más grande del paquete
+`datos_offline_p2` (descargado del servicio con la ubicación de llaves) y la verifica: en
+`cripta-06` (300 salas, 760 salidas, 4 llaves) tardó 0.9 ms, el mejor de 5 corridas, contra
+el límite de 200 ms de §6.1. Dos pruebas automatizadas lo vigilan: una con esa misma cripta
+del paquete y otra con una cripta sintética de 301 salas; las dos exigen menos de 200 ms.
+
+**Resultados sobre las criptas publicadas**, con su ubicación de llaves descargada del
+servicio: `cripta-02`, `03`, `04` y `06` son resolubles; `cripta-05` no lo es, por un ciclo
+de dos llaves: la llave negra está detrás de una puerta que pide la de hierro, y la de
+hierro detrás de puertas que piden la negra. Antes de tener el `llaves.json` del servicio,
+la misma verificación se había hecho armando la ubicación de llaves a partir del contenido
+de las salas, y dio exactamente las mismas ubicaciones y los mismos resultados.
+
+### Límites conocidos
+
+- **Salidas de un solo sentido.** El recorrido respeta el sentido de cada salida, pero trata
+  la región alcanzable como un conjunto: una llave obtenida sirve en cualquier sala de la
+  región. Con salidas de un solo sentido, el jugador podría obtener una llave en una sala
+  desde la que no puede volver a la puerta que esa llave abre, y la verificación diría
+  «resoluble». Resolverlo exactamente exige la búsqueda sobre estados, que crece como 2^K.
+  Las criptas publicadas a la fecha no tienen salidas de un solo sentido.
+- **Una sola explicación por llave.** Si a la sala de una llave se llega por dos puertas
+  bloqueadas, el reporte muestra una sola dependencia, elegida con la regla fija de FR-014.
+  Por eso un ciclo de una sola llave significa «con esa llave se llegaría a ella misma», y no
+  necesariamente que no haya ninguna otra puerta bloqueada en el camino.
 
 ---
 

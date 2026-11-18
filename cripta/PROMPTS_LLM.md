@@ -1915,3 +1915,21 @@ Revisa los mensajes con las posibles actualizaciones que pudieron hacerse en el 
 Uso en el proyecto: `specs/006-resolubilidad/spec.md` (cinco respuestas nuevas en Clarifications y el límite conocido de las salidas de un solo sentido en las suposiciones), `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, `contracts/interfaz-resolubilidad.md`, `tasks.md` y `cripta/docs/INTERFAZ_RESOLUBILIDAD.md`, que es el contrato con el que la especificación 005 conecta `--verificar` y `--forzar`. Antes de esta documentación se integró `main` en la rama; el único conflicto de código fue el costo en null, que `main` ya había corregido igual, y se tomó la versión de `main`.
 
 Cambios realizados por el estudiante: Las cinco preguntas de `/speckit.clarify` se presentaron juntas, cada una con una opción recomendada. El estudiante aceptó las cinco: el orden va por rondas y, dentro de cada ronda, por id; cuando hay varias explicaciones de un bloqueo se prefiere la que apunta a una llave sin ubicación y después la de menor id; el reporte explica cada llave que no se puede obtener; `--replay` nunca se detiene por la verificación; y cada línea del orden dice dónde se obtiene la llave. `/speckit.analyze` cubrió los 28 requisitos con tareas, sin conflictos con la constitución, y dejó tres hallazgos: las banderas dependen de la especificación 005; las salidas de un solo sentido se tratan con una aproximación, que quedó escrita como límite conocido; y la medición de la cripta de referencia necesita el paquete con su ubicación de llaves real. También notó que FR-002 y FR-021 solo tenían pruebas indirectas, y se agregaron pruebas explícitas en la implementación.
+
+### 5.36 `/speckit.implement` de la especificación 006, resolubilidad
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai. El modelo ejecutó `/speckit.implement` de spec-kit v1.4.1 siguiendo `.claude/skills/speckit-implement/SKILL.md`, con las tareas de `specs/006-resolubilidad/tasks.md`. La lista de verificación de la especificación estaba completa (16 de 16), así que el comando siguió sin preguntar.
+
+Fecha: 2026-11-18
+
+Objetivo: Implementar la verificación de resolubilidad con sus pruebas, la medición de §5.4 y la sección 5.4 de DECISIONES.
+
+Prompts utilizados:
+
+```text
+/speckit.implement
+```
+
+Uso en el proyecto: `cripta/model/resolubilidad.py` (recorrido por rondas con listas de espera por llave, explicación del bloqueo con un montículo propio, ciclos y reporte), los cambios en `cripta/repository/repositorio_cripta.py` (verificación después de la ubicación de llaves, `exigir_resolubilidad`, `CriptaNoResoluble`, `verificar_cripta` y `reporte_de_resolubilidad`), `cripta/benchmark/bench_resolubilidad.py` (variante ingenua, criptas encadenadas con semilla y medición de la cripta más grande del paquete) sumado a `--bench`, `cripta/tests/test_resolubilidad.py` (34 pruebas, cuatro de ellas los casos del Apéndice B) y la sección 5.4 de `cripta/docs/DECISIONES.md`. Con esto pasan 1122 pruebas.
+
+Cambios realizados por el estudiante: Pidió la implementación después de la documentación de la especificación 006, que quedó en un commit propio. El código se había redactado mientras se preparaba el plan, para comprobar el diseño con las criptas publicadas antes de escribirlo en el plan; con este comando se completó, se agregaron las pruebas explícitas de FR-002 y FR-021 que pidió la revisión de consistencia, se corrió la suite completa, se marcaron las tareas y se confirmó en un commit aparte, después de la documentación. El estudiante descargó y subió a Git el paquete `datos_offline_p2` con la ubicación de llaves del servicio, y con él se cerró la tarea T014: la cripta de referencia se verifica en 0.9 ms, y las ubicaciones del servicio coinciden con las que se habían armado a partir del contenido de las salas.

@@ -26,6 +26,7 @@ SUITES = (
     ("Guardado binario de la partida", "benchmark.bench_almacen_partida"),
     ("Persecucion del cazador", "benchmark.bench_cazador"),
     ("Linea de tiempo", "benchmark.bench_linea_de_tiempo"),
+    ("Verificacion de resolubilidad", "benchmark.bench_resolubilidad"),
 )
 
 
