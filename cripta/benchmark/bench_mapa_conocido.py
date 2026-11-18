@@ -18,10 +18,12 @@ Qué se mide y contra qué
        el promedio por paso de un viaje entero. Se comparan con la búsqueda
        completa sin mejoras, que queda fija como referencia, y con una
        búsqueda que escoge el mínimo recorriendo una lista, sin montículo.
-       El viaje va de la primera sala del esqueleto a la última; si con el
-       mapa conocido no hay ruta entre ellas, va hacia la sala más lejana que
-       se alcanza desde la primera, por costo mínimo, y la fila lo dice.
-       FR-036.
+       El viaje parte de la sala inicial de la cripta (en las criptas
+       reales, la sala_inicial de sus datos generales; en las sintéticas, la
+       primera sala) y va a la última sala del esqueleto; si con el mapa
+       conocido no hay ruta, o la sala inicial ya es la última, va hacia la
+       sala más lejana que se alcanza desde la inicial, por costo mínimo, y
+       la fila lo dice. FR-036.
     6. Salidas de un solo sentido (plan, alternativa 9). Tiempo y memoria de
        armar el índice de salidas entrantes, cuántas salidas entran a cada
        sala, y la búsqueda completa expandida por las salidas que entran
@@ -100,7 +102,8 @@ def _unir(room_map, id_a, id_b, ida, vuelta, azar):
 
 
 def criptas_sin_conexion(carpeta=CARPETA_SIN_CONEXION):
-    """(id, mapa de salas) de cada cripta del paquete, o una lista vacía."""
+    """(id, mapa de salas, sala inicial) de cada cripta del paquete, o una
+    lista vacía. La sala inicial sale de los datos generales de la cripta."""
     try:
         fuente = FuenteOffline(carpeta)
         lista = fuente.listar_criptas()["criptas"]
@@ -113,7 +116,11 @@ def criptas_sin_conexion(carpeta=CARPETA_SIN_CONEXION):
         id_cripta = cripta["id"]
         generales = fuente.datos_generales(id_cripta)
         salas = descargar_salas_del_esqueleto(fuente, id_cripta, generales["paginas"])
-        criptas.append((id_cripta, Traductor(lambda id_ficha: None).crear_mapa(salas)))
+        criptas.append((
+            id_cripta,
+            Traductor(lambda id_ficha: None).crear_mapa(salas),
+            generales["sala_inicial"],
+        ))
 
     return criptas
 
@@ -365,7 +372,7 @@ def viaje_del_programa(mapa, destino, camino):
         viaje.siguiente_paso(partida, mapa, destino, ruta)
 
 
-ENTRE_EXTREMOS = "entre los extremos"
+HACIA_LA_ULTIMA = "hacia la ultima"
 HACIA_LA_MAS_LEJANA = "hacia la mas lejana"
 SIN_ALCANZABLES = "sin salas alcanzables"
 
@@ -373,37 +380,52 @@ SIN_ALCANZABLES = "sin salas alcanzables"
 class RecorridoMedido:
     """Partida y destino del viaje que se mide, y por qué se escogió ese destino.
 
-    motivo es ENTRE_EXTREMOS, HACIA_LA_MAS_LEJANA o SIN_ALCANZABLES; costo es
+    motivo es HACIA_LA_ULTIMA, HACIA_LA_MAS_LEJANA o SIN_ALCANZABLES; costo es
     el costo mínimo de la partida al destino, o None si no lo alcanza.
+    ultima es la última sala del esqueleto, el destino que se intentó primero.
     """
 
-    def __init__(self, partida, destino, motivo, costo):
+    def __init__(self, partida, destino, motivo, costo, ultima=None):
         self.partida = partida
         self.destino = destino
         self.motivo = motivo
         self.costo = costo
+        self.ultima = destino if ultima is None else ultima
 
 
-def elegir_recorrido(mapa, room_map):
-    """El viaje entre los extremos del esqueleto; si con el mapa conocido no
-    hay ruta de la primera sala a la última, el viaje hacia la sala más lejana
-    que sí se alcanza desde la primera, por costo mínimo.
+def elegir_recorrido(mapa, room_map, partida=None):
+    """El viaje de la sala de partida a la última sala del esqueleto; si con
+    el mapa conocido no hay ruta, o la partida ya es la última, el viaje
+    hacia la sala más lejana que sí se alcanza desde la partida, por costo
+    mínimo.
 
-    La búsqueda va desde la primera sala y se expande por las salidas que
-    SALEN de cada sala, así que la distancia que da es la de ir de la primera
-    sala a cada una, también con salidas de un solo sentido. Entre dos salas
-    igual de lejanas gana la de menor id, para que la medición se repita.
+    partida es la sala inicial de la cripta; sin ella (las cuadrículas
+    sintéticas, que no tienen datos generales) se usa la primera sala del
+    esqueleto.
+
+    La búsqueda va desde la partida y se expande por las salidas que SALEN
+    de cada sala, así que la distancia que da es la de ir de la partida a
+    cada una, también con salidas de un solo sentido. Entre dos salas igual
+    de lejanas gana la de menor id, para que la medición se repita.
     """
-    partida, ultima = recorrido_de_prueba(room_map)
+    primera, ultima = recorrido_de_prueba(room_map)
+    ids = room_map.room_ids()
+
+    if partida is None:
+        partida = primera
+    elif partida not in ids:
+        raise ValueError(f"La sala inicial {partida!r} no está en el esqueleto de la cripta.")
+
     desde_partida = RutasMasBaratas(mapa.vecinas_conocidas, partida)
 
     if ultima != partida and desde_partida.alcanza(ultima):
-        return RecorridoMedido(partida, ultima, ENTRE_EXTREMOS, desde_partida.distancia_a(ultima))
+        return RecorridoMedido(partida, ultima, HACIA_LA_ULTIMA,
+                               desde_partida.distancia_a(ultima), ultima)
 
     lejana = None
     costo_lejana = None
 
-    for id_sala in room_map.room_ids():
+    for id_sala in ids:
         if id_sala == partida or not desde_partida.alcanza(id_sala):
             continue
 
@@ -414,12 +436,12 @@ def elegir_recorrido(mapa, room_map):
             costo_lejana = costo
 
     if lejana is None:
-        return RecorridoMedido(partida, ultima, SIN_ALCANZABLES, None)
+        return RecorridoMedido(partida, ultima, SIN_ALCANZABLES, None, ultima)
 
-    return RecorridoMedido(partida, lejana, HACIA_LA_MAS_LEJANA, costo_lejana)
+    return RecorridoMedido(partida, lejana, HACIA_LA_MAS_LEJANA, costo_lejana, ultima)
 
 
-def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True):
+def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True, partida=None):
     """Un paso de «ir a» con el mapa conocido completo.
 
     primero: el primer paso de un viaje, como lo calcula el programa.
@@ -428,9 +450,11 @@ def medir_paso_de_ir_a(room_map, con_alternativa_lineal=True):
         como referencia fija entre una mejora y otra.
     lineal: la alternativa sin montículo.
     recorrido: el RecorridoMedido, que dice hacia dónde fue el viaje.
+
+    partida es la sala inicial de la cripta, si se conoce (ver elegir_recorrido).
     """
     mapa = conocimiento_completo(room_map)
-    recorrido = elegir_recorrido(mapa, room_map)
+    recorrido = elegir_recorrido(mapa, room_map, partida)
     partida, destino = recorrido.partida, recorrido.destino
 
     camino = []
@@ -637,8 +661,9 @@ def mediciones_de_criptas_reales(carpeta_sin_conexion=CARPETA_SIN_CONEXION):
             f"no hay paquete sin conexion en {carpeta_sin_conexion}",
         ))
 
-    for id_cripta, room_map in reales:
-        primero, por_paso, completa, lineal, largo, recorrido = medir_paso_de_ir_a(room_map)
+    for id_cripta, room_map, sala_inicial in reales:
+        primero, por_paso, completa, lineal, largo, recorrido = medir_paso_de_ir_a(
+            room_map, partida=sala_inicial)
         if largo == 0:
             # Un viaje sin pasos no tiene nada que promediar.
             promedio = "por paso: el viaje no dio pasos"
@@ -655,15 +680,19 @@ def mediciones_de_criptas_reales(carpeta_sin_conexion=CARPETA_SIN_CONEXION):
 
 def descripcion_del_recorrido(recorrido):
     """Hacia dónde fue el viaje medido, para la fila de una cripta real."""
-    if recorrido.motivo == ENTRE_EXTREMOS:
-        return (f"de la sala {recorrido.partida} a la {recorrido.destino} "
-                f"(extremos, costo {recorrido.costo})")
+    if recorrido.motivo == HACIA_LA_ULTIMA:
+        return (f"de la sala inicial {recorrido.partida} a la {recorrido.destino}, "
+                f"la ultima del esqueleto (costo {recorrido.costo})")
 
     if recorrido.motivo == HACIA_LA_MAS_LEJANA:
-        return (f"sin ruta entre los extremos; de la sala {recorrido.partida} a la "
+        if recorrido.partida == recorrido.ultima:
+            motivo = "la sala inicial es la ultima del esqueleto"
+        else:
+            motivo = f"sin ruta de la sala inicial a la {recorrido.ultima}, la ultima del esqueleto"
+        return (f"{motivo}; de la sala inicial {recorrido.partida} a la "
                 f"{recorrido.destino}, la mas lejana alcanzable (costo {recorrido.costo})")
 
-    return (f"sin ruta desde la sala {recorrido.partida} a ninguna otra; "
+    return (f"sin ruta desde la sala inicial {recorrido.partida} a ninguna otra; "
             f"medido hacia la {recorrido.destino}")
 
 

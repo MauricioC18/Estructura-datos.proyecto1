@@ -3,16 +3,24 @@
 La fila de la cripta de referencia en --bench sale de las criptas del paquete
 sin conexion. Estas pruebas comprueban que «python main.py --bench --offline
 CARPETA» mide esa carpeta, que sin --offline se sigue usando la carpeta por
-omision, y que la fila de criptas reales muestra el promedio por paso. No
+omision, que la fila de criptas reales muestra el promedio por paso y que
+el viaje medido parte de la sala inicial de los datos de la cripta. No
 dependen del id ni del tamaño de ninguna cripta.
 """
+import json
+import os
+import shutil
+import tempfile
 import types
 import unittest
 from unittest import mock
 
+from adapters.fuente_offline import FuenteOffline, RutasDatosOffline
 from benchmark import bench_mapa_conocido, benchmark
 from main import main
 from model.room import DIRECTIONS, Door, Exit, Room, RoomMap
+
+DATOS_OFFLINE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "datos_offline")
 
 
 def suite_falsa(acepta_carpeta):
@@ -99,11 +107,11 @@ class TestFilaDeCriptasReales(unittest.TestCase):
         """FR-036: la fila de cada cripta real muestra primer paso y promedio por paso."""
         cripta = bench_mapa_conocido.cuadricula(3)
         recorrido = bench_mapa_conocido.RecorridoMedido(
-            1, 9, bench_mapa_conocido.ENTRE_EXTREMOS, 42)
+            1, 9, bench_mapa_conocido.HACIA_LA_ULTIMA, 42)
         tiempos = (0.001, 0.002, 0.003, 0.004, 7, recorrido)
 
         with mock.patch.object(bench_mapa_conocido, "criptas_sin_conexion",
-                               return_value=[("cripta-de-prueba", cripta)]), \
+                               return_value=[("cripta-de-prueba", cripta, 1)]), \
                 mock.patch.object(bench_mapa_conocido, "medir_paso_de_ir_a",
                                   return_value=tiempos):
             filas = bench_mapa_conocido.mediciones_de_criptas_reales("otra_carpeta")
@@ -114,39 +122,61 @@ class TestFilaDeCriptasReales(unittest.TestCase):
         self.assertIn(f"({len(cripta)} salas)", filas[0].name)
         self.assertIn("primer paso 1.0000 ms", filas[0].detail)
         self.assertIn("por paso en un viaje de 7 pasos 2.0000 ms", filas[0].detail)
-        self.assertIn("de la sala 1 a la 9 (extremos, costo 42)", filas[0].detail)
+        self.assertIn("de la sala inicial 1 a la 9, la ultima del esqueleto (costo 42)",
+                      filas[0].detail)
 
     def test_la_fila_mide_de_verdad_cada_cripta_del_paquete(self):
         """FR-036: sin reemplazar la medición, cada cripta tiene su fila con el promedio por paso."""
-        criptas = [("primera", bench_mapa_conocido.cuadricula(3)),
-                   ("segunda", bench_mapa_conocido.cuadricula(4))]
+        criptas = [("primera", bench_mapa_conocido.cuadricula(3), 1),
+                   ("segunda", bench_mapa_conocido.cuadricula(4), 1)]
 
         with mock.patch.object(bench_mapa_conocido, "criptas_sin_conexion",
                                return_value=criptas):
             filas = bench_mapa_conocido.mediciones_de_criptas_reales("otra_carpeta")
 
         self.assertEqual(len(filas), 2)
-        for fila, (id_cripta, cripta) in zip(filas, criptas):
+        for fila, (id_cripta, cripta, _) in zip(filas, criptas):
             self.assertIn(f"mapa completo de {id_cripta} ({len(cripta)} salas)", fila.name)
             self.assertIn("por paso en un viaje de", fila.detail)
 
-    def test_sin_ruta_entre_los_extremos_mide_hacia_la_mas_lejana(self):
-        """FR-036: sin ruta entre los extremos, la fila mide y dice el viaje hacia la sala más lejana."""
+    def test_la_partida_es_la_sala_inicial_de_los_datos(self):
+        """FR-036: el viaje medido parte de la sala inicial de la cripta, no de la primera del esqueleto."""
         with mock.patch.object(bench_mapa_conocido, "criptas_sin_conexion",
-                               return_value=[("cortada", ultima_aislada())]):
+                               return_value=[("inicial-en-medio", inicial_en_medio(), 3)]):
             filas = bench_mapa_conocido.mediciones_de_criptas_reales("otra_carpeta")
 
-        self.assertIn("sin ruta entre los extremos; de la sala 1 a la 3, "
-                      "la mas lejana alcanzable (costo 12)", filas[0].detail)
+        self.assertIn("de la sala inicial 3 a la 4, la ultima del esqueleto (costo 9)",
+                      filas[0].detail)
+        self.assertIn("por paso en un viaje de 1 pasos", filas[0].detail)
+
+    def test_sin_ruta_a_la_ultima_mide_hacia_la_mas_lejana(self):
+        """FR-036: sin ruta a la última, la fila mide y dice el viaje hacia la sala más lejana."""
+        with mock.patch.object(bench_mapa_conocido, "criptas_sin_conexion",
+                               return_value=[("cortada", ultima_aislada(), 1)]):
+            filas = bench_mapa_conocido.mediciones_de_criptas_reales("otra_carpeta")
+
+        self.assertIn("sin ruta de la sala inicial a la 4, la ultima del esqueleto; "
+                      "de la sala inicial 1 a la 3, la mas lejana alcanzable (costo 12)",
+                      filas[0].detail)
         self.assertIn("por paso en un viaje de 2 pasos", filas[0].detail)
+
+    def test_si_la_sala_inicial_es_la_ultima_mide_hacia_la_mas_lejana(self):
+        """FR-036: si la sala inicial es la última del esqueleto, el viaje va a la más lejana."""
+        with mock.patch.object(bench_mapa_conocido, "criptas_sin_conexion",
+                               return_value=[("al-final", bench_mapa_conocido.cuadricula(3), 9)]):
+            filas = bench_mapa_conocido.mediciones_de_criptas_reales("otra_carpeta")
+
+        self.assertIn("la sala inicial es la ultima del esqueleto; de la sala inicial 9 a la ",
+                      filas[0].detail)
+        self.assertIn("la mas lejana alcanzable", filas[0].detail)
 
     def test_un_viaje_sin_pasos_no_inventa_un_promedio(self):
         """§5.3: si el viaje medido no tiene pasos, la fila lo dice en vez de promediar."""
         with mock.patch.object(bench_mapa_conocido, "criptas_sin_conexion",
-                               return_value=[("aislada", sin_salidas())]):
+                               return_value=[("aislada", sin_salidas(), 1)]):
             filas = bench_mapa_conocido.mediciones_de_criptas_reales("otra_carpeta")
 
-        self.assertIn("sin ruta desde la sala 1 a ninguna otra; medido hacia la 2",
+        self.assertIn("sin ruta desde la sala inicial 1 a ninguna otra; medido hacia la 2",
                       filas[0].detail)
         self.assertIn("por paso: el viaje no dio pasos", filas[0].detail)
 
@@ -189,19 +219,71 @@ def sin_salidas():
     return mapa_de_salas(2, [])
 
 
-def recorrido_con_mapa_completo(room_map):
+def inicial_en_medio():
+    """1-2 (1), 2-3 (1) y 3-4 (9). Desde la 1 a la 4 son 3 pasos y costo 11;
+    desde la 3, que será la sala inicial, 1 paso y costo 9."""
+    return mapa_de_salas(4, [(1, 2, 1, True), (2, 3, 1, True), (3, 4, 9, True)])
+
+
+def recorrido_con_mapa_completo(room_map, partida=None):
     return bench_mapa_conocido.elegir_recorrido(
-        bench_mapa_conocido.conocimiento_completo(room_map), room_map)
+        bench_mapa_conocido.conocimiento_completo(room_map), room_map, partida)
+
+
+class TestSalaInicialDelPaquete(unittest.TestCase):
+
+    def test_la_sala_inicial_sale_de_los_datos_generales(self):
+        """FR-036: con un paquete real cuya sala inicial no es la primera del esqueleto, la fila parte de ella."""
+        with tempfile.TemporaryDirectory() as carpeta_temporal:
+            carpeta = os.path.join(carpeta_temporal, "paquete")
+            shutil.copytree(DATOS_OFFLINE, carpeta)
+            fuente = FuenteOffline(carpeta)
+            id_cripta = fuente.listar_criptas()["criptas"][0]["id"]
+            generales = fuente.datos_generales(id_cripta)
+            ids_del_esqueleto = [sala["id"] for sala in fuente.pagina_salas(id_cripta, 1)["salas"]]
+            otra_inicial = ids_del_esqueleto[1]
+            self.assertNotEqual(otra_inicial, ids_del_esqueleto[0])
+
+            generales["sala_inicial"] = otra_inicial
+            ruta = RutasDatosOffline(carpeta).datos_generales(id_cripta)
+            with open(ruta, "w", encoding="utf-8") as archivo:
+                json.dump(generales, archivo)
+
+            criptas = bench_mapa_conocido.criptas_sin_conexion(carpeta)
+            filas = bench_mapa_conocido.mediciones_de_criptas_reales(carpeta)
+
+        self.assertEqual(criptas[0][2], otra_inicial)
+        self.assertIn(f"de la sala inicial {otra_inicial} a la", filas[0].detail)
 
 
 class TestElegirRecorrido(unittest.TestCase):
 
-    def test_con_ruta_entre_los_extremos_los_usa(self):
-        """FR-036: si hay ruta de la primera sala a la última, se mide ese viaje."""
+    def test_con_ruta_a_la_ultima_la_usa(self):
+        """FR-036: si hay ruta de la sala de partida a la última, se mide ese viaje."""
         recorrido = recorrido_con_mapa_completo(bench_mapa_conocido.cuadricula(3))
 
-        self.assertEqual(recorrido.motivo, bench_mapa_conocido.ENTRE_EXTREMOS)
+        self.assertEqual(recorrido.motivo, bench_mapa_conocido.HACIA_LA_ULTIMA)
         self.assertEqual((recorrido.partida, recorrido.destino), (1, 9))
+
+    def test_parte_de_la_sala_inicial_dada(self):
+        """FR-036: con sala inicial, el viaje parte de ella y no de la primera del esqueleto."""
+        recorrido = recorrido_con_mapa_completo(inicial_en_medio(), partida=3)
+
+        self.assertEqual(recorrido.motivo, bench_mapa_conocido.HACIA_LA_ULTIMA)
+        self.assertEqual((recorrido.partida, recorrido.destino, recorrido.costo), (3, 4, 9))
+
+    def test_el_viaje_medido_parte_de_la_sala_inicial(self):
+        """FR-036: el camino medido tiene los pasos desde la sala inicial, no desde la primera."""
+        *_, largo, recorrido = bench_mapa_conocido.medir_paso_de_ir_a(
+            inicial_en_medio(), con_alternativa_lineal=False, partida=3)
+
+        self.assertEqual(recorrido.partida, 3)
+        self.assertEqual(largo, 1)
+
+    def test_una_sala_inicial_fuera_del_esqueleto_es_un_error(self):
+        """§5.3: una sala inicial que no está en el esqueleto no se mide en silencio."""
+        with self.assertRaises(ValueError):
+            recorrido_con_mapa_completo(inicial_en_medio(), partida=99)
 
     def test_sin_ruta_va_a_la_mas_lejana_por_costo(self):
         """FR-036: sin ruta a la última, el destino es la alcanzable de mayor costo mínimo."""
@@ -244,7 +326,8 @@ class TestElegirRecorrido(unittest.TestCase):
         *_, largo, recorrido = bench_mapa_conocido.medir_paso_de_ir_a(
             bench_mapa_conocido.cuadricula(3), con_alternativa_lineal=False)
 
-        self.assertEqual(recorrido.motivo, bench_mapa_conocido.ENTRE_EXTREMOS)
+        self.assertEqual(recorrido.motivo, bench_mapa_conocido.HACIA_LA_ULTIMA)
+        self.assertEqual(recorrido.partida, 1)
         self.assertGreater(largo, 0)
 
 
