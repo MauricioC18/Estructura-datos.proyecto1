@@ -72,6 +72,7 @@ COMPORTAMIENTOS = (
     ("guardián", Enemy.GUARDIAN),
     ("errante", Enemy.WANDERER),
     ("rastreador", Enemy.TRACKER),
+    ("cazador", Enemy.HUNTER),
 )
 
 # Campos que permite el contrato del API (esquemas del Swagger, versión 1.0.0).
@@ -79,7 +80,7 @@ COMPORTAMIENTOS = (
 CAMPOS_COMUNES_DE_OBJETO = ("id", "nombre", "clase", "peso", "valor")
 CAMPOS_POR_CLASE = (
     (CLASE_ENEMIGO, ("id", "nombre", "clase", "vida_max", "ataque", "defensa",
-                     "velocidad", "comportamiento", "suelta")),
+                     "velocidad", "comportamiento", "suelta", "rango")),
     (Item.WEAPON, CAMPOS_COMUNES_DE_OBJETO + ("ataque_bonus",)),
     (Item.ARMOR, CAMPOS_COMUNES_DE_OBJETO + ("defensa_bonus",)),
     (Item.POTION, CAMPOS_COMUNES_DE_OBJETO + ("cura", "modificador_velocidad", "duracion")),
@@ -91,7 +92,7 @@ CAMPOS_POR_CLASE = (
 )
 CAMPOS_DE_COLOCACION_DE_ENEMIGO = ("instancia", "tipo", "vida")
 CAMPOS_DE_COLOCACION_DE_TRAMPA = ("instancia", "tipo")
-CAMPOS_DE_SALIDA = ("sala", "cerrada", "llave", "cierre_automatico")
+CAMPOS_DE_SALIDA = ("sala", "cerrada", "llave", "cierre_automatico", "costo")
 
 
 class ErrorDatosCripta(Exception):
@@ -177,22 +178,54 @@ class Traductor:
         cerrada = bool(salida.get("cerrada"))
         llave = salida.get("llave")
         cierre = salida.get("cierre_automatico")
+        costo = self._costo_de_salida(salida, direccion, origen)
 
         de_vuelta = pendientes.obtener(f"{destino}->{origen}")
         if de_vuelta:
-            puerta = de_vuelta.pop(0)
+            # Se guarda el costo DECLARADO por el otro lado, no el efectivo de
+            # la puerta: si el otro lado no lo declaro, la puerta ya trae el
+            # valor por omision y compararlo contra este avisaria de una
+            # discrepancia que no existe.
+            puerta, costo_del_otro_lado = de_vuelta.pop(0)
             puerta.closed = puerta.closed or cerrada
             puerta.key_id = self._combinar(puerta.key_id, llave, origen, destino, "llave")
             puerta.auto_close = self._combinar(puerta.auto_close, cierre, origen, destino,
                                                "cierre automático")
+            combinado = self._combinar(costo_del_otro_lado, costo, origen, destino, "costo")
+
+            if combinado is not None:
+                puerta.cost = combinado
         else:
             puerta = Door(origen, destino, closed=cerrada, key_id=llave, auto_close=cierre)
+
+            if costo is not None:
+                puerta.cost = costo
             clave = f"{origen}->{destino}"
             if not pendientes.contiene(clave):
                 pendientes.insertar(clave, [])
-            pendientes.obtener(clave).append(puerta)
+            pendientes.obtener(clave).append((puerta, costo))
 
         mapa.room(origen).add_exit(Exit(direccion, destino, puerta))
+
+    def _costo_de_salida(self, salida, direccion, origen):
+        """El costo declarado, o None si la salida no lo declara (§3.1).
+
+        Un costo malformado es un dato invalido de la cripta y se reporta como
+        tal: sustituirlo en silencio por el valor por omision escondería el
+        error.
+        """
+        if "costo" not in salida:
+            return None
+
+        costo = salida["costo"]
+
+        if not isinstance(costo, int) or isinstance(costo, bool) or costo < 1:
+            raise ErrorDatosCripta(
+                f"La salida {direccion} de la sala {origen} declara un costo "
+                f"invalido: {costo!r}. Debe ser un entero mayor o igual que 1."
+            )
+
+        return costo
 
     def _combinar(self, valor_del_otro_lado, valor_de_este_lado, este_lado, otro_lado, campo):
         """Un valor declarado por un solo lado se usa tal cual. Si los dos lados
@@ -252,6 +285,7 @@ class Traductor:
                                          "Una colocación de enemigo")
         ficha = self._ficha_de_clase(id_tipo, (CLASE_ENEMIGO,))
         comportamiento = _comportamiento_del_modelo(ficha.get("comportamiento"), id_tipo)
+        rango = self._rango_de_cazador(ficha, id_tipo, comportamiento)
 
         soltados = []
         for posicion, id_tipo_soltado in enumerate(ficha.get("suelta") or []):
@@ -270,6 +304,7 @@ class Traductor:
                 health=colocacion.get("vida"),
                 drops=soltados,
                 regeneration=0,  # el contrato del API no tiene campo de regeneración (S13)
+                pursuit_range=rango,
             )
         except (KeyError, ValueError, TypeError) as error:
             raise ErrorDatosCripta(f"Datos inválidos para el enemigo {id_instancia} ({id_tipo}): {error}") from error
@@ -358,6 +393,36 @@ class Traductor:
             self._avisar_campos_desconocidos(ficha, campos_conocidos_de_la_clase(clase),
                                              f"La ficha {id_tipo}")
         return ficha
+
+    def _rango_de_cazador(self, ficha, id_tipo, comportamiento):
+        """Rango de la ficha de un cazador (§3.2, §4.1).
+
+        Un cazador sin rango, o con un rango que no es entero mayor o igual
+        que 1, es un dato inválido de la cripta: no se sustituye por un valor
+        por omisión, porque eso escondería el error. El mínimo es 1 porque así
+        lo declara el contrato del servicio 1.1.0.
+        """
+        declarado = ficha.get("rango")
+
+        if comportamiento != Enemy.HUNTER:
+            if declarado is not None:
+                self.avisos.append(
+                    f"La ficha {id_tipo} declara rango sin ser cazador; se ignora."
+                )
+            return 0
+
+        if declarado is None:
+            raise ErrorDatosCripta(
+                f"La ficha de cazador {id_tipo} no declara rango."
+            )
+
+        if isinstance(declarado, bool) or not isinstance(declarado, int) or declarado < 1:
+            raise ErrorDatosCripta(
+                f"El rango de la ficha de cazador {id_tipo} debe ser un entero "
+                f"mayor o igual que 1: {declarado!r}."
+            )
+
+        return declarado
 
     def _avisar_campos_desconocidos(self, datos, campos_conocidos, que_dato_es):
         """Anota un aviso por cada campo que no está en campos_conocidos.

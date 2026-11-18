@@ -12,6 +12,7 @@ class Enemy(Actor):
     GUARDIAN = "guardian"
     WANDERER = "errante"
     TRACKER = "rastreador"
+    HUNTER = "cazador"
 
     ATTACK = "attack"
     WAIT = "wait"
@@ -30,6 +31,7 @@ class Enemy(Actor):
         health=None,
         drops=None,
         regeneration=0,
+        pursuit_range=0,
     ):
         super().__init__(
             actor_id,
@@ -45,6 +47,27 @@ class Enemy(Actor):
         self.drops = [] if drops is None else list(drops)
         self.regeneration = regeneration
         self.is_active = False
+        self.pursuit_range = pursuit_range
+
+    @property
+    def pursuit_range(self):
+        return self._pursuit_range
+
+    @pursuit_range.setter
+    def pursuit_range(self, value):
+        """El 0 es el valor neutro de los enemigos que no son cazadores.
+
+        El minimo que el contrato del servicio declara para la ficha de un
+        cazador es 1, y eso lo exige el traductor, donde entran los datos. El
+        modelo solo exige que no sea negativo.
+        """
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(
+                f"El rango de {self.actor_id} debe ser un entero mayor o igual "
+                f"que 0: {value!r}"
+            )
+
+        self._pursuit_range = value
 
     def decide_action(
         self,
@@ -53,6 +76,7 @@ class Enemy(Actor):
         random_generator=None,
         trail=None,
         current_time=0,
+        routes=None,
     ):
         """Accion del enemigo en su turno, segun la seccion 2.8.
 
@@ -70,7 +94,36 @@ class Enemy(Actor):
         if self.behavior == self.TRACKER:
             return self._track(room, trail, current_time)
 
+        if self.behavior == self.HUNTER:
+            return self._hunt(room, routes)
+
         return self.WAIT, None
+
+    def _hunt(self, room, routes):
+        """Da un paso por la ruta mas barata hacia el jugador (section 3.2).
+
+        Espera si no hay ruta por salidas abiertas o si la mas barata cuesta
+        mas que su rango. Las reglas de cual salida elegir viven en la
+        busqueda: suma costos, cuenta solo salidas abiertas y desempata por la
+        sala vecina de menor id.
+
+        El cazador no conoce el mapa: recibe la busqueda ya hecha, igual que
+        el rastreador recibe el rastro.
+        """
+        if room is None or routes is None:
+            return self.WAIT, None
+
+        distance = routes.distancia_a(room.room_id)
+
+        if distance is None or distance > self.pursuit_range:
+            return self.WAIT, None
+
+        chosen = routes.primer_paso_desde(room.room_id)
+
+        if chosen is None:
+            return self.WAIT, None
+
+        return self.MOVE, chosen
 
     def _track(self, room, trail, current_time):
         """Sigue el rastro fresco mas reciente, o espera si no hay (§2.9).

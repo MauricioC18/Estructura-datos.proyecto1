@@ -1,7 +1,15 @@
 import unittest
 
 from model.item import Item
-from model.room import DIRECTIONS, Door, Exit, Room, RoomMap, direction_index
+from model.room import (
+    DEFAULT_EXIT_COST,
+    DIRECTIONS,
+    Door,
+    Exit,
+    Room,
+    RoomMap,
+    direction_index,
+)
 from model.trap import DEFAULT_REARM_INTERVAL, Trap
 
 
@@ -137,6 +145,50 @@ class TestItemAndTrap(unittest.TestCase):
 
         self.assertTrue(trap.armed)
         self.assertEqual(trap.rearm_interval, 300)
+
+
+
+class PruebasCostoDeSalida(unittest.TestCase):
+    """Terreno: el costo vive en la puerta (§3.1).
+
+    Especificacion: specs/001-terreno-costo-salidas/spec.md
+    """
+
+    def test_una_puerta_sin_costo_vale_el_de_omision(self):
+        """FR-002."""
+        self.assertEqual(Door(1, 2).cost, DEFAULT_EXIT_COST)
+        self.assertEqual(DEFAULT_EXIT_COST, 100)
+
+    def test_una_puerta_puede_declarar_su_costo(self):
+        """FR-001."""
+        self.assertEqual(Door(1, 2, cost=250).cost, 250)
+
+    def test_el_costo_es_el_mismo_desde_las_dos_salas(self):
+        """FR-003: sale por construccion, porque la puerta es un solo objeto."""
+        puerta = Door(1, 2, cost=250)
+        ida = Exit("N", 2, puerta)
+        vuelta = Exit("S", 1, puerta)
+
+        self.assertEqual(ida.cost, vuelta.cost)
+
+        puerta.cost = 80
+
+        self.assertEqual(ida.cost, 80)
+        self.assertEqual(vuelta.cost, 80)
+
+    def test_un_costo_invalido_se_rechaza(self):
+        """FR-001: entero mayor o igual que 1."""
+        for malo in (0, -1, 1.5, "100", None, True):
+            with self.subTest(costo=malo):
+                with self.assertRaises(ValueError):
+                    Door(1, 2, cost=malo)
+
+    def test_el_mensaje_dice_que_se_recibio(self):
+        with self.assertRaises(ValueError) as reportado:
+            Door(1, 2, cost=0)
+
+        self.assertIn("0", str(reportado.exception))
+
 
 
 if __name__ == "__main__":

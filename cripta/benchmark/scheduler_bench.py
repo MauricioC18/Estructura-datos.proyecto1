@@ -20,7 +20,7 @@ from model.event import Event
 from model.game import Game
 from model.game_state import GameState
 from model.player import Player
-from model.room import Door, Exit, Room, RoomMap
+from model.room import DEFAULT_EXIT_COST, Door, Exit, Room, RoomMap
 from model.trap import Trap
 from structures.event_queue import EventQueue
 from structures.history import History, ReversibleEventQueue
@@ -225,12 +225,29 @@ def measure_operation_frequency(enemy_count, decisions, seed):
     return game, agenda
 
 
-def build_synthetic_crypt(room_count, trap_rearm=150, auto_close=400):
+# Costos de transito que se reparten entre las salidas de la cripta sintetica
+# (§3.1). Son deterministas por posicion, no al azar, para que la medicion sea
+# repetible. Incluyen 1 y 400 para cubrir los extremos: el intervalo minimo y
+# una salida cara.
+SYNTHETIC_EXIT_COSTS = (100, 250, 50, 400, 1, 150)
+
+
+def build_synthetic_crypt(room_count, trap_rearm=150, auto_close=400,
+                          varied_costs=True, closed_every=3):
     """Salas en linea, con trampas en todas y una puerta de cada tres cerrada.
 
     Las puertas cerradas no piden llave, de modo que el jugador tiene que
     abrirlas al pasar; como se cierran solas, vuelve a abrirlas en el viaje de
     vuelta. Asi la medicion pasa por abrir puertas y por sus eventos de cierre.
+
+    Con varied_costs las salidas reparten costos distintos, que es la carga de
+    la segunda parte. Con varied_costs=False todas cuestan 100, que es la carga
+    con la que se midio la primera parte; sirve para comparar.
+
+    Con closed_every=0 ninguna puerta nace cerrada. Sirve para medir la busqueda
+    del cazador: con una puerta cerrada de cada tres, la region alcanzable es
+    diminuta por mas grande que sea la cripta, asi que el corte por rango no se
+    podria distinguir del bloqueo por puertas.
     """
     rooms = []
 
@@ -250,13 +267,19 @@ def build_synthetic_crypt(room_count, trap_rearm=150, auto_close=400):
         rooms.append(room)
 
     for index in range(room_count - 1):
-        closed = index % 3 == 0
+        closed = closed_every > 0 and index % closed_every == 0
+        cost = (
+            SYNTHETIC_EXIT_COSTS[index % len(SYNTHETIC_EXIT_COSTS)]
+            if varied_costs
+            else DEFAULT_EXIT_COST
+        )
         door = Door(
             rooms[index].room_id,
             rooms[index + 1].room_id,
             closed=closed,
             key_id=None,
             auto_close=auto_close if closed else None,
+            cost=cost,
         )
         rooms[index].add_exit(Exit("N", rooms[index + 1].room_id, door))
         rooms[index + 1].add_exit(Exit("S", rooms[index].room_id, door))

@@ -56,7 +56,9 @@ class ConsoleView:
 
             for exit_ in room.exits:
                 state = "" if exit_.is_open else " (cerrada)"
-                exits.append(f"{exit_.direction}->{exit_.destination}{state}")
+                exits.append(
+                    f"{exit_.direction}->{exit_.destination} (costo {exit_.cost}){state}"
+                )
 
             self._print("Salidas: " + ", ".join(exits))
         else:
@@ -82,6 +84,50 @@ class ConsoleView:
                 f"  {marks}{item.name} ({item.item_class}) "
                 f"peso {item.weight}, valor {item.value}"
             )
+
+    def show_history(self, resumen):
+        """Imprime el resumen de un instante pasado (seccion 3.6).
+
+        El resumen llega como dato desde el modelo: la vista decide como se
+        ve, y no decide que va adentro.
+        """
+        self._print(
+            f"Instante {resumen.instante} "
+            f"(antes de la accion {resumen.acciones_del_jugador + 1}):"
+        )
+
+        nombre = resumen.nombre_de_la_sala or "desconocida"
+        self._print(f"  Sala: {resumen.sala}, {nombre}")
+        self._print(
+            f"  Vida: {resumen.vida}/{resumen.vida_maxima}  "
+            f"ataque {resumen.ataque}, defensa {resumen.defensa}, "
+            f"velocidad {resumen.velocidad}"
+        )
+
+        if resumen.inventario:
+            objetos = ", ".join(
+                f"{nombre} ({clase})" for nombre, clase in resumen.inventario
+            )
+            self._print(f"  Inventario: {objetos}")
+        else:
+            self._print("  Inventario: vacio")
+
+        if resumen.efectos:
+            efectos = ", ".join(
+                nombre if termina is None else f"{nombre} hasta {termina}"
+                for nombre, termina in resumen.efectos
+            )
+            self._print(f"  Efectos: {efectos}")
+        else:
+            self._print("  Efectos: ninguno")
+
+        if resumen.enemigos:
+            for actor_id, nombre_enemigo, vida in resumen.enemigos:
+                self._print(f"  Enemigo {actor_id}: {nombre_enemigo}, vida {vida}")
+        else:
+            self._print("  Enemigos en la sala: ninguno")
+
+        self._print(f"  Mapa conocido: {resumen.mapa_conocido}")
 
     def show_scores(self, entries, crypt_id=None):
         title = "Puntajes" if crypt_id is None else f"Puntajes de {crypt_id}"

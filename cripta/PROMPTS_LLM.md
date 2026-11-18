@@ -1436,6 +1436,170 @@ Uso en el proyecto: `docs/REPARTO_PROYECTO2.md`, `docs/PROMPT_SDD_PARA_EL_GRUPO.
 
 Cambios realizados por el estudiante: Se revisó el estado real del repositorio antes de planificar y se encontró que no había ningún avance de la segunda parte: sin commits desde el 28 de octubre, sin spec-kit inicializado y con el enunciado sin subir, a dos días de la entrega. Se decidió, pese a la advertencia sobre el riesgo, intentar las cuatro capacidades completas en vez de reducir el alcance. El reparto se hizo siguiendo lo que cada integrante ya dominaba de la primera parte, para no gastar tiempo en volver a aprender módulos ajenos, y se compensó el desbalance de pesos de la rúbrica asignando a la Persona 4 las banderas nuevas de todo el equipo, la integración de `--bench` y el README. Se identificó además el orden que desbloquea al resto: la constitución la sube una sola persona porque `specify init` escribe en la raíz, y los campos nuevos del traductor son prerrequisito de las otras tres capacidades. Se fijó spec-kit en la versión v1.4.1, la más reciente publicada, y se descubrió que el enunciado menciona la bandera `--ai`, que corresponde a la versión 1.1 y que en la 1.4.1 se llama `--integration`. La constitución se redactó con los siete principios que pide §2.3, en palabras del grupo y apoyados en lo que la primera parte ya hacía, y se agregó la lista concreta de dependencias prohibidas para que el agente la tenga presente en la fase de plan y no al implementar. También se detectó que el enunciado remite a una sección 2.7 que no existe en el documento, lo que quedó como pregunta para el profesor.
 
+### 2.25 Especificación de terreno con /speckit.specify
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Escribir la primera especificación de la segunda parte, la del costo de tránsito de las salidas (§3.1), siguiendo el flujo obligatorio de spec-kit.
+
+Prompts utilizados:
+
+```text
+/speckit.specify Terreno: costo de tránsito de las salidas.
+
+Contexto: segunda parte del proyecto CRIPTA, juego de mazmorra dirigido por eventos con reloj virtual. El enunciado completo está en cripta/docs/SegundoProyecto-EDII-2026.md; esta capacidad corresponde a su sección 3.1 y al caso 6 y 7 del Apéndice B bajo "Terreno y cazador".
+
+Cada salida de una sala puede declarar un campo "costo", entero mayor o igual que 1. Si la salida no lo declara, su costo es 100. El costo es el mismo en ambos sentidos. Moverse a través de una salida pasa a ser una acción cuyo costo base es el costo de esa salida, en lugar del valor fijo 100. El intervalo se sigue calculando con la fórmula de la primera parte. La regla aplica a todos los actores. El costo de las demás acciones no cambia y los comportamientos de enemigo existentes conservan su lógica. La vista debe mostrar el costo de las salidas de la sala actual.
+
+[El prompt completo incluye los escenarios de aceptación obligatorios del Apéndice B, la justificación de separar terreno del cazador, las dependencias prohibidas y los requisitos de rendimiento heredados.]
+```
+
+Uso en el proyecto: `specs/001-terreno-costo-salidas/spec.md` y su lista de verificación.
+
+Cambios realizados por el estudiante: Se decidió separar el terreno del cazador en dos especificaciones distintas, aunque el enunciado las presente como una sola capacidad. La razón es de orden de trabajo y queda escrita en la especificación: el costo de las salidas es infraestructura de la que dependen el cazador, el viaje automático y las mediciones, así que entregarlo por separado desbloquea a los otros integrantes en vez de que esperen al cazador completo; el enunciado permite dividir una capacidad si se justifica. Al revisar la especificación contra su propia lista de verificación se detectó que la fórmula del intervalo estaba escrita con sintaxis de Python, y se reformuló como división entera para que no dependiera de ningún lenguaje. Se dejaron explícitamente fuera del alcance dos cosas que pertenecen a otras capacidades: qué conoce el jugador del costo de una salida que no ha explorado, que es de la niebla de guerra, y cómo se calculan rutas de costo mínimo, que es del cazador y del viaje automático.
+
+### 2.26 Plan, tareas e implementación del terreno
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Completar el flujo de spec-kit para la primera capacidad: planificar el costo de tránsito de las salidas, descomponerlo en tareas e implementarlo.
+
+Prompts utilizados:
+
+```text
+sí, dale, hacé el plan y las tareas e implementalo
+```
+
+Uso en el proyecto: `specs/001-terreno-costo-salidas/plan.md` y `tasks.md`; `model/room.py`, `model/game.py`, `repository/traductor.py`, `controller/application.py`, `view/console_view.py`, `benchmark/scheduler_bench.py` y las pruebas de `tests/test_room.py`, `tests/test_traductor.py`, `tests/test_movement.py` y `tests/test_actor.py`.
+
+Cambios realizados por el estudiante: La decisión de diseño fue guardar el costo en la puerta y no en la salida. La puerta ya era un único objeto compartido por las dos salas que conecta, así que el requisito de que el costo sea igual en ambos sentidos se cumple por construcción en vez de depender de una validación. Se descartaron guardar el costo en la salida, que obligaría a validar a mano que las dos direcciones coincidan, y guardarlo en una estructura aparte indexada por par de salas, que sería un índice y la sección 7 lo prohíbe. Se reutilizó el mecanismo que el traductor ya tenía para cuando los dos lados de una puerta declaran valores distintos, el mismo que usa para la llave y el cierre automático, en vez de inventar una regla nueva. Al revisar lo implementado se encontró un error propio: se estaba comparando el costo efectivo de la puerta, que siempre trae el valor por omisión, en vez del costo declarado, de modo que si un solo lado declaraba costo el traductor avisaba de una discrepancia inexistente; se corrigió guardando el valor declarado junto a la puerta pendiente de emparejar. También se eliminó la constante del costo de movimiento del motor, que quedaba repitiendo el mismo 100 que ya define el modelo, porque era el riesgo anotado en el propio plan. Dos requisitos resultaron ya satisfechos por el diseño de la primera parte, el intervalo mínimo de una unidad y el reescalado al cambiar de velocidad, así que sus tareas fueron demostrarlo con pruebas y no implementarlo. La medición cerró el ciclo: 0.1912 ms por ciclo con costos uniformes contra 0.1897 ms con costos variables, o sea que el cambio no cuesta nada medible.
+
+### 2.27 Especificación del cazador con /speckit.specify
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Escribir la segunda especificación de la segunda parte, la del cazador y su ruta de costo mínimo (§3.2, §5.1 y §5.2), siguiendo el flujo obligatorio de spec-kit.
+
+Prompts utilizados:
+
+```text
+sí, subilo a las dos y seguí con el cazador
+```
+
+```text
+/speckit.specify El cazador: un enemigo que persigue al jugador por la ruta más barata.
+
+Se agrega un cuarto comportamiento de enemigo, "cazador", junto a guardián, errante y rastreador. Su ficha de catálogo incluye un campo "rango", entero en unidades de costo. En su turno: si comparte sala con el jugador ataca; si no, considera el costo mínimo d de llegar hasta la sala del jugador sumando el costo de cada salida y usando solo salidas abiertas en ese instante; si no existe ruta o d es mayor que su rango, espera con costo 100; si existe, se mueve un paso por una ruta de costo d.
+
+Desempate obligatorio: entre las vecinas v tales que costo(u,v) + distancia(v, jugador) = d, se mueve a la de menor id. Conoce el esqueleto completo y el estado actual de las puertas; no le afecta la niebla de guerra y no abre puertas cerradas. Equivalencia observable: su decisión en cada turno debe ser idéntica a la de un cálculo desde cero en ese instante.
+
+[El prompt completo incluye los cinco casos del Apéndice B que faltaban, los requisitos de rendimiento de §5.1 y §5.2, lo que queda fuera por pertenecer a otros integrantes, y las estructuras propias que ya existen en el repositorio.]
+```
+
+Uso en el proyecto: `specs/002-cazador-ruta-mas-barata/spec.md` y su lista de verificación.
+
+Cambios realizados por el estudiante: Antes de escribir la especificación se leyó el enunciado de la segunda parte y el código de los tres comportamientos existentes, para no inventar reglas y para saber qué colaboradores recibe un enemigo en su turno. Se resolvieron como supuestos documentados, en vez de dejar marcadores de aclaración, tres puntos que el enunciado no dice de forma literal: que un rango igual al costo de la ruta sí permite perseguir, porque el enunciado dice que el cazador espera cuando el costo es «mayor» que el rango; que un rango ausente o inválido es un error de datos de cripta, con el mismo criterio que la capacidad anterior aplicó al costo de las salidas; y que un rango de 0 es una ficha válida que simplemente nunca persigue. Se dejó explícitamente fuera del alcance la niebla de guerra y el viaje automático, que son de otros integrantes, con la nota de que el viaje automático calcula rutas sobre el mapa conocido y no sobre el real, de modo que compartir implementación es decisión de su propio plan.
+
+### 2.28 Revisión de consistencia con /speckit.analyze y corrección de la especificación
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Revisar la consistencia entre la especificación, el plan y las tareas del cazador antes de implementar, como pide §2.2 del enunciado, y corregir lo que apareciera.
+
+Prompts utilizados:
+
+```text
+/speckit.analyze Revisar la consistencia entre spec.md, plan.md y tasks.md de specs/002-cazador-ruta-mas-barata, y contra .specify/memory/constitution.md, antes de implementar.
+```
+
+Uso en el proyecto: la corrección de `specs/002-cazador-ruta-mas-barata/spec.md` en una confirmación propia, antes del código, y el ajuste del plan y de las tareas.
+
+Cambios realizados por el estudiante: La revisión encontró seis problemas reales y se corrigieron todos antes de escribir código, en el orden que exige el principio VII de la constitución: primero la especificación y en su propia confirmación. Dos de ellos eran contradicciones entre documentos escritos por uno mismo. Primero, un criterio de éxito decía que ninguna prueba anterior se modificaría, mientras una tarea decía que las del guardado binario sí cambiarían al subir la versión del formato; se acotó la excepción en el criterio. Segundo, un requisito exigía que el costo de la decisión dependiera del rango de cada cazador, sin admitir que un cálculo compartido entre varios abarca el rango mayor; se agregó esa salvedad y la obligación de medir el sobrecosto, que después resultó ser de diecisiete veces. Tercero, el desempate estaba escrito sobre salas vecinas, pero dos salidas distintas pueden llevar a la misma vecina con costos distintos, así que el costo entre dos salas no estaba definido; se fijó que cuenta la más barata. Cuarto, «decenas de cazadores» no era verificable y se fijó en 50. Además se detectó que la revisión misma incumplía la constitución: faltaba registrar en este archivo las invocaciones de spec-kit de esta capacidad, y se agregó una tarea para ello. Y se anotó como riesgo que la firma de la decisión del enemigo tiene diez llamadas directas en las pruebas, varias posicionales, de modo que el colaborador nuevo tenía que entrar al final y con valor por omisión.
+
+### 2.29 Plan, tareas e implementación del cazador
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Completar el flujo de spec-kit para la segunda capacidad: planificar la ruta de costo mínimo del cazador, descomponerla en tareas, implementarla y medirla.
+
+Prompts utilizados:
+
+```text
+/speckit.plan Planificar specs/002-cazador-ruta-mas-barata. Decidir con qué estructuras propias se calcula la ruta de costo mínimo del cazador, respetando la prohibición de dict como índice, set, heapq, bisect, collections y bibliotecas de grafos. Evaluar y documentar como alternativas: Dijkstra por cazador con corte por rango reutilizando el montículo binario de la agenda de eventos; un único cálculo compartido desde la sala del jugador para todos los cazadores activos; y recalcular siempre desde cero. Planificar las mediciones que exigen §5.1 y §5.2.
+```
+
+```text
+/speckit.tasks Generar tasks.md para specs/002-cazador-ruta-mas-barata a partir de su plan.md. Tareas pequeñas y verificables, cada una con los requisitos que atiende y sus dependencias. Incluir las tareas de medición de §5.1 y §5.2 y la prueba de equivalencia contra el modo de recalcular siempre.
+```
+
+Uso en el proyecto: `specs/002-cazador-ruta-mas-barata/plan.md` y `tasks.md`; `structures/rutas_mas_baratas.py`, `model/enemy.py`, `model/game.py`, `repository/traductor.py`, `adapters/almacen_partida.py`, `benchmark/bench_cazador.py`, `benchmark/scheduler_bench.py`, `benchmark/benchmark.py` y las pruebas de `tests/test_rutas_mas_baratas.py`, `tests/test_cazador.py`, `tests/test_traductor.py` y `tests/test_almacen_partida.py`.
+
+Cambios realizados por el estudiante: La decisión de diseño fue buscar desde la sala del jugador y no desde la del cazador. El desempate del enunciado está escrito como costo(u, v) más distancia(v, jugador), así que buscar desde el jugador entrega ese número para todas las vecinas de golpe; además el grafo no tiene dirección, porque el costo de una salida es el mismo en ambos sentidos y una puerta abierta lo está para los dos lados, de modo que una sola búsqueda sirve a todos los cazadores activos. Buscando desde cada cazador habría que reconstruir rutas para recuperar la distancia de cada vecina y compartir trabajo sería imposible. No se escribió ninguna estructura nueva: la cola de prioridad es el montículo binario de la agenda de eventos, que ordena por el par (instante, secuencia) y al que se le entregan pares (distancia, id de sala), de modo que ordena por distancia y desempata por id sin tocarlo; las distancias y las salas asentadas van en la tabla hash del grupo. El desempate se aplica aparte, sobre las vecinas de la sala consultada, y no se deja al orden de expansión del montículo; hay una prueba con una topología donde el orden de expansión y el id dan respuestas distintas, para que una implementación que confíe en el montículo falle.
+
+Se encontraron cuatro errores propios al implementar y medir, todos corregidos. Primero, un ayudante de prueba activaba a los cazadores poniéndoles el campo a mano, y resulta que es el camino de activación del motor el que también los programa en la agenda: varias pruebas de ciclo completo pasaban en vano porque el cazador nunca tomaba un turno. Se cambió para activarlos por el camino del motor y se comprobó que ahora sí se mueven. Segundo, la prueba de equivalencia decía ejercitar cierres automáticos frecuentes y no ejercitaba ninguno, porque un cierre automático solo se programa cuando alguien abre la puerta; se reescribió para que el jugador abra puertas y se verificó que la invalidación se dispara, con una comprobación dentro de la prueba de que hubo más de una búsqueda. Tercero, la medición del corte por rango salía plana también sin corte, y el motivo era que la cripta sintética nace con una puerta cerrada de cada tres, así que la región alcanzable era de dos salas por grande que fuera la cripta: no se medía el corte sino el bloqueo. Se parametrizó el generador y, bien medida, quitar el corte multiplica el costo de la decisión por 320. Cuarto, se identificó un punto de invalidación que el plan no había previsto: el pergamino de retroceso revierte el historial, así que puede cambiar la sala del jugador y el estado de las puertas de golpe.
+
+El hallazgo principal de las mediciones contradice lo que el plan esperaba, y así quedó escrito. El plan suponía que el ahorro vendría de reutilizar el cálculo entre turnos cuando las puertas están quietas. No es así: el jugador se mueve casi en cada decisión, y moverse invalida, de modo que el cálculo se rehace 297 veces en 300 decisiones. El ahorro real viene de compartir una sola búsqueda entre todos los cazadores del mismo instante, de 3902 búsquedas a 297. Eso cambia cuál es la justificación de la decisión: lo que vale no es la caché, es haber buscado desde el jugador en vez de desde cada cazador, porque si se buscara desde cada cazador compartir sería imposible. Con cincuenta cazadores activos el ciclo completo de eventos queda en 0.1854 ms, contra 0.1897 ms sin cazadores: la persecución de cincuenta enemigos no mueve la aguja. Por último, el bloque de enemigo del archivo de partida tuvo que guardar el rango, lo que subió la versión del formato de 1 a 2; sus pruebas usaban la constante y no el número, así que ninguna hubo que reescribir.
+
+### 2.30 Especificación, plan y tareas de la línea de tiempo
+
+Herramienta: Claude (Claude Opus 5), mediante la extensión de Claude Code para VS Code
+
+Fecha: 2026-11-16
+
+Objetivo: Desarrollar la cuarta capacidad del proyecto, la línea de tiempo (§3.6 y §5.5), con el flujo completo de spec-kit.
+
+Prompts utilizados:
+
+```text
+Ok, Claude, ayúdame y si quieres, avanza más todavía, tipo, haz la línea del tiempo y avanza al siguiente paso que creas y luego me dices lo que tengo que dejarle al grupo en general, como para decirle, ok, voy por aquí, para que ellos sí vayan avanzando.
+```
+
+```text
+/speckit.specify La línea de tiempo: consultar el estado de la partida en cualquier instante pasado.
+
+El pergamino de retroceso sigue limitado a 5 acciones. La línea de tiempo es independiente: permite consultar, sin modificar la partida, el estado en cualquier instante desde el inicio. El estado en el instante t es el estado después de ejecutar todos los eventos con tiempo menor o igual que t; si a t le corresponde una decisión del jugador, es el estado justo antes de tomarla.
+
+El comando "historia <t>" o "historia #k" muestra reloj, sala, vida y estadísticas, inventario, efectos activos, enemigos de esa sala con su vida, y el mapa conocido. La consulta no consume tiempo virtual, no se registra como acción y no altera ningún estado del juego ni del historial de retroceso. Las acciones revertidas con un pergamino dejan de existir en la línea. Consultar un instante posterior al reloj actual se rechaza.
+
+Se permite guardar copias completas del estado, no más de una cada K acciones del jugador. Una consulta no puede requerir aplicar o deshacer cambios de más de K acciones. Guardar y cargar conserva la línea completa.
+
+[El prompt completo incluye los dos casos del Apéndice B, los cinco requisitos de rendimiento de §5.5, lo que queda fuera por ser de otros integrantes, y las estructuras propias que ya existen en el repositorio.]
+```
+
+```text
+/speckit.plan Planificar specs/003-linea-de-tiempo. La decisión central es cómo se reconstruye el estado de un instante pasado: el enunciado permite reconstruir hacia adelante desde un punto de control re-simulando, o hacia atrás desde el estado actual invirtiendo cambios. Evaluar y documentar las dos, más la alternativa ingenua de una copia completa por acción. Tener en cuenta que el historial reversible guarda cambios inversos pero solo de las últimas 5 acciones, y que sus objetos Change guardan referencias directas a los objetos vivos, de modo que no se pueden aplicar a una copia. Tener en cuenta que el guardado binario ya serializa el estado completo incluido el estado del generador aleatorio. Planificar la búsqueda del punto de control más cercano con búsqueda binaria propia, porque bisect está prohibido. Planificar las mediciones de memoria y tiempo de consulta para al menos tres valores de K y la justificación del valor por omisión.
+```
+
+```text
+/speckit.tasks
+```
+
+```text
+sigue
+```
+
+Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md`, `plan.md`, `tasks.md` y su lista de verificación; `structures/linea_de_tiempo.py`, `model/consulta_historia.py`, `model/game.py`, `adapters/almacen_partida.py`, `controller/commands.py`, `controller/application.py`, `view/console_view.py`, `benchmark/bench_linea_de_tiempo.py`, `docs/INTERFAZ_LINEA_DE_TIEMPO.md` y las pruebas de `tests/test_linea_de_tiempo.py`.
+
+Cambios realizados por el estudiante: La decisión de diseño fue reconstruir hacia adelante desde una copia completa, y el motivo no fue de preferencia sino de código. Antes de planificar se revisó el historial reversible de la primera parte y se encontró que sus objetos de cambio guardan referencias directas a los objetos vivos; como acotar una consulta a K acciones obliga a partir de una copia, y una copia reconstruida crea objetos nuevos, los cambios inversos no se les pueden aplicar. Reconstruir hacia atrás habría exigido restaurar el estado vivo campo por campo sin cambiar la identidad de ningún objeto, lo que es mucho más riesgoso que lo que resuelve. Hacia adelante, en cambio, todo lo necesario ya estaba escrito: el serializador completo guarda el estado del generador aleatorio y el cargador construye objetos nuevos sin rehacer el trabajo de inicio de partida, así que la consulta no puede alterar la partida viva por construcción y no por cuidado. Un punto de control es ese mismo bloque de bytes guardado en memoria, lo que obligó a separar en el adaptador el armado del contenido de su escritura en disco; ese refactor no cambió ningún comportamiento y las 54 pruebas del guardado siguieron pasando sin tocarlas. La búsqueda del punto de control del que partir y la traducción de un instante a un número de acción son búsquedas binarias escritas a mano, porque bisect está prohibido.
+
+Durante la planificación se encontró el que iba a ser el problema central: el pergamino de retroceso devuelve el reloj a su valor anterior pero no devuelve el estado del generador aleatorio, que es una decisión deliberada y documentada de la primera parte. Re-simular habría divergido después de cada pergamino y los resúmenes de los instantes posteriores habrían sido falsos sin que nada se viera raro. La primera respuesta fue anotar el estado del generador una vez por pergamino usado, que son unos 5 KB frente a una copia completa. La prueba de equivalencia tumbó esa idea: un pergamino además consume un pergamino del inventario, y ese consumo no es una acción del jugador, así que no está en la lista que la re-simulación repite. El anclaje alineaba el azar y dejaba el inventario mal. La respuesta correcta resultó más simple de explicar: un pergamino es un punto donde el estado vivo no se puede derivar de la lista de acciones, así que la línea se re-ancla con una copia completa. El mecanismo del anclaje se retiró del código en vez de dejarlo sin uso, y la desviación respecto del presupuesto de una copia cada K acciones quedó declarada en el plan con su justificación: entre correcto y dentro del presupuesto de memoria, manda correcto.
+
+La misma prueba de equivalencia destapó un defecto ajeno a esta capacidad: el archivo de partida nunca guardaba el costo de las salidas. La capacidad 001 lo agregó al modelo y no al guardado, así que guardar y cargar devolvía todas las salidas a costo 100 en silencio, y no había prueba que lo cubriera porque el costo se agregó después del guardado. Es el argumento más fuerte a favor de esta capacidad: reconstruir el pasado obliga a que el estado se serialice completo, y eso delata cualquier campo que falte. También se evitó un error de diseño que habría crecido en silencio: si una copia llevara la línea de tiempo dentro, cada copia contendría las anteriores y el tamaño crecería de forma exponencial; por eso el bloque global se arma con la línea cuando es un archivo de partida y sin ella cuando es una copia, y hay una prueba que lo comprueba.
+
+Se corrigieron además tres errores propios en las pruebas, todos detectados al comparar contra el estado real: el ayudante guardaba el estado posterior a una espera en vez del anterior cuando una acción se rechazaba; los objetos extra del inventario se agregaban después de que se tomaba la copia inicial, por fuera del flujo registrado, lo que era un defecto de la prueba y no del programa; y la medición del costo de una consulta frente al largo de la partida consultaba siempre la última acción, que cae justo después de una copia y casi no repite nada, de modo que salía plana por el caso más fácil sin probar nada. Es el mismo error que ya había aparecido en la capacidad del cazador. Se cambió a puntos repartidos y entonces sí midió lo que decía medir.
+
+El valor por omisión de K quedó en 50, elegido con las mediciones como exige el enunciado. La alternativa ingenua de una copia por acción cuesta 43 veces más memoria para ganar menos de 0.6 ms por consulta. Entre los valores razonables el argumento resultó ser de latencia y no de memoria: con 98 KiB la memoria ya es irrelevante en términos absolutos, así que lo que queda por optimizar es cuánto tarda una consulta, y K de 200 ahorra 71 KiB que nadie nota y duplica el tiempo. También quedó anotado que esas cifras son de una cripta de 40 salas y que la memoria de las copias crece con el tamaño de la cripta, más la optimización evidente que no se hizo a propósito: guardar en la copia solo el estado mutable y no el esqueleto, que no cambia nunca. Se prefirió reutilizar el serializador ya probado antes que escribir un segundo serializador, y el costo está medido.
+
 ### 5.30 Arranque de la segunda parte: análisis del enunciado, del contrato 1.1.0 y de las criptas publicadas
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai

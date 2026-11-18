@@ -4,6 +4,9 @@ from structures.tabla_hash import TablaHash
 
 DIRECTIONS = ("N", "S", "E", "O")
 
+# Costo de transito de una salida que no lo declara (SegundoProyecto §3.1).
+DEFAULT_EXIT_COST = 100
+
 
 def direction_index(direction):
     """Posicion de una direccion en DIRECTIONS. Son 4, asi que es O(1)."""
@@ -24,14 +27,35 @@ class Door:
 
     key_id es el id de la ficha llave que la abre (§2.7); auto_close es el
     intervalo de cierre automatico, o None si la puerta no se cierra sola.
+
+    cost es lo que cuesta atravesar el paso (SegundoProyecto §3.1). Vive aca y
+    no en Exit porque la puerta es un solo objeto compartido por las dos salas:
+    asi el costo es el mismo en ambos sentidos por construccion, sin que nadie
+    tenga que validarlo.
     """
 
-    def __init__(self, room_a, room_b, closed=False, key_id=None, auto_close=None):
+    def __init__(self, room_a, room_b, closed=False, key_id=None, auto_close=None,
+                 cost=DEFAULT_EXIT_COST):
+        self.cost = cost
         self.room_a = room_a
         self.room_b = room_b
         self.closed = closed
         self.key_id = key_id
         self.auto_close = auto_close
+
+    @property
+    def cost(self):
+        return self._cost
+
+    @cost.setter
+    def cost(self, value):
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            raise ValueError(
+                f"El costo de una salida debe ser un entero mayor o igual que 1, "
+                f"se recibio {value!r}."
+            )
+
+        self._cost = value
 
     @property
     def is_open(self):
@@ -57,6 +81,12 @@ class Exit:
     direction: str
     destination: int
     door: Door
+
+    @property
+    def cost(self):
+        """Lo que cuesta atravesarla. El dato vive en la puerta, que es la que
+        comparten las dos salas, pero se pide desde la salida."""
+        return self.door.cost
 
 
 class Room:

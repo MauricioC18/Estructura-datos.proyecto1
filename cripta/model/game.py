@@ -23,10 +23,21 @@ from structures.circular_log import CircularLog
 from structures.event_queue import EventQueue
 from structures.history import use_rewind_scroll
 from structures.inventory import is_rewind_scroll
+from structures.rutas_mas_baratas import RutasMasBaratas
 from structures.sorting import sort
 
 
-MOVE_COST = 100
+# Nombres de las acciones del jugador que la linea de tiempo registra, para
+# poder repetirlas al reconstruir un instante pasado (seccion 3.6).
+ACTION_MOVE = "mover"
+ACTION_OPEN = "abrir"
+ACTION_ATTACK = "atacar"
+ACTION_WAIT = "esperar"
+ACTION_PICK_UP = "recoger"
+ACTION_DROP = "soltar"
+ACTION_USE = "usar"
+ACTION_EQUIP = "equipar"
+
 ATTACK_COST = 100
 WAIT_COST = 100
 USE_ITEM_COST = 50
@@ -132,6 +143,9 @@ class Game:
         message_log=None,
         event_queue=None,
         start=True,
+        always_recompute_routes=False,
+        timeline=None,
+        snapshot=None,
     ):
         self.state = state
         self.player = player
@@ -148,6 +162,11 @@ class Game:
         self.player_actions = 0
         self.enemies_defeated = 0
         self.events_processed = 0
+        self.always_recompute_routes = always_recompute_routes
+        self.route_searches = 0
+        self._routes = None
+        self.timeline = timeline
+        self._snapshot = snapshot
 
         if start:
             self._begin_new_game()
@@ -166,6 +185,7 @@ class Game:
         self._schedule(self.player, self.state.clock)
         self._activate_enemies_in(self.player.room_id)
         self._advance_to_player_turn()
+        self._save_timeline_snapshot()
 
     @classmethod
     def load(
@@ -185,6 +205,8 @@ class Game:
         result=IN_PROGRESS,
         player_actions=0,
         enemies_defeated=0,
+        timeline=None,
+        snapshot=None,
     ):
         """Arma una partida guardada en disco, para el guardado de §4.10.
 
@@ -204,7 +226,8 @@ class Game:
         archivo y la interfaz no mostraria nada, sin que diera ningun error.
 
         El historial del retroceso no se carga: al abrir una partida guardada
-        el de la sesion anterior ya no aplica.
+        el de la sesion anterior ya no aplica. La linea de tiempo si, porque
+        describe la historia de la partida y no la de la sesion (seccion 3.6).
         """
         game = cls(
             state,
@@ -217,6 +240,8 @@ class Game:
             message_log,
             event_queue,
             start=False,
+            timeline=timeline,
+            snapshot=snapshot,
         )
 
         for event in events:
@@ -241,7 +266,7 @@ class Game:
 
         self.history.begin_action()
 
-        return self._player_acts(WAIT_COST, "Esperas.")
+        return self._player_acts(WAIT_COST, "Esperas.", (ACTION_WAIT, None))
 
     def attack(self, enemy_id):
         if self.is_over:
@@ -266,7 +291,7 @@ class Game:
             self._check_death(target)
             message = f"{message} {target.name} muere."
 
-        return self._player_acts(ATTACK_COST, message)
+        return self._player_acts(ATTACK_COST, message, (ACTION_ATTACK, enemy_id))
 
     def move(self, direction):
         """Mueve al jugador a la sala vecina en esa direccion (§2.5).
@@ -299,6 +324,7 @@ class Game:
 
         self.history.begin_action()
         self.history.assign(self.player, "room_id", destination.room_id)
+        self._invalidate_routes()
         self._activate_enemies_in(destination.room_id)
         message = f"Entras a {destination.name}."
         self._log(message)
@@ -317,7 +343,7 @@ class Game:
 
             return ActionResult(True, message)
 
-        return self._finish_player_action(MOVE_COST, message)
+        return self._finish_player_action(exit_.cost, message, (ACTION_MOVE, direction))
 
     def open_door(self, direction):
         """Abre la puerta de esa salida si el jugador tiene la llave (§2.5).
@@ -347,6 +373,7 @@ class Game:
 
         self.history.begin_action()
         self.history.assign(door, "closed", False)
+        self._invalidate_routes()
         message = f"Abres la puerta hacia {direction}."
 
         if door.auto_close is not None:
@@ -354,7 +381,7 @@ class Game:
                 self.player.room_id, direction, door.auto_close
             )
 
-        return self._player_acts(OPEN_DOOR_COST, message)
+        return self._player_acts(OPEN_DOOR_COST, message, (ACTION_OPEN, direction))
 
     def pick_up(self, floor_index):
         """Recoge un objeto del suelo de la sala actual (§2.7)."""
@@ -382,7 +409,8 @@ class Game:
         item = self._take_from_floor(floor, floor_index)
         self.player.inventory.pick_up(item)
 
-        return self._player_acts(PICK_UP_COST, f"Recoges {item.name}.")
+        return self._player_acts(PICK_UP_COST, f"Recoges {item.name}.",
+                                 (ACTION_PICK_UP, floor_index))
 
     def drop(self):
         """Suelta al suelo el objeto que muestra el cursor (§4.5)."""
@@ -400,7 +428,8 @@ class Game:
         dropped = self.player.inventory.drop_current(self.player)
         self._put_on_floor(floor, dropped)
 
-        return self._player_acts(DROP_COST, f"Sueltas {dropped.name}.")
+        return self._player_acts(DROP_COST, f"Sueltas {dropped.name}.",
+                                 (ACTION_DROP, dropped.instance_id))
 
     def use_item(self):
         """Usa el objeto que muestra el cursor y lo consume (§2.7)."""
@@ -421,7 +450,8 @@ class Game:
         message = self._apply_item_effect(item)
         self.player.inventory.drop_current(self.player)
 
-        return self._player_acts(USE_ITEM_COST, message)
+        return self._player_acts(USE_ITEM_COST, message,
+                                 (ACTION_USE, item.instance_id))
 
     def equip_item(self):
         """Equipa el objeto que muestra el cursor y lo mueve al frente (§2.7)."""
@@ -440,7 +470,8 @@ class Game:
         if replaced is not None:
             message = f"{message} Guardas {replaced.name}."
 
-        return self._player_acts(EQUIP_ITEM_COST, message)
+        return self._player_acts(EQUIP_ITEM_COST, message,
+                                 (ACTION_EQUIP, item.instance_id))
 
     def inventory_next(self):
         return self._move_cursor(True)
@@ -474,6 +505,8 @@ class Game:
             return ActionResult(False, "No hay ninguna accion que revertir.")
 
         use_rewind_scroll(self.player.inventory, self.history)
+        self._invalidate_routes()
+        self._trim_timeline()
         self._log("Usas un pergamino de retroceso. El tiempo vuelve atras.")
 
         return ActionResult(True, "Usas un pergamino de retroceso.")
@@ -608,10 +641,10 @@ class Game:
             messages=list(self.messages),
         )
 
-    def _player_acts(self, cost, message):
+    def _player_acts(self, cost, message, action=None):
         self._log(message)
 
-        return self._finish_player_action(cost, message)
+        return self._finish_player_action(cost, message, action)
 
     def _mark_trail(self):
         """Refresca el rastro en la sala donde queda el jugador (§2.9).
@@ -623,7 +656,7 @@ class Game:
         if self.trail is not None:
             self.trail.mark(self.player.room_id, self.state.clock)
 
-    def _finish_player_action(self, cost, message):
+    def _finish_player_action(self, cost, message, action=None):
         """Programa la siguiente accion del jugador y corre el ciclo.
 
         Esta separado de _player_acts porque moverse anota su mensaje antes de
@@ -631,6 +664,7 @@ class Game:
         sala y despues lo que le paso adentro.
         """
         self.history.assign(self, "player_actions", self.player_actions + 1)
+        self._record_on_timeline(action)
         self._mark_trail()
         self._schedule(
             self.player,
@@ -638,6 +672,7 @@ class Game:
         )
         self._advance_to_player_turn()
         self._forget_finished_effects()
+        self._save_timeline_snapshot()
 
         return ActionResult(True, message)
 
@@ -688,6 +723,112 @@ class Game:
         elif event.event_type == TRAP_REARM:
             self._rearm_trap(event.room_id, event.instance_id)
 
+    def _trim_timeline(self):
+        """Recorta la linea al usar un pergamino (seccion 3.6).
+
+        La accion revertida deja de existir: la linea cuenta la historia de la
+        partida tal como quedo.
+
+        Y se fuerza una copia completa, porque un pergamino deja la partida en
+        un estado que la lista de acciones NO puede reproducir, por dos
+        motivos:
+          - devuelve el reloj a su valor anterior pero no devuelve el estado
+            del generador aleatorio, que es una decision deliberada de la
+            primera parte;
+          - consume un pergamino del inventario, y ese consumo no es una
+            accion del jugador, asi que no esta en la lista.
+        Sin la copia, el resumen de cualquier instante posterior seria falso
+        sin que nada se viera raro. Es correccion, no optimizacion.
+        """
+        if self.timeline is None:
+            return
+
+        self.timeline.recortar_ultima_accion()
+
+        if self._snapshot is not None:
+            self.timeline.guardar_copia(self.state.clock, self._snapshot(self))
+
+    def _record_on_timeline(self, action):
+        """Anota la accion en la linea y pide copia si corresponde.
+
+        action es (nombre, argumento). El reloj que se anota es el de antes de
+        la accion, porque el estado en ese instante es el de justo antes de
+        tomarla (FR-002).
+        """
+        if self.timeline is None or action is None:
+            return
+
+        name, argument = action
+        self.timeline.registrar_accion(name, argument, self.state.clock)
+
+    def _save_timeline_snapshot(self):
+        """Guarda una copia completa del estado si la linea la pide.
+
+        Quien sabe serializar el estado es el adaptador, no el modelo, asi que
+        la funcion llega desde afuera (principio III de la constitucion).
+        """
+        if self.timeline is None or self._snapshot is None:
+            return
+
+        if not self.timeline.hace_falta_copia():
+            return
+
+        self.timeline.guardar_copia(self.state.clock, self._snapshot(self))
+
+    def _invalidate_routes(self):
+        """Olvida el calculo compartido de rutas (§5.2).
+
+        Se llama donde cambia lo unico de lo que ese calculo depende: la sala
+        del jugador y el estado de las puertas. El movimiento de un cazador,
+        la muerte de un actor y un cambio de velocidad no lo invalidan, porque
+        ninguno puede cambiar la respuesta.
+        """
+        self._routes = None
+
+    def _open_exits_of(self, room_id):
+        """Vecinas alcanzables de una sala: (id, costo, salida).
+
+        Solo las salidas cuya puerta esta abierta en este instante, porque un
+        enemigo no abre puertas cerradas (§2.5).
+        """
+        neighbours = []
+
+        for exit_ in self.room_map.room(room_id).exits():
+            if exit_.door.is_open:
+                neighbours.append((exit_.destination, exit_.cost, exit_))
+
+        return neighbours
+
+    def _routes_towards_player(self):
+        """Costos minimos desde la sala del jugador, para los cazadores.
+
+        Se busca una sola vez desde la sala del jugador y sirve a todos los
+        cazadores activos: el grafo no tiene direccion, asi que la distancia
+        desde el jugador es la distancia hasta el jugador. El corte es el
+        rango mayor entre los cazadores activos; cada uno compara despues su
+        propia distancia contra su propio rango.
+        """
+        if self._routes is not None and not self.always_recompute_routes:
+            return self._routes
+
+        cut = 0
+
+        for enemy in self.enemies:
+            if enemy.behavior == Enemy.HUNTER and enemy.is_active and enemy.is_alive:
+                cut = max(cut, enemy.pursuit_range)
+
+        self.route_searches += 1
+        routes = RutasMasBaratas(self._open_exits_of, self.player.room_id, cut)
+        self._routes = routes
+
+        return routes
+
+    def _routes_for(self, enemy):
+        if enemy.behavior != Enemy.HUNTER or self.room_map is None:
+            return None
+
+        return self._routes_towards_player()
+
     def _run_enemy_turn(self, enemy):
         action, chosen_exit = enemy.decide_action(
             self.player,
@@ -695,6 +836,7 @@ class Game:
             self.state.random_generator,
             self.trail,
             self.state.clock,
+            self._routes_for(enemy),
         )
 
         if action == Enemy.ATTACK:
@@ -709,7 +851,7 @@ class Game:
             cost = ATTACK_COST
         elif action == Enemy.MOVE:
             self.history.assign(enemy, "room_id", chosen_exit.destination)
-            cost = MOVE_COST
+            cost = chosen_exit.cost
         else:
             cost = WAIT_COST
 
@@ -986,6 +1128,7 @@ class Game:
             return
 
         self.history.assign(exit_.door, "closed", True)
+        self._invalidate_routes()
         self._log(f"La puerta hacia {direction} se cierra sola.")
 
     def _rearm_trap(self, room_id, instance_id):

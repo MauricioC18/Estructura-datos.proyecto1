@@ -45,6 +45,9 @@ def contenido_de(id_sala):
     raise ValueError(id_sala)
 
 
+_SIN_CAMPO = object()
+
+
 def nuevo_traductor(fichas=FICHAS_CRIPTA_01):
     return Traductor(crear_buscador_de_fichas(fichas))
 
@@ -498,6 +501,176 @@ class TestIdsEnUso(unittest.TestCase):
 
     def test_sin_nada_en_uso(self):
         self.assertTrue(self.traductor.ids_en_uso().esta_vacia())
+
+
+
+class PruebasCostoDeSalida(unittest.TestCase):
+    """Terreno: el traductor lee el costo del esqueleto (§3.1, §4.1).
+
+    Especificacion: specs/001-terreno-costo-salidas/spec.md
+    """
+
+    def dos_salas(self, costo_ida=None, costo_vuelta=None):
+        ida = {"sala": 2}
+        vuelta = {"sala": 1}
+
+        if costo_ida is not None:
+            ida["costo"] = costo_ida
+
+        if costo_vuelta is not None:
+            vuelta["costo"] = costo_vuelta
+
+        return [
+            {"id": 1, "nombre": "A", "salidas": {"N": ida}},
+            {"id": 2, "nombre": "B", "salidas": {"S": vuelta}},
+        ]
+
+    def test_una_salida_sin_costo_vale_cien(self):
+        """FR-002."""
+        traductor = nuevo_traductor()
+
+        mapa = traductor.crear_mapa(self.dos_salas())
+
+        self.assertEqual(mapa.room(1).exit_towards("N").cost, 100)
+        self.assertEqual(traductor.avisos, [])
+
+    def test_el_costo_declarado_llega_a_la_puerta(self):
+        """FR-001."""
+        mapa = nuevo_traductor().crear_mapa(self.dos_salas(costo_ida=250))
+
+        self.assertEqual(mapa.room(1).exit_towards("N").cost, 250)
+
+    def test_declarado_por_un_solo_lado_vale_para_los_dos(self):
+        """FR-003: y no debe avisar de discrepancia, porque no la hay."""
+        traductor = nuevo_traductor()
+
+        mapa = traductor.crear_mapa(self.dos_salas(costo_ida=250))
+
+        self.assertEqual(mapa.room(1).exit_towards("N").cost, 250)
+        self.assertEqual(mapa.room(2).exit_towards("S").cost, 250)
+        self.assertEqual(traductor.avisos, [])
+
+    def test_los_dos_lados_con_el_mismo_costo_no_avisan(self):
+        traductor = nuevo_traductor()
+
+        traductor.crear_mapa(self.dos_salas(costo_ida=250, costo_vuelta=250))
+
+        self.assertEqual(traductor.avisos, [])
+
+    def test_costos_distintos_gana_la_sala_de_menor_id_y_avisa(self):
+        """Caso borde de la especificacion: se reporta, no se resuelve callado."""
+        traductor = nuevo_traductor()
+
+        mapa = traductor.crear_mapa(self.dos_salas(costo_ida=250, costo_vuelta=80))
+
+        self.assertEqual(mapa.room(1).exit_towards("N").cost, 250)
+        self.assertEqual(len(traductor.avisos), 1)
+        self.assertIn("costo", traductor.avisos[0])
+
+    def test_un_costo_invalido_es_error_de_datos(self):
+        """FR-011: no se sustituye por el valor por omision en silencio."""
+        for malo in (0, -5, 1.5, "100"):
+            with self.subTest(costo=malo):
+                with self.assertRaises(ErrorDatosCripta):
+                    nuevo_traductor().crear_mapa(self.dos_salas(costo_ida=malo))
+
+    def test_costo_ya_no_se_reporta_como_campo_desconocido(self):
+        traductor = nuevo_traductor()
+
+        traductor.crear_mapa(self.dos_salas(costo_ida=250))
+
+        for aviso in traductor.avisos:
+            self.assertNotIn("costo", aviso)
+
+
+
+class PruebasRangoDeCazador(unittest.TestCase):
+    """El cuarto comportamiento y su rango (FR-001, FR-002, FR-014)."""
+
+    FICHA_DE_CAZADOR = {
+        "id": "ent_sabueso_oseo",
+        "nombre": "Sabueso óseo",
+        "clase": "enemigo",
+        "vida_max": 18,
+        "ataque": 6,
+        "defensa": 2,
+        "velocidad": 120,
+        "comportamiento": "cazador",
+        "rango": 600,
+        "suelta": [],
+    }
+
+    def cazador_con(self, **cambios):
+        ficha = dict(self.FICHA_DE_CAZADOR)
+        ficha.update(cambios)
+
+        for campo, valor in list(ficha.items()):
+            if valor is _SIN_CAMPO:
+                del ficha[campo]
+
+        traductor = nuevo_traductor(FICHAS_CRIPTA_01 + [ficha])
+
+        return traductor, traductor.crear_enemigo(
+            {"instancia": "e-1", "tipo": ficha["id"]}, 1
+        )
+
+    def test_una_ficha_de_cazador_produce_un_cazador_con_su_rango(self):
+        _, cazador = self.cazador_con()
+
+        self.assertEqual(cazador.behavior, Enemy.HUNTER)
+        self.assertEqual(cazador.pursuit_range, 600)
+
+    def test_el_rango_minimo_de_la_ficha_es_uno(self):
+        """El contrato del servicio 1.1.0 declara el campo con minimo 1."""
+        _, cazador = self.cazador_con(rango=1)
+
+        self.assertEqual(cazador.pursuit_range, 1)
+
+    def test_una_ficha_de_cazador_sin_rango_es_un_error_de_datos(self):
+        """FR-014: no se sustituye por un valor por omisión."""
+        with self.assertRaises(ErrorDatosCripta) as error:
+            self.cazador_con(rango=_SIN_CAMPO)
+
+        self.assertIn("rango", str(error.exception))
+
+    def test_un_rango_invalido_es_un_error_de_datos(self):
+        for invalido in (0, -1, "600", 1.5, True, [600]):
+            with self.subTest(rango=invalido):
+                with self.assertRaises(ErrorDatosCripta):
+                    self.cazador_con(rango=invalido)
+
+    def test_el_campo_rango_ya_no_se_avisa_como_desconocido(self):
+        traductor, _ = self.cazador_con()
+
+        self.assertEqual(
+            [aviso for aviso in traductor.avisos if "rango" in aviso],
+            [],
+        )
+
+    def test_rango_en_una_ficha_que_no_es_de_cazador_se_avisa_y_se_ignora(self):
+        ficha = {
+            "id": "ent_espectro",
+            "nombre": "Espectro",
+            "clase": "enemigo",
+            "vida_max": 9,
+            "ataque": 3,
+            "defensa": 0,
+            "velocidad": 80,
+            "comportamiento": "errante",
+            "rango": 400,
+        }
+        traductor = nuevo_traductor(FICHAS_CRIPTA_01 + [ficha])
+
+        espectro = traductor.crear_enemigo(
+            {"instancia": "e-1", "tipo": "ent_espectro"}, 1
+        )
+
+        self.assertEqual(espectro.behavior, Enemy.WANDERER)
+        self.assertEqual(espectro.pursuit_range, 0)
+        self.assertTrue(any("rango" in aviso for aviso in traductor.avisos))
+
+    def test_el_campo_rango_es_conocido_para_la_clase_enemigo(self):
+        self.assertIn("rango", campos_conocidos_de_la_clase(CLASE_ENEMIGO))
 
 
 if __name__ == "__main__":
