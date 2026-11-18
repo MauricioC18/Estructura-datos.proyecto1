@@ -196,5 +196,86 @@ class RutasMasBaratasTest(unittest.TestCase):
             RutasMasBaratas(proveedor([]), origen=1, corte=True)
 
 
+def proveedor_dirigido(aristas):
+    """Proveedor de un grafo DIRIGIDO: devuelve (entrantes, salientes).
+
+    entrantes(v) da las aristas que llegan a v, que es por donde se expande
+    la busqueda desde el origen; salientes(u) da las que salen de u, que es
+    por donde se da el primer paso.
+    """
+    def entrantes(id_sala):
+        return [
+            (a, costo, (a, b, costo))
+            for a, b, costo in aristas
+            if b == id_sala
+        ]
+
+    def salientes(id_sala):
+        return [
+            (b, costo, (a, b, costo))
+            for a, b, costo in aristas
+            if a == id_sala
+        ]
+
+    return entrantes, salientes
+
+
+class ParadaAnticipadaConSalidasDirigidasTest(unittest.TestCase):
+    """parar_en y salidas_de se pueden usar juntos.
+
+    El argumento de la parada anticipada no depende de por donde se expanda la
+    busqueda: solo usa que Dijkstra asienta en orden no decreciente de
+    distancia y que todo costo es al menos 1.
+    """
+
+    def test_el_primer_paso_es_el_mismo_con_parada_y_sin_ella(self):
+        aristas = [(1, 4, 50), (4, 9, 50), (9, 7, 1), (7, 1, 1)]
+        entrantes, salientes = proveedor_dirigido(aristas)
+
+        completa = RutasMasBaratas(entrantes, 9, salidas_de=salientes)
+        con_parada = RutasMasBaratas(
+            entrantes, 9, parar_en=1, salidas_de=salientes
+        )
+
+        self.assertEqual(completa.distancia_a(1), 100)
+        self.assertEqual(con_parada.distancia_a(1), 100)
+        self.assertEqual(
+            completa.primer_paso_desde(1), con_parada.primer_paso_desde(1)
+        )
+        self.assertEqual(con_parada.primer_paso_desde(1), (1, 4, 50))
+
+    def test_el_desempate_se_cumple_con_parada_y_salidas_dirigidas(self):
+        aristas = [(1, 7, 100), (7, 9, 100), (1, 4, 100), (4, 9, 100)]
+        entrantes, salientes = proveedor_dirigido(aristas)
+
+        rutas = RutasMasBaratas(entrantes, 9, parar_en=1, salidas_de=salientes)
+
+        self.assertEqual(rutas.primer_paso_desde(1), (1, 4, 100))
+
+    def test_una_sala_no_asentada_se_rechaza_en_vez_de_mentir(self):
+        aristas = [(1, 2, 10), (2, 9, 10), (3, 9, 500)]
+        entrantes, salientes = proveedor_dirigido(aristas)
+
+        rutas = RutasMasBaratas(entrantes, 9, parar_en=2, salidas_de=salientes)
+
+        self.assertTrue(rutas.se_detuvo())
+        self.assertTrue(rutas.esta_asentada(2))
+
+        with self.assertRaises(ValueError):
+            rutas.primer_paso_desde(3)
+
+        with self.assertRaises(ValueError):
+            rutas.distancia_a(3)
+
+    def test_si_la_sala_nunca_se_alcanza_la_busqueda_termina_entera(self):
+        aristas = [(1, 2, 10), (2, 9, 10)]
+        entrantes, salientes = proveedor_dirigido(aristas)
+
+        rutas = RutasMasBaratas(entrantes, 9, parar_en=77, salidas_de=salientes)
+
+        self.assertFalse(rutas.se_detuvo())
+        self.assertEqual(rutas.distancia_a(1), 20)
+
+
 if __name__ == "__main__":
     unittest.main()

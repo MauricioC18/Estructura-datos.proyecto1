@@ -95,6 +95,10 @@ class GameController:
             return ActionResult(False, str(error))
 
         self.game.enemies.extend(enemies)
+        # El contenido acaba de entrar desde afuera y la linea de tiempo no
+        # puede reproducirlo repitiendo acciones, asi que se avisa antes del
+        # movimiento que lo necesita.
+        self.game.contenido_disponible(destination)
 
         return None
 

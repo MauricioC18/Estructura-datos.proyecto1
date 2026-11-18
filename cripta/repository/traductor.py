@@ -237,10 +237,13 @@ class Traductor:
         tal: sustituirlo en silencio por el valor por omision escondería el
         error.
         """
-        if "costo" not in salida:
-            return None
+        costo = salida.get("costo")
 
-        costo = salida["costo"]
+        if costo is None:
+            # El contrato admite "costo": null y significa que la salida no
+            # tiene costo propio, igual que no declarar el campo. Rechazarlo
+            # tumbaria una cripta valida entera.
+            return None
 
         if not isinstance(costo, int) or isinstance(costo, bool) or costo < 1:
             raise ErrorDatosCripta(
