@@ -2019,3 +2019,21 @@ Sí: haz que python main.py --bench --offline <ruta> mida esa carpeta, y que sin
 Uso en el proyecto: `cripta/main.py` (`run_bench`), `cripta/benchmark/benchmark.py` (`run_suite`, `main` y la marca `USA_PAQUETE_SIN_CONEXION`), `cripta/benchmark/bench_mapa_conocido.py` (`mediciones_de_criptas_reales`) y la prueba `tests/test_bench_paquete_sin_conexion.py`.
 
 Cambios realizados por el estudiante: El primer prompt no se pudo cumplir: traía el texto de relleno de la ruta en vez de la ruta, y el paquete no estaba en ningún disco del equipo. No se midió nada ni se completó la fila de §5.3, y T044 sigue abierta. Al revisar la suite apareció que `--bench` ignoraba `--offline` y siempre leía `datos_offline/`, que hoy solo trae cripta-01; por eso se pidió el segundo prompt. Solo recibe la carpeta la suite que lo declara, para que las demás no cambien. La búsqueda del cazador no se agregó a la fila porque está en `bench_cazador`, que es de Carlos. Al correr la fila nueva con cripta-01, el viaje entre la primera y la última sala del esqueleto tenía 0 pasos, y el «promedio por paso» habría salido de dividir entre 1 sin medir ningún paso: la fila dice «sin ruta entre los extremos» en ese caso. Una de las pruebas falló al principio porque `mock.patch` usa `importlib.import_module` para resolver sus rutas, y la prueba lo reemplazaba antes del segundo `patch`; se cambió el orden. Pruebas: 1215 en WSL con Python 3.12.3, con los dos fallos esperados de los escenarios 7 y 8.
+
+### 2.50 README de --bench --offline y viaje medido hacia la sala más lejana alcanzable
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Documentar en el README `python main.py --bench --offline CARPETA` y la fila de las criptas reales, y que esa fila mida algo útil cuando con el mapa conocido no hay ruta entre la primera y la última sala del esqueleto.
+
+Prompts utilizados:
+
+```text
+Haz dos cosas, en commits separados, sin push, sin atribución de Claude: 1. README: documenta python main.py --bench --offline <ruta> y la nueva fila de las criptas reales. Commit de documentos aparte. 2. En la suite del mapa conocido, cuando no haya ruta entre la primera y la última sala, mide el primer paso hacia la sala más lejana alcanzable con el mapa conocido (por costo mínimo desde la sala inicial), y dilo en la fila. Con prueba. Sin ids ni tamaños de cripta en el código. No toques archivos de Carlos. [...]
+```
+
+Uso en el proyecto: `cripta/benchmark/bench_mapa_conocido.py` (`elegir_recorrido`, `RecorridoMedido`, `descripcion_del_recorrido`), `tests/test_bench_paquete_sin_conexion.py` y `cripta/README.md`.
+
+Cambios realizados por el estudiante: Se tomó como «sala inicial» la partida del viaje que ya medía la suite, que es la primera sala del esqueleto. En cripta-01 coincide con la `sala_inicial` de sus datos generales, pero eso no está garantizado en otras criptas. Para saber qué salas se alcanzan, la búsqueda va desde esa sala y se expande por las salidas que salen de cada sala. Así la distancia es la de ir desde ella, y una sala que solo tiene salida hacia la primera no cuenta como alcanzable; hay una prueba para ese caso. Si dos salas están igual de lejos, gana la de menor id, para que la medición dé lo mismo en cada corrida. Las cuadrículas sintéticas no cambian, porque en ellas siempre hay ruta entre los extremos. Con cripta-01, la fila ahora dice que no hay ruta entre los extremos y mide un viaje de 3 pasos de la sala 1 a la 4, que es la más lejana (costo 300). En la sesión anterior, dos `with` de una prueba habían quedado unidos en una sola línea, porque la barra de continuación se perdió al escribir el archivo desde la terminal. Seguía siendo Python válido; se separaron en este commit y desde entonces las pruebas se editan con la herramienta de edición. Pruebas: 1223 en WSL con Python 3.12.3, con los dos fallos esperados de los escenarios 7 y 8.
