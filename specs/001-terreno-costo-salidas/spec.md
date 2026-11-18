@@ -79,7 +79,7 @@ Si un actor bebe una poción de velocidad mientras está atravesando una salida 
 
 ### Casos borde
 
-- Una salida declara un costo menor que 1 o un valor que no es entero: se trata como un dato inválido de la cripta y se reporta como tal, sin inventar un valor por defecto que oculte el error.
+- Una salida declara un costo menor que 1 o un valor que no es entero: se trata como un dato inválido de la cripta y se reporta como tal, sin inventar un valor por defecto que oculte el error. El valor **vacío** no entra en este caso: el contrato lo admite y significa «sin costo propio», así que vale 100.
 - Una salida declara un costo muy grande: el movimiento tarda mucho, pero el reloj sigue avanzando y la partida sigue siendo jugable; no hay tope.
 - Un actor de velocidad muy alta frente a una salida de costo 1: el tiempo consumido se recorta a 1 para que el reloj siempre avance.
 - Las dos salas que conecta una salida declaran costos distintos para ella: es una contradicción en los datos y debe reportarse, no resolverse en silencio escogiendo uno de los dos.
@@ -90,7 +90,7 @@ Si un actor bebe una poción de velocidad mientras está atravesando una salida 
 ### Requisitos funcionales
 
 - **FR-001**: Cada salida de una sala DEBE tener un costo de tránsito, expresado como un entero mayor o igual que 1.
-- **FR-002**: Una salida que no declara costo DEBE comportarse como si declarara 100.
+- **FR-002**: Una salida que no declara costo DEBE comportarse como si declarara 100. Declarar el campo **vacío** cuenta como no declararlo: el contrato del servicio 1.1.0 admite el valor nulo y significa que esa salida no tiene costo propio.
 - **FR-003**: El costo de una salida DEBE ser el mismo en los dos sentidos.
 - **FR-004**: Moverse a través de una salida DEBE consumir, en unidades de tiempo virtual, el mayor entre 1 y la división entera de `costo_de_la_salida * 100` entre la velocidad del actor. Es la misma fórmula de P1 §2.3, con el costo de la salida en lugar del valor fijo 100.
 - **FR-005**: FR-004 DEBE aplicarse a todos los actores: al jugador y a todos los enemigos, sea cual sea su comportamiento.
