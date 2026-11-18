@@ -2310,6 +2310,24 @@ Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md` (FR-003, escenario 10 de
 
 Cambios realizados por el estudiante: La especificación se corrigió primero y en su propio commit: FR-003 ahora dice que las acciones se numeran desde 1, sin reenumerar ningún requisito, y un caso borde dice qué pasa con `#k` igual a las acciones tomadas según FR-010. El código no se tocó, así que el programa y la especificación quedan con un desfase conocido, y el README lo dice tal cual en vez de esconderlo. En DECISIONES, la cifra de 1.26 ms de §5.4 se dejó acompañada de lo que no mide (leer y traducir el paquete) y de la medición de esa parte tomada en la entrada 2.58; no se agregó ninguna medición nueva. La nota sobre `/speckit.clarify` en 001 a 003 dice que no hubo sesión, en vez de reconstruir una. En las pruebas solo cambió el texto de cuatro docstrings, que ahora citan su FR; las pruebas dieron lo mismo antes y después.
 
+### 2.61 historia #k numera las acciones desde 1
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-18
+
+Objetivo: Alinear el comando `historia #k` con FR-003 de la especificación 003, ya corregida en la entrada 2.60: las acciones se numeran desde 1, y `#0` o un número mayor que las acciones tomadas se rechazan (FR-010).
+
+Prompts utilizados:
+
+```text
+Corrige el desfase de "historia #k" en el CÓDIGO para alinearlo con la spec 003 (ya commiteada en 2666494: las acciones se numeran desde 1, #1 = historia 0, y #0 o un k mayor que las acciones tomadas se rechazan por FR-010). ENFOQUE: convierte el número en la capa del controlador/comandos [...] NO modifiques model/consulta_historia.py, structures/linea_de_tiempo.py ni adapters/almacen_partida.py, ni la prueba de fondo de Carlos [...]
+```
+
+Uso en el proyecto: `cripta/controller/application.py` (`_consultar_historia` y `_exigir_accion_tomada`), `cripta/tests/test_historia_numero_de_accion.py` y `cripta/README.md`.
+
+Cambios realizados por el estudiante: La conversión quedó en el controlador, donde se atiende el comando: `#k` se traduce al índice `k - 1` que usa el modelo, que sigue contando las acciones ya tomadas desde 0, y su prueba de fondo no cambia. La vista ya mostraba «antes de la accion N» sumando 1 al número de acciones previas, así que con la conversión el texto quedó correcto sin tocarla. Antes de cambiar nada se buscaron las pruebas que fijaban el comportamiento viejo del comando y no había ninguna: la única que usa `#1` lo hace con una acción tomada, que sigue siendo válida. Se agregaron seis pruebas: `#1` da lo mismo que `historia 0` y se muestra como «antes de la accion 1»; cada `#k` es el instante de la acción *k*; `#N` con *N* acciones tomadas es válido y no es el presente; `#0` y `#N+1` se rechazan sin cambiar nada; y, desde la consola, ninguna consulta consume tiempo ni queda en `partida.log`. Pruebas: 1347 en WSL con Python 3.12.3, con un fallo esperado (T023).
+
 ### 5.30 Arranque de la segunda parte: análisis del enunciado, del contrato 1.1.0 y de las criptas publicadas
 
 Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai

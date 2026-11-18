@@ -80,7 +80,7 @@ python -m unittest discover -s tests -t . -v
 
 En Windows también funciona `py` en lugar de `python`.
 
-Estado al 2026-11-18, en la rama `Parte_2-niebla-ir-a`: **1341 pruebas, todas pasan**, medido con Python 3.12.3 en WSL (no hay un Python de Windows instalado en el equipo donde se corrieron). Una se cuenta como *fallo esperado* (ver «Lo que todavía no funciona»). Incluye lo unido de `main` (con el arreglo de T023 de la línea de tiempo) y de la rama de Mauricio (`specs/004-datos-nuevos-servicio`, `specs/006-resolubilidad` y el paquete `datos_offline_p2/`).
+Estado al 2026-11-18, en `main`: **1347 pruebas, todas pasan**, medido con Python 3.12.3 en WSL (no hay un Python de Windows instalado en el equipo donde se corrieron). Una se cuenta como *fallo esperado* (ver «Lo que todavía no funciona»). Incluye lo unido de `main` (con el arreglo de T023 de la línea de tiempo) y de la rama de Mauricio (`specs/004-datos-nuevos-servicio`, `specs/006-resolubilidad` y el paquete `datos_offline_p2/`).
 
 ### Pruebas de aceptación por capacidad
 
@@ -147,7 +147,7 @@ Comandos dentro de la partida (con `ayuda` se ven en pantalla):
 | `cargar <archivo>` | Deja la partida actual y continúa la guardada, con una bitácora nueva. Si el archivo no sirve, se sigue en la partida actual |
 | `mapa` | Ver las salas exploradas, sus salidas, el estado recordado de cada puerta y las salas avistadas (niebla de guerra, §3.3). No consume tiempo |
 | `ir a <sala>` | Viajar a una sala explorada por la ruta conocida más barata, un movimiento por paso (§3.4); al detenerse dice por qué. Respeta las salidas de un solo sentido: solo las recorre en su sentido |
-| `historia <t>`, `historia #k` | Ver el estado de la partida en el instante `t` o antes de la acción `k`, incluido el mapa conocido de ese momento. **Ver la nota sobre la línea de tiempo más abajo** |
+| `historia <t>`, `historia #k` | Ver el estado de la partida en el instante `t` o antes de la acción `k` (la primera es la 1, así que `historia #1` es lo mismo que `historia 0`), incluido el mapa conocido de ese momento. **Ver la nota sobre la línea de tiempo más abajo** |
 | `salir` | Terminar la sesión |
 
 Al terminar una partida el programa muestra el resultado, la registra en la tabla de puntajes si se ganó o se perdió, y muestra el reporte de red: solicitudes realizadas, presupuesto de la cripta, aciertos y fallos de caché (§5.1).
@@ -162,7 +162,6 @@ El log de una sesión que empezó cargando un guardado, con `--cargar` o con `ca
 - **«ir a» en mapas mucho más grandes que la cripta de referencia.** En cripta-06 (300 salas) un paso tarda como máximo 0.45 ms, y 3.19 ms con todas las puertas abiertas, debajo del límite de 5 ms. En las cuadrículas sintéticas de 400 y 1600 salas, el primer paso de un viaje largo pasa de 5 ms (5.59 y 30.31 ms en la última corrida); los pasos siguientes no (`docs/DECISIONES.md`, §5.3).
 - **Salidas de un solo sentido en criptas reales.** «ir a» y la verificación de resolubilidad las respetan, pero ninguna cripta del paquete `datos_offline_p2/` tiene una, así que solo lo comprueban las pruebas con mapas sintéticos.
 - **La verificación de resolubilidad con salidas de un solo sentido** supone que una llave obtenida sirve en toda la región alcanzable, aunque el jugador no siempre pueda volver a la puerta que abre. Es un límite declarado en `specs/006-resolubilidad/spec.md` (Assumptions) y en `docs/DECISIONES.md` §5.4.
-- **`historia #k` cuenta las acciones desde 0 en el programa, y la especificación dice desde 1.** La spec 003 (FR-003) fija que `historia #1` es el estado justo antes de la primera acción, igual que `historia 0`. El modelo (`model/consulta_historia.py`) toma `#k` como el estado después de *k* acciones, así que hoy `historia #1` muestra «antes de la accion 2», y `historia #k` con *k* igual a las acciones tomadas se acepta y muestra el presente en vez de la última acción. Es un desfase conocido, pendiente de corregir en el código. Mientras tanto, `historia <t>` con un instante del reloj responde bien.
 - **Python 3.11 no se probó en este equipo.** Todas las pruebas y mediciones de la entrega se corrieron con Python 3.12.3 en WSL, porque en el equipo no hay un Python 3.11 ni un Python de Windows instalado.
 
 ## Herramientas del bloque 2
