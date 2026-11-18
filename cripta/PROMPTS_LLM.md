@@ -1997,3 +1997,25 @@ Renombra mi spec de specs/003-niebla-ir-a a specs/005-niebla-ir-a y sube la rama
 Uso en el proyecto: `specs/005-niebla-ir-a/` (renombrada con `git mv`), las referencias en `spec.md`, `plan.md`, `tasks.md`, `cripta/docs/DECISIONES.md`, `cripta/README.md`, `cripta/benchmark/bench_mapa_conocido.py` y los docstrings de quince archivos de pruebas, y `.specify/feature.json`, que git ignora.
 
 Cambios realizados por el estudiante: Solo se cambiaron identificadores y rutas: 25 apariciones de `003-niebla-ir-a` en 20 archivos versionados, más `.specify/feature.json`. Ninguna regla, requisito ni lógica cambió, y las pruebas dieron lo mismo antes y después: 1205, con los dos fallos esperados de los escenarios 7 y 8. Las entradas anteriores de este registro conservan la ruta vieja a propósito, porque cuentan lo que se hizo en su momento. La única mención suelta de esta capacidad por número está en `structures/rutas_mas_baratas.py` («de la capacidad 003»), que es de Carlos: no se tocó y queda para que él la actualice. Las demás apariciones de «003» son números de requisito (FR-003, SC-003) o datos de mediciones.
+
+### 2.49 --bench con la carpeta de --offline y el promedio por paso de «ir a» en criptas reales
+
+Herramienta: Claude (Claude Opus 5.5), mediante Claude Code
+
+Fecha: 2026-11-17
+
+Objetivo: Preparar `--bench` para medir el paquete sin conexión de la segunda parte (criptas 02 a 06, con cripta-06 como referencia) en cuanto esté en el equipo: que `python main.py --bench --offline CARPETA` mida esa carpeta y que la fila de criptas reales muestre también el promedio por paso.
+
+Prompts utilizados:
+
+```text
+Mauricio publicó el paquete sin conexión datos_offline_p2 con las criptas 02 a 06; cripta-06 es la de referencia (300 salas). [...] 1. Verifica cómo mi suite de --bench encuentra y carga el paquete sin conexión y córrela contra datos_offline_p2 (FuenteOffline), midiendo CADA cripta del paquete [...] 2. Mide con todo el mapa conocido explorado: el primer paso de «ir a» [...], el promedio por paso, y la búsqueda del cazador [...] 3. Cuenta [...] cuántas salidas son de un solo sentido [...] 4. [...] completa la fila de la cripta de referencia en DECISIONES §5.3 y en el plan, cierra T044 [...]
+```
+
+```text
+Sí: haz que python main.py --bench --offline <ruta> mida esa carpeta, y que sin --offline siga usando datos_offline como hasta ahora. Haz dos commits de código, separados, cada uno con su prueba: 1. --bench usa la carpeta de --offline cuando se pasa. Sin ids ni tamaños de cripta escritos en el código. 2. La fila de las criptas reales imprime también el promedio por paso (hoy se calcula pero no se muestra). NO toques bench_cazador ni otros archivos de Carlos [...]
+```
+
+Uso en el proyecto: `cripta/main.py` (`run_bench`), `cripta/benchmark/benchmark.py` (`run_suite`, `main` y la marca `USA_PAQUETE_SIN_CONEXION`), `cripta/benchmark/bench_mapa_conocido.py` (`mediciones_de_criptas_reales`) y la prueba `tests/test_bench_paquete_sin_conexion.py`.
+
+Cambios realizados por el estudiante: El primer prompt no se pudo cumplir: traía el texto de relleno de la ruta en vez de la ruta, y el paquete no estaba en ningún disco del equipo. No se midió nada ni se completó la fila de §5.3, y T044 sigue abierta. Al revisar la suite apareció que `--bench` ignoraba `--offline` y siempre leía `datos_offline/`, que hoy solo trae cripta-01; por eso se pidió el segundo prompt. Solo recibe la carpeta la suite que lo declara, para que las demás no cambien. La búsqueda del cazador no se agregó a la fila porque está en `bench_cazador`, que es de Carlos. Al correr la fila nueva con cripta-01, el viaje entre la primera y la última sala del esqueleto tenía 0 pasos, y el «promedio por paso» habría salido de dividir entre 1 sin medir ningún paso: la fila dice «sin ruta entre los extremos» en ese caso. Una de las pruebas falló al principio porque `mock.patch` usa `importlib.import_module` para resolver sus rutas, y la prueba lo reemplazaba antes del segundo `patch`; se cambió el orden. Pruebas: 1215 en WSL con Python 3.12.3, con los dos fallos esperados de los escenarios 7 y 8.
