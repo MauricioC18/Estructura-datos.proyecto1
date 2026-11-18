@@ -335,7 +335,7 @@ class HunterRangeTest(unittest.TestCase):
     """Historia 3: el rango."""
 
     def test_no_open_route_waits_with_cost_one_hundred(self):
-        """Apendice B: sin ruta, espera con costo 100."""
+        """FR-005 y Apendice B: sin ruta, espera con costo 100."""
         rooms = make_rooms([1, 2])
         connect(rooms, 1, 2, "N", closed=True)
         hunter = make_hunter(room_id=2, pursuit_range=10 ** 6, speed=100)
@@ -353,7 +353,7 @@ class HunterRangeTest(unittest.TestCase):
         self.assertEqual(hunter.scheduled_event.time, start + WAIT_COST)
 
     def test_a_route_dearer_than_the_range_waits_with_cost_one_hundred(self):
-        """Apendice B: ruta de 700 y rango 600, espera."""
+        """FR-006 y Apendice B: ruta de 700 y rango 600, espera."""
         rooms = make_rooms([1, 2, 3])
         connect(rooms, 1, 2, "N", cost=400)
         connect(rooms, 2, 3, "N", cost=300)

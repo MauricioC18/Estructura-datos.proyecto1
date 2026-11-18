@@ -652,7 +652,7 @@ class ConsultasImposiblesTest(unittest.TestCase):
         jugar_guardando_el_estado(self.juego, 12)
 
     def test_un_instante_posterior_al_reloj_se_rechaza(self):
-        """Apendice B y SC-004."""
+        """FR-009, Apendice B y SC-004."""
         with self.assertRaises(ConsultaRechazada) as error:
             consultar_instante(
                 self.juego, self.juego.state.clock + 1, reconstruir_desde_copia
@@ -722,7 +722,7 @@ class PergaminoYLineaTest(unittest.TestCase):
     """Historia 3: lo que el pergamino borro deja de estar en la historia."""
 
     def test_la_accion_revertida_deja_de_estar_en_la_linea(self):
-        """Apendice B."""
+        """FR-011 y Apendice B."""
         juego, linea = construir_partida_con_linea()
         jugar_guardando_el_estado(juego, 12)
         cuantas = linea.cantidad_de_acciones()
