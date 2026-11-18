@@ -6,7 +6,7 @@
 
 **Estado**: Borrador
 
-**Origen**: §3.6 del enunciado de la segunda parte (`cripta/docs/SegundoProyecto-EDII-2026.md`), el problema de estructuras de datos §5.5, y los dos casos del Apéndice B bajo «Línea de tiempo». Se apoya en el pergamino de retroceso de P1 §2.11 y en el guardado binario de P1 §4.10, y no modifica ninguno de los dos.
+**Origen**: §3.6 del enunciado de la segunda parte (`cripta/docs/SegundoProyecto-EDII-2026.md`), el problema de estructuras de datos §5.5, y tres casos del Apéndice B bajo «Línea de tiempo». Se apoya en el pergamino de retroceso de P1 §2.11 y en el guardado binario de P1 §4.10, y no modifica ninguno de los dos.
 
 **Qué la distingue del pergamino**: el pergamino **cambia** la partida y solo alcanza cinco acciones atrás. La línea de tiempo **no cambia nada** y alcanza hasta el instante 0. Son capacidades independientes: la primera es una jugada, la segunda es una consulta.
 
@@ -113,6 +113,20 @@ Y un archivo guardado con la primera parte, que no tiene línea de tiempo, se re
 
 ---
 
+### Historia 6 — Consultar una partida registrada sin jugarla (Prioridad: P3)
+
+Quien revisa una partida ya jugada no quiere volver a jugarla: quiere reproducir su bitácora y ver cómo estaba todo en un instante, con el mismo resumen que da la consulta en partida. Si pide un instante al que la partida nunca llegó, porque terminó antes, lo útil es ver cómo quedó al final y saber que terminó antes, no un rechazo: la partida ya no puede avanzar, así que ese instante nunca va a existir.
+
+**Por qué esta prioridad**: es un caso borde obligatorio, pero se apoya en una consulta que ya existe (FR-014).
+
+**Prueba independiente**: se juega una partida corta, se reproduce su bitácora hasta un instante mayor que el reloj final y se comprueba que se muestra el resumen del estado final con un aviso de que la partida terminó antes.
+
+**Escenarios de aceptación**:
+
+1. **Dado** la bitácora de una partida cuyo reloj quedó en 4000 al terminar, **cuando** se reproduce hasta el instante 5000, **entonces** se muestra el resumen del estado final, el del instante 4000, y se indica que la partida terminó antes del instante pedido. *(Apéndice B)*
+
+---
+
 ### Casos borde
 
 - **El instante 0 y el instante exacto del reloj actual**: los dos son consultables. El primero da el estado inicial; el segundo, el presente.
@@ -124,6 +138,7 @@ Y un archivo guardado con la primera parte, que no tiene línea de tiempo, se re
 - **Una consulta en una partida ya terminada**: válida; la historia no deja de existir porque la partida acabó.
 - **El mapa conocido todavía no existe en el programa**: el resumen debe poder construirse igual y decir que ese dato no está disponible, en vez de fallar. Cuando la niebla de guerra exista, el mismo resumen lo incluye sin que cambie el resto.
 - **Una consulta con un instante negativo o con un texto que no es un número**: se rechaza con un mensaje, como cualquier dato mal escrito.
+- **Reproducir una bitácora hasta exactamente el instante en que terminó la partida**: no es posterior al final, así que se muestra el resumen de ese instante sin el aviso de que la partida terminó antes. Esto no cambia la consulta en partida: ahí un instante posterior al reloj sigue rechazándose (FR-009), porque la partida todavía puede llegar a él.
 
 ## Requisitos
 
@@ -152,6 +167,7 @@ Y un archivo guardado con la primera parte, que no tiene línea de tiempo, se re
 - **FR-021**: Un archivo guardado por la primera parte, que no contiene línea de tiempo, DEBE detectarse como incompatible y rechazarse con un mensaje, sin leerse a medias.
 - **FR-022**: Dos consultas del mismo instante DEBEN producir resúmenes idénticos.
 - **FR-023**: El resumen de un instante DEBE coincidir con el estado que la partida tuvo de verdad en ese instante.
+- **FR-025**: Al reproducir una bitácora hasta un instante posterior al reloj con que terminó la partida reproducida, el programa DEBE mostrar el resumen del estado final y DEBE indicar que la partida terminó antes del instante pedido, en vez de rechazar la consulta. La consulta en partida no cambia: FR-009 sigue vigente.
 
 ### Requisitos de rendimiento
 
