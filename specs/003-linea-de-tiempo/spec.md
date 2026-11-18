@@ -32,10 +32,11 @@ Puede preguntar de dos formas: por un instante del reloj, o por el número de un
 4. **Dado** un número de acción del jugador, **cuando** se consulta por ese número, **entonces** se recibe el estado justo **antes** de tomar esa acción.
 5. **Dado** un instante al que le corresponde una decisión del jugador, **cuando** se consulta, **entonces** el estado es el de justo antes de tomarla, no el de después.
 6. **Dado** un instante que cae entre dos eventos, **cuando** se consulta, **entonces** el estado incluye todos los eventos de tiempo menor o igual que el pedido y ninguno posterior.
-7. **Dado** un instante en el que ocurren **varios eventos a la vez** —por ejemplo dos enemigos que actúan y un pulso de veneno—, **cuando** se consulta ese instante, **entonces** el estado es el posterior a todos ellos y no a solo algunos. *(Apéndice B)*
-8. **Dado** un instante en el que coinciden varios eventos **y** una decisión del jugador, **cuando** se consulta, **entonces** se ven aplicados los eventos y **no** la decisión, que es lo que dice FR-002.
-7. **Dado** una consulta cualquiera, **cuando** termina, **entonces** el reloj, la vida, el inventario, la agenda de eventos y las acciones que quedan por revertir están exactamente como antes de consultar.
-8. **Dado** el mismo instante, **cuando** se consulta dos veces, **entonces** el resumen es idéntico.
+7. **Dado** un instante que cae **entre dos decisiones del jugador**, y que después de ese instante y antes de la siguiente decisión ocurren más eventos —por ejemplo el ataque de un enemigo—, **cuando** se consulta ese instante, **entonces** esos eventos posteriores **no** aparecen en el resumen. Consultar el instante 300 no puede traer lo que pasó en el 400.
+8. **Dado** un instante en el que ocurren **varios eventos a la vez** —por ejemplo dos enemigos que actúan y un pulso de veneno—, **cuando** se consulta ese instante, **entonces** el estado es el posterior a todos ellos y no a solo algunos. *(Apéndice B)*
+9. **Dado** un instante en el que coinciden varios eventos **y** una decisión del jugador, **cuando** se consulta, **entonces** se ven aplicados los eventos y **no** la decisión, que es lo que dice FR-002.
+10. **Dado** una consulta cualquiera, **cuando** termina, **entonces** el reloj, la vida, el inventario, la agenda de eventos y las acciones que quedan por revertir están exactamente como antes de consultar.
+11. **Dado** el mismo instante, **cuando** se consulta dos veces, **entonces** el resumen es idéntico.
 
 ---
 
@@ -125,6 +126,7 @@ Y un archivo guardado con la primera parte, que no tiene línea de tiempo, se re
 - **La cantidad entre copias mayor que el total de acciones de la partida**: existe una sola copia, la inicial, y las consultas reconstruyen desde ahí. Debe seguir funcionando.
 - **Varios pergaminos usados seguidos**: la línea se recorta una vez por cada uno y queda consistente.
 - **Una consulta en una partida ya terminada**: válida; la historia no deja de existir porque la partida acabó.
+- **Un instante entre dos decisiones del jugador, con eventos después de él**: esos eventos posteriores no cuentan. El tramo entre dos decisiones no es indivisible: se puede consultar por la mitad.
 - **Varios eventos en el mismo instante**: cuentan todos. El orden entre ellos lo fija el número de secuencia de la primera parte, así que no hay ambigüedad.
 - **Reproducir una bitácora hasta un instante posterior al final**: se muestra el final y se avisa, no se rechaza. Es el único caso en que pedir «el futuro» tiene una respuesta razonable, porque ese futuro ya se sabe que no existió.
 - **El mapa conocido todavía no existe en el programa**: el resumen debe poder construirse igual y decir que ese dato no está disponible, en vez de fallar. Cuando la niebla de guerra exista, el mismo resumen lo incluye sin que cambie el resto.

@@ -285,22 +285,42 @@ La optimización evidente está identificada y **no** se hizo: guardar en la cop
 
 ## Trazabilidad
 
-| Requisito | Dónde se implementa | Dónde se prueba |
-| --- | --- | --- |
-| FR-001, FR-002, FR-023 | `model/consulta_historia.py` | `tests/test_linea_de_tiempo.py`, prueba de todos los instantes |
-| FR-003 | `structures/linea_de_tiempo.py`, `model/consulta_historia.py` | `tests/test_linea_de_tiempo.py` |
-| FR-004 | `model/consulta_historia.py` | `tests/test_linea_de_tiempo.py` |
-| FR-005 a FR-008 | se cumplen por construcción: la consulta trabaja sobre objetos nuevos | `tests/test_linea_de_tiempo.py` |
-| FR-009, FR-010 | `model/consulta_historia.py` | `tests/test_linea_de_tiempo.py` |
-| FR-011, FR-019 | `structures/linea_de_tiempo.py`, `model/game.py` | `tests/test_linea_de_tiempo.py` |
-| FR-012, FR-013 | ninguno: el pergamino no se toca | `tests/test_linea_de_tiempo.py`, y las pruebas del pergamino que ya existen |
-| FR-014 | `model/consulta_historia.py` (no instancia la vista) | `tests/test_linea_de_tiempo.py` |
-| FR-015, FR-016 | `model/game.py`, `structures/linea_de_tiempo.py` | `tests/test_linea_de_tiempo.py` |
-| FR-017 | `structures/linea_de_tiempo.py` | medición 1 |
-| FR-018 | `structures/linea_de_tiempo.py` (búsqueda binaria propia) | `tests/test_linea_de_tiempo.py` |
-| FR-020, FR-021 | `adapters/almacen_partida.py` | `tests/test_almacen_partida.py` |
-| FR-022 | consecuencia de II | `tests/test_linea_de_tiempo.py` |
-| FR-024 | el diseño completo | medición 4 |
+Una fila por requisito, sin rangos y con el nombre de la prueba. En la defensa se escoge
+un requisito al azar y hay que mostrar su escenario, su tarea, su código y su prueba
+(§7.4), así que una tabla con rangos no sirve.
+
+| Requisito | Tarea | Dónde se implementa | Prueba |
+| --- | --- | --- | --- |
+| FR-001 | T005 | `model/consulta_historia.py` | `test_todos_los_instantes_coinciden_con_el_estado_real` |
+| FR-002 | T001, T005, T023 | `structures/linea_de_tiempo.py`, `accion_en_instante`, y el tope de eventos de `model/game.py` | `test_un_instante_que_cae_sobre_una_accion_queda_justo_antes` y `test_un_instante_en_medio_no_trae_los_eventos_posteriores` |
+| FR-003 | T005 | `consultar_instante` y `consultar_accion` | `test_consultar_por_instante_del_reloj_da_lo_mismo` |
+| FR-004 | T005 | `_resumir` | `test_el_resumen_trae_todo_lo_que_exige_el_enunciado` |
+| FR-005 | T007 | por construcción: objetos nuevos | `test_consultar_no_consume_tiempo_virtual` |
+| FR-006 | T007 | por construcción: motor sin bitácora | `test_consultar_no_cuenta_como_accion` |
+| FR-007 | T007 | por construcción: objetos nuevos | `test_cien_consultas_no_cambian_la_partida` |
+| FR-008 | T007 | por construcción | `test_consultar_no_toca_el_historial_del_pergamino` |
+| FR-009 | T009 | `consultar_instante` | `test_un_instante_posterior_al_reloj_se_rechaza` |
+| FR-010 | T009 | `consultar_accion` | `test_una_accion_que_no_se_ha_tomado_se_rechaza` |
+| FR-011 | T010 | `Game._trim_timeline` | `test_la_accion_revertida_deja_de_estar_en_la_linea` |
+| FR-012 | T011 | ninguno: el pergamino no se toca | `test_la_linea_llega_mas_atras_que_el_pergamino` |
+| FR-013 | T011 | ninguno: la línea lleva su propia lista | `test_la_linea_llega_mas_atras_que_el_pergamino` |
+| FR-014 | T005 | `consultar_hasta`, sin vista | `test_reproducir_hasta_un_instante_valido_no_avisa_nada` |
+| FR-015 | T001, T004 | `LineaDeTiempo(copias_cada=...)` | `test_con_k_de_diez_y_treinta_y_cinco_acciones_hay_cuatro_copias` |
+| FR-016 | T012 | `copia_para_accion` | `test_ninguna_consulta_repite_mas_de_k_acciones` |
+| FR-017 | T001 | `memoria_en_bytes` | medición 1, y `test_bajar_k_sube_la_memoria_de_las_copias` |
+| FR-018 | T001 | búsqueda binaria propia | `test_un_numero_de_accion_entre_dos_copias` |
+| FR-019 | T001, T010 | `recortar_ultima_accion` | `test_recortar_quita_la_copia_que_quedo_en_el_futuro` |
+| FR-020 | T013 | `adapters/almacen_partida.py` | `test_la_linea_viaja_completa` |
+| FR-021 | T013 | versión del formato | `test_un_archivo_de_una_version_anterior_se_rechaza` |
+| FR-022 | T006 | consecuencia del principio II | `test_dos_consultas_del_mismo_instante_dan_lo_mismo` |
+| FR-023 | T006 | el diseño completo | `test_todos_los_instantes_coinciden_con_el_estado_real` |
+| FR-024 | T016 | el diseño completo | medición 4 |
+| FR-025 | T021 | `consultar_hasta` | `test_reproducir_hasta_despues_del_final_da_el_estado_final` |
+| FR-026 | T021 | el ciclo de eventos del motor, sin cambios | `test_varios_eventos_en_el_mismo_instante_cuentan_todos` |
+
+Los requisitos que dicen «por construcción» son los que más conviene poder explicar: no
+hay código que los haga cumplir, los cumple la decisión de reconstruir sobre objetos
+nuevos. Si esa decisión cambiara, los cuatro se caen a la vez.
 
 ## Fases
 

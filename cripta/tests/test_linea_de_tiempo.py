@@ -1230,5 +1230,131 @@ class CasosDelApendiceBTest(unittest.TestCase):
             )
 
 
+class InstanteEnMedioDeUnTramoTest(unittest.TestCase):
+    """T023: un instante entre dos decisiones no puede traer el futuro.
+
+    Lo reporto Steven. El tramo entre dos decisiones del jugador NO es
+    indivisible: se puede consultar por la mitad, y los eventos que ocurren
+    despues del instante pedido no deben aparecer.
+
+    Las demas pruebas no lo detectaban porque consultaban instantes que
+    coinciden con una decision del jugador, que es el caso facil.
+    """
+
+    def partida_con_enemigo_lento(self):
+        """El enemigo ataca entre dos decisiones del jugador, no en ellas."""
+        cuartos = []
+
+        for numero in (1, 2):
+            cuarto = Room(numero, f"Sala {numero}")
+            cuarto.content_loaded = True
+            cuartos.append(cuarto)
+
+        puerta = Door(1, 2, closed=False, cost=100)
+        cuartos[0].add_exit(Exit("N", 2, puerta))
+        cuartos[1].add_exit(Exit("S", 1, puerta))
+
+        mapa = RoomMap()
+
+        for cuarto in cuartos:
+            mapa.add(cuarto)
+
+        estado = GameState(seed=2026)
+        historial = History(estado)
+        jugador = Player("p-1", "Heroe", 10 ** 6, 6, 0, 100, 1)
+        jugador.inventory = Inventory(10, history=historial)
+
+        # Velocidad 150: actua cada 66 unidades, asi que casi siempre golpea
+        # en medio de un tramo del jugador y no en sus limites.
+        enemigo = Enemy("e-1", "Rata", 500, 5, 1, 150, 1, Enemy.GUARDIAN)
+        linea = LineaDeTiempo(copias_cada=5)
+
+        juego = Game(
+            estado,
+            jugador,
+            [enemigo],
+            room_map=mapa,
+            trail=PlayerTrail(historial),
+            history=historial,
+            event_queue=ReversibleEventQueue(historial),
+            timeline=linea,
+            snapshot=tomar_copia_del_estado,
+        )
+
+        return juego, linea
+
+    def decisiones(self, juego, cuantas):
+        """(reloj, vida) en cada decision del jugador."""
+        tomadas = []
+
+        for _ in range(cuantas):
+            tomadas.append((juego.state.clock, juego.player.health))
+            juego.wait()
+
+        return tomadas
+
+    def test_un_instante_en_medio_no_trae_los_eventos_posteriores(self):
+        """El caso exacto que reporto Steven.
+
+        El jugador decide cada 100 y el enemigo pega cada 66, asi que entre
+        dos decisiones hay golpes. Un instante anterior al primer golpe del
+        tramo tiene que dar la vida de la decision, no la de la siguiente.
+        """
+        juego, _ = self.partida_con_enemigo_lento()
+        tomadas = self.decisiones(juego, 6)
+
+        reloj, vida = tomadas[0]
+        reloj_siguiente, vida_siguiente = tomadas[1]
+
+        self.assertNotEqual(
+            vida, vida_siguiente,
+            "sin golpes entre las dos decisiones la prueba no compara nada",
+        )
+
+        a_la_mitad = reloj + (reloj_siguiente - reloj) // 3
+        resumen = consultar_instante(juego, a_la_mitad, reconstruir_desde_copia)
+
+        self.assertEqual(resumen.vida, vida)
+
+    def test_cada_instante_intermedio_da_una_vida_que_no_decrece(self):
+        """Recorre el tramo completo: la vida solo puede bajar al avanzar."""
+        juego, _ = self.partida_con_enemigo_lento()
+        tomadas = self.decisiones(juego, 6)
+
+        anterior = None
+
+        for instante in range(0, tomadas[-1][0] + 1, 10):
+            resumen = consultar_instante(juego, instante, reconstruir_desde_copia)
+
+            if anterior is not None:
+                self.assertLessEqual(
+                    resumen.vida, anterior,
+                    f"la vida subio al avanzar hasta el instante {instante}",
+                )
+
+            anterior = resumen.vida
+
+    def test_el_instante_de_una_decision_coincide_con_esa_decision(self):
+        """Lo que ya funcionaba tiene que seguir funcionando."""
+        juego, _ = self.partida_con_enemigo_lento()
+
+        for reloj, vida in self.decisiones(juego, 6):
+            with self.subTest(reloj=reloj):
+                resumen = consultar_instante(juego, reloj, reconstruir_desde_copia)
+                self.assertEqual(resumen.vida, vida)
+
+    def test_el_tope_se_quita_despues_de_consultar(self):
+        """El motor reconstruido es de usar y tirar, pero el tope no puede
+        quedar puesto en el que se devuelve."""
+        juego, _ = self.partida_con_enemigo_lento()
+
+        for _ in range(8):
+            juego.wait()
+
+        consultar_instante(juego, 150, reconstruir_desde_copia)
+
+        self.assertIsNone(juego._event_limit)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2672,6 +2672,22 @@ informaría una historia **falsa**, y el enunciado exige que el estado consultad
 real. Entre correcto y dentro del presupuesto, manda correcto. La cantidad de copias extra
 está acotada por los pergaminos que la cripta contenga, porque cada uso consume uno.
 
+**Un instante entre dos decisiones no puede traer el futuro, y esto también lo encontró
+un compañero.** El ciclo de eventos del motor corre hasta la siguiente decisión del
+jugador, así que al reconstruir un instante que cae **en medio** de un tramo se
+procesaban eventos posteriores al pedido: consultar el instante 300 traía los ataques del
+400.
+
+El arreglo es un **tope** opcional en el ciclo de eventos, que la reconstrucción pone solo
+en la última acción que repite —la única que puede pasarse— y quita al terminar. En una
+partida normal el tope nunca se pone.
+
+Lo que vale anotar es por qué no se había visto: las pruebas consultaban instantes que
+**coinciden con una decisión del jugador**, que es el caso en que el tope no hace falta.
+El tramo entre dos decisiones no es indivisible, y eso no estaba probado. La prueba nueva
+se verificó anulando el arreglo, para confirmar que de verdad lo detecta; sin eso habría
+sido otra prueba que pasa sin probar nada.
+
 **Cargar el contenido de una sala también fuerza una copia, y esto lo encontró un
 compañero, no yo.** En una partida real el contenido de cada sala se descarga cuando el
 jugador va a entrar, y lo carga el **controlador** justo antes del movimiento. Si un punto
@@ -3783,16 +3799,16 @@ con costo 100 da 66, que es el ejemplo de §2.4 y §2.13, y la secuencia del jug
 
 | Archivo | Pruebas | Capacidad |
 | --- | ---: | --- |
-| `tests/test_rutas_mas_baratas.py` | 18 | §5.1, la búsqueda, probada sin el motor |
+| `tests/test_rutas_mas_baratas.py` | 22 | §5.1, la búsqueda, probada sin el motor |
 | `tests/test_cazador.py` | 40 | §5.1 y §5.2, incluidas 5 de salidas de un solo sentido |
-| `tests/test_parada_anticipada.py` | 4 | §5.1, equivalencia contra un cálculo de referencia independiente |
-| `tests/test_linea_de_tiempo.py` | 69 | §5.5 |
+| `tests/test_parada_anticipada.py` | 4 | §5.1, equivalencia contra un cálculo de referencia independiente, escrito por otro integrante |
+| `tests/test_linea_de_tiempo.py` | 83 | §5.5 |
 
 Las pruebas del terreno (§3.1) no están en archivos nuevos: quedaron repartidas en
 `test_room.py`, `test_traductor.py`, `test_movement.py` y `test_actor.py`, porque son
 cambios a reglas que ya existían.
 
-**El proyecto tiene 1 026 pruebas y todas pasan** en Python 3.14.6, al cerrar las
+**El proyecto tiene 1 051 pruebas y todas pasan** en Python 3.14.6, al cerrar las
 capacidades de §5.1, §5.2, §5.5 y el terreno. Eran 861 al terminar la primera parte. Se
 corren con `python -m unittest discover -s tests -t . -v` desde `cripta/`, con las
 dependencias de `requirements.txt` instaladas.

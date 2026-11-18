@@ -179,10 +179,19 @@ def _reconstruir(juego, linea, numero_de_accion, instante, reconstruir_copia):
 
     reconstruido = reconstruir_copia(copia.bloque)
     repetidas = 0
+    ultima = numero_de_accion - 1
 
     for posicion in range(copia.acciones, numero_de_accion):
+        if posicion == ultima:
+            # El tope solo se pone en la ultima accion que se repite. Sin el,
+            # el ciclo seguiria hasta la siguiente decision del jugador y
+            # traeria eventos POSTERIORES al instante pedido.
+            reconstruido.detener_eventos_en(instante)
+
         _repetir(reconstruido, linea.acciones()[posicion])
         repetidas += 1
+
+    reconstruido.detener_eventos_en(None)
 
     return _resumir(reconstruido, instante, numero_de_accion, repetidas)
 

@@ -35,8 +35,8 @@ Los **seis** casos del Apéndice B bajo «Línea de tiempo».
 
 - [x] `historia <t>` con t mayor que el reloj actual: se rechaza → Historia 2, escenario 1, FR-009 y SC-004
 - [x] `historia` después de usar un pergamino: no muestra las acciones revertidas → Historia 3, escenario 1, FR-011 y SC-005
-- [x] Varios eventos en el mismo instante: muestra el estado después de todos ellos → Historia 1, escenarios 7 y 8, y FR-026
-- [x] `historia` no consume tiempo, no se registra en `partida.log` y no toca el historial de retroceso → Historia 1, escenario 7 original, y FR-005 a FR-008, SC-003
+- [x] Varios eventos en el mismo instante: muestra el estado después de todos ellos → Historia 1, escenarios 8 y 9, y FR-026
+- [x] `historia` no consume tiempo, no se registra en `partida.log` y no toca el historial de retroceso → Historia 1, escenario 10, y FR-005 a FR-008, SC-003
 - [x] `--replay --hasta t` con t posterior al final: muestra el estado final e indica que terminó antes → Historia 2, escenario 6, FR-025 y SC-011
 - [x] Se carga un archivo de la primera parte: se reporta la incompatibilidad, nunca en silencio → Historia 5, escenario 3, y FR-021
 
