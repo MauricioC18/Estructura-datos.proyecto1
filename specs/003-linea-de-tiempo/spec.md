@@ -35,7 +35,7 @@ Puede preguntar de dos formas: por un instante del reloj, o por el número de un
 7. **Dado** un instante que cae **entre dos decisiones del jugador**, y que después de ese instante y antes de la siguiente decisión ocurren más eventos —por ejemplo el ataque de un enemigo—, **cuando** se consulta ese instante, **entonces** esos eventos posteriores **no** aparecen en el resumen. Consultar el instante 300 no puede traer lo que pasó en el 400.
 8. **Dado** un instante en el que ocurren **varios eventos a la vez** —por ejemplo dos enemigos que actúan y un pulso de veneno—, **cuando** se consulta ese instante, **entonces** el estado es el posterior a todos ellos y no a solo algunos. *(Apéndice B)*
 9. **Dado** un instante en el que coinciden varios eventos **y** una decisión del jugador, **cuando** se consulta, **entonces** se ven aplicados los eventos y **no** la decisión, que es lo que dice FR-002.
-10. **Dado** una consulta cualquiera, **cuando** termina, **entonces** el reloj, la vida, el inventario, la agenda de eventos y las acciones que quedan por revertir están exactamente como antes de consultar.
+10. **Dado** una consulta cualquiera, **cuando** termina, **entonces** el reloj, la vida, el inventario, la agenda de eventos y las acciones que quedan por revertir están exactamente como antes de consultar, y la consulta no queda escrita en la bitácora de reproducción (`partida.log`).
 11. **Dado** el mismo instante, **cuando** se consulta dos veces, **entonces** el resumen es idéntico.
 
 ---
@@ -122,6 +122,7 @@ Y un archivo guardado con la primera parte, que no tiene línea de tiempo, se re
 - **El instante 0 y el instante exacto del reloj actual**: los dos son consultables. El primero da el estado inicial; el segundo, el presente.
 - **Un instante que cae exactamente sobre un evento**: ese evento cuenta como ejecutado, porque el estado en el instante t incluye todos los eventos de tiempo menor o igual que t.
 - **Una consulta antes de la primera acción del jugador**: válida, y devuelve el estado inicial.
+- **`historia #k` con *k* igual al número de acciones tomadas**: válida; es el estado justo antes de la última acción tomada. Con *k* mayor que ese número, o con `#0`, la acción no existe y la consulta se rechaza (FR-010). El estado presente se consulta por instante, con el reloj actual.
 - **Una copia completa por cada acción**: es el extremo configurable; vuelve las consultas inmediatas y la memoria la peor posible. Debe seguir funcionando, y sirve de referencia para medir.
 - **La cantidad entre copias mayor que el total de acciones de la partida**: existe una sola copia, la inicial, y las consultas reconstruyen desde ahí. Debe seguir funcionando.
 - **Varios pergaminos usados seguidos**: la línea se recorta una vez por cada uno y queda consistente.
@@ -138,7 +139,7 @@ Y un archivo guardado con la primera parte, que no tiene línea de tiempo, se re
 
 - **FR-001**: El programa DEBE poder informar el estado que la partida tuvo en cualquier instante entre 0 y el reloj actual, sea cual sea la cantidad de acciones transcurridas.
 - **FR-002**: El estado en el instante *t* DEBE ser el estado después de ejecutar todos los eventos de tiempo menor o igual que *t*. Si a *t* le corresponde una decisión del jugador, DEBE ser el estado justo antes de tomarla.
-- **FR-003**: La consulta DEBE aceptarse de dos formas: por un instante del reloj, y por el número de una acción del jugador, en cuyo caso devuelve el estado justo antes de esa acción.
+- **FR-003**: La consulta DEBE aceptarse de dos formas: por un instante del reloj, y por el número de una acción del jugador, en cuyo caso devuelve el estado justo antes de esa acción. Las acciones se numeran **desde 1**, en el orden en que el jugador las tomó: `historia #1` es el estado justo antes de la primera acción, el mismo que `historia 0`, y `historia #k` es el estado justo antes de la acción número *k* (aclarado el 2026-11-18).
 - **FR-004**: El resumen de un instante DEBE incluir al menos: el reloj, la sala del jugador, su vida y sus estadísticas, su inventario, los efectos activos, los enemigos de esa sala con su vida, y el mapa conocido en ese momento.
 - **FR-005**: Una consulta NO DEBE consumir tiempo virtual.
 - **FR-006**: Una consulta NO DEBE registrarse como una acción del jugador ni aparecer en la bitácora de reproducción.
