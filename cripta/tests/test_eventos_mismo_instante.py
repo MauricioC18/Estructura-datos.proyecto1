@@ -153,11 +153,13 @@ class VariosEventosEnElMismoInstanteTest(unittest.TestCase):
         siguiente decisión del jugador hay otro evento, el estado de t no lo
         incluye.
 
-        Falla: la consulta repite la última acción del jugador completa, con
-        todos los eventos hasta su siguiente decisión, también los de tiempo
-        mayor que t. Corregirlo es de la línea de tiempo
-        (model/consulta_historia.py y model/game.py): repetir esa última
-        acción deteniendo los eventos en t. Al corregirlo, quitar el decorador.
+        Falla todavía en un caso (T023, corregida en parte): el tope de
+        eventos se pone solo en la última acción que la reconstrucción
+        repite, y si hay una copia justo en la última acción anterior a t no
+        se repite ninguna, así que el estado sale de esa copia con todos los
+        eventos del tramo. Con copias_cada=10 fallan los instantes 1300 y
+        2700. Corregirlo es de la línea de tiempo
+        (model/consulta_historia.py). Al corregirlo, quitar el decorador.
         """
         self.comprobar([caso for caso in self.instantes if caso[2]])
 
