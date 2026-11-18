@@ -3,7 +3,7 @@ Pruebas de RepositorioCripta: el bloque 2 completo, de punta a punta.
 
 Se usa una fuente simulada que sirve cripta-01 completa y anota cada
 solicitud, con las carpetas de caché en un directorio temporal. Las pruebas
-más importantes verifican el presupuesto real: 7 de 9 solicitudes en un
+más importantes verifican el presupuesto real: 8 de 9 solicitudes en un
 arranque en frío y 3 en un arranque en caliente.
 
 Ejecutar desde la carpeta cripta/:  python -m unittest discover -s tests -t . -v
@@ -43,11 +43,13 @@ RECORRIDO_COMPLETO = [2, 3, 2, 5, 2, 3, 4, 6]
 class FuenteCriptaFalsa(FuenteDatos):
     """Sirve cripta-01 completa y anota cada solicitud por tipo."""
 
-    def __init__(self, generales=None, version_catalogo=VERSION_CATALOGO_REAL, fichas=None):
+    def __init__(self, generales=None, version_catalogo=VERSION_CATALOGO_REAL, fichas=None,
+                 llaves=None):
         super().__init__()
         self.generales = dict(generales or GENERALES_CRIPTA_01)
         self.version = version_catalogo
         self.fichas = FICHAS_CRIPTA_01 if fichas is None else fichas
+        self.llaves = [] if llaves is None else llaves
         self.solicitudes = []  # ("tipo", detalle)
 
     def listar_criptas(self):
@@ -74,6 +76,11 @@ class FuenteCriptaFalsa(FuenteDatos):
         self.solicitudes.append(("contenido", list(ids_salas)))
         return {"contenido": [entrada for id_sala in ids_salas
                               for entrada in CONTENIDO_CRIPTA_01 if entrada["sala"] == id_sala]}
+
+    def ubicacion_de_llaves(self, id_cripta):
+        self._consumir_solicitud("obtener la ubicación de las llaves")
+        self.solicitudes.append(("llaves", id_cripta))
+        return {"llaves": list(self.llaves)}
 
     def catalogo(self, ids):
         validar_ids_catalogo(ids)
@@ -118,15 +125,15 @@ class PruebasRepositorioCripta(unittest.TestCase):
 
     # --- presupuesto real de cripta-01 -------------------------------
 
-    def test_arranque_en_frio_usa_7_de_9_solicitudes(self):
+    def test_arranque_en_frio_usa_8_de_9_solicitudes(self):
         repositorio, fuente = self.jugar_partida()
         self.assertEqual(fuente.tipos_de_solicitud(), [
-            "lista", "generales", "version_catalogo", "pagina",
+            "lista", "generales", "version_catalogo", "pagina", "llaves",
             "contenido", "catalogo", "catalogo",
         ])
-        self.assertEqual(fuente.solicitudes[4][1], [1, 2, 3, 5, 4, 6])  # todo el contenido en un lote
+        self.assertEqual(fuente.solicitudes[5][1], [1, 2, 3, 5, 4, 6])  # todo el contenido en un lote
         reporte = repositorio.reporte_de_red()
-        self.assertEqual(reporte.solicitudes_realizadas, 7)
+        self.assertEqual(reporte.solicitudes_realizadas, 8)
         self.assertEqual(reporte.presupuesto_solicitudes, 9)
         self.assertEqual(reporte.esperas_en_la_puerta, 0)
         self.assertEqual(reporte.fichas_descargadas, 11)
@@ -151,7 +158,7 @@ class PruebasRepositorioCripta(unittest.TestCase):
         _, fuente = self.jugar_partida(fuente)
         # Las fichas siguen vigentes (mismo catálogo); esqueleto y contenido no.
         self.assertEqual(fuente.tipos_de_solicitud(),
-                         ["lista", "generales", "version_catalogo", "pagina", "contenido"])
+                         ["lista", "generales", "version_catalogo", "pagina", "llaves", "contenido"])
 
     def test_presupuesto_insuficiente_llega_al_controlador(self):
         fuente = FuenteCriptaFalsa(generales=dict(GENERALES_CRIPTA_01, presupuesto_solicitudes=5))
@@ -218,7 +225,7 @@ class PruebasRepositorioCripta(unittest.TestCase):
     def test_reporte_en_texto(self):
         repositorio, _ = self.jugar_partida()
         texto = "\n".join(repositorio.reporte_de_red().lineas_de_texto())
-        self.assertIn("Solicitudes realizadas: 7 de 9", texto)
+        self.assertIn("Solicitudes realizadas: 8 de 9", texto)
         self.assertIn("Aciertos de caché", texto)
         self.assertIn("Fallos de caché", texto)
         self.assertIn("fuente simulada", texto)
@@ -229,7 +236,7 @@ class PruebasRepositorioCripta(unittest.TestCase):
         self.carpeta_cache = archivo
         repositorio, fuente = self.jugar_partida()
         reporte = repositorio.reporte_de_red()
-        self.assertEqual(reporte.solicitudes_realizadas, 7)
+        self.assertEqual(reporte.solicitudes_realizadas, 8)
         self.assertGreater(len(reporte.avisos), 0)
 
 
@@ -261,10 +268,10 @@ class PruebasRepositorioConElModelo(unittest.TestCase):
             repositorio.despues_de_accion(siguiente)
         return repositorio, fuente, jugador, mapa, enemigos
 
-    def test_recorrido_completo_sigue_usando_7_de_9(self):
+    def test_recorrido_completo_sigue_usando_8_de_9(self):
         repositorio, fuente, _, _, _ = self.jugar_con_el_modelo()
 
-        self.assertEqual(fuente.solicitudes_realizadas(), 7)
+        self.assertEqual(fuente.solicitudes_realizadas(), 8)
         # La última es la poción que suelta la rata, pedida por la precarga.
         self.assertEqual(fuente.solicitudes[-1], ("catalogo", ["itm_pocion_menor"]))
         self.assertEqual(repositorio.reporte_de_red().esperas_en_la_puerta, 0)
@@ -349,8 +356,8 @@ class PruebasRepositorioConElModelo(unittest.TestCase):
         self.assertEqual(enemigos[0].drops[0].name, "Colmillo")
 
         # Con el presupuesto justo no hay precarga: se pide al entrar, no en combate.
-        fuente, enemigos, antes_de_entrar = entrar_a_la_sala_2(6)
-        self.assertEqual(antes_de_entrar, 5)
+        fuente, enemigos, antes_de_entrar = entrar_a_la_sala_2(7)
+        self.assertEqual(antes_de_entrar, 6)
         self.assertEqual(fuente.solicitudes[-1], ("catalogo", ["itm_colmillo"]))
         self.assertEqual(enemigos[0].drops[0].instance_id, "e-201-s0")
         self.assertEqual(enemigos[0].drops[0].attack_bonus, 1)
@@ -366,7 +373,7 @@ class PruebasRepositorioConElModelo(unittest.TestCase):
             repositorio.despues_de_accion(4)
 
         self.assertEqual(repositorio.reporte_de_red().aciertos_de_cache, aciertos)
-        self.assertEqual(fuente.solicitudes_realizadas(), 7)
+        self.assertEqual(fuente.solicitudes_realizadas(), 8)
 
     def test_ids_en_uso_para_la_cache(self):
         repositorio, _, _, mapa, enemigos = self.jugar_con_el_modelo(recorrido=[2])

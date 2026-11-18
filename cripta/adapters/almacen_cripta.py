@@ -103,6 +103,16 @@ class AlmacenCripta:
     # Archivos
     # ------------------------------------------------------------------
 
+    def leer_ubicacion_de_llaves(self, id_cripta):
+        datos = self._leer_json(self._ruta_ubicacion_de_llaves(id_cripta))
+        if isinstance(datos, dict) and isinstance(datos.get("llaves"), list):
+            return datos
+        return None
+
+    def guardar_ubicacion_de_llaves(self, id_cripta, respuesta):
+        self._escribir_json(self._ruta_ubicacion_de_llaves(id_cripta), respuesta,
+                            f"guardar la ubicación de las llaves de {id_cripta}")
+
     def _carpeta_de_cripta(self, id_cripta):
         return self._carpeta / nombre_de_archivo_seguro(id_cripta)
 
@@ -111,6 +121,9 @@ class AlmacenCripta:
 
     def _ruta_esqueleto(self, id_cripta):
         return self._carpeta_de_cripta(id_cripta) / "esqueleto.json"
+
+    def _ruta_ubicacion_de_llaves(self, id_cripta):
+        return self._carpeta_de_cripta(id_cripta) / "llaves.json"
 
     @staticmethod
     def _leer_json(ruta):

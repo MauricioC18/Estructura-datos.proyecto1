@@ -44,6 +44,7 @@ class FuenteDeContenidoSimulada(FuenteDatos):
     def version_cripta(self, id_cripta): raise NotImplementedError
     def pagina_salas(self, id_cripta, pagina): raise NotImplementedError
     def catalogo(self, ids): raise NotImplementedError
+    def ubicacion_de_llaves(self, id_cripta): raise NotImplementedError
     def version_catalogo(self): raise NotImplementedError
 
 

@@ -2121,3 +2121,157 @@ Haz tres cosas, en este orden, con commits pequeños y separados (spec aparte de
 Uso en el proyecto: `specs/003-linea-de-tiempo/spec.md` (Historia 6, un caso borde y FR-025), `specs/003-linea-de-tiempo/tasks.md` (T021), `cripta/controller/application.py` (`_instante_reproducido`), `cripta/tests/test_banderas_linea_de_tiempo.py` y `cripta/README.md`.
 
 Cambios realizados por el estudiante: Ninguna historia de la especificación 003 hablaba de consultar sin interacción, y el caso no encajaba en la Historia 2, que es la del rechazo. Por eso se agregó una Historia 6 corta. Hacía falta un requisito nuevo, porque FR-014 no dice qué pasa después del final: FR-025 quedó al final de los requisitos funcionales, sin reenumerar ninguno, y deja dicho que FR-009 (el rechazo en la partida en curso) no cambia. La diferencia se justifica en la historia: la partida en curso todavía puede llegar a ese instante, y la reproducida ya no. El arreglo quedó en `replay()` sin tocar la línea de tiempo: si el instante es posterior al reloj final, avisa y consulta el reloj final, que ya era consultable. La prueba que fijaba el rechazo se reemplazó por tres. Una comprueba el aviso, que viene antes del resumen, y el resumen del instante final, sin la vista. Otra comprueba que el instante final exacto no avisa (el caso borde). La tercera, que un instante negativo se sigue rechazando. Como el resumen final se obtiene con la misma reconstrucción, le alcanza el defecto ya reportado de las copias espaciadas. El README dejó de citar Python 3.14.6 como versión de desarrollo, que no se pudo comprobar, y quedó en 3.11 o superior; las pruebas se corrieron con 3.12.3. Pruebas: 1231 en WSL con Python 3.12.3, con los dos fallos esperados de T052.
+
+### 5.30 Arranque de la segunda parte: análisis del enunciado, del contrato 1.1.0 y de las criptas publicadas
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai
+
+Fecha: 2026-11-16
+
+Objetivo: Analizar el enunciado de la segunda parte, el reparto del grupo y la constitución para definir qué le toca a la Persona 2 y en qué orden hacerlo, y revisar el contrato nuevo del API y las criptas publicadas para la segunda parte.
+
+Prompts utilizados:
+
+```text
+Este es el proyecto CRIPTA que estabamos trabajando, hay un segundo proyecto que se trabaja sobre este mismo trabajo, esta actualizado del repositorio del GitHub asi que esta diferente a como estaba la ultima vez. El archivo PDF es el enunciado del segundo proyecto para que analices que es lo que se solicita de este proyecto y las restricciones que hay del mismo. El compañero de grupo hizo una organización de trabajo con una IA (Claude si no me equivoco) y envió el siguiente mensaje que esta entre comillas: "Lo armé siguiendo lo que cada uno ya domina de la primera parte. Con dos días, el tiempo de volver a aprender un módulo ajeno es tiempo que no existe.
+
+Quién	Qué	Peso	Por qué
+Vos	Terreno, cazador, invalidación de rutas	20 %	Dueño del motor. Y el cazador necesita cola de prioridad propia porque heapq está prohibido — tu montículo de event_queue.py ya existe, probado y medido
+Mauricio A.	Resolubilidad + campos nuevos del API	15 %	Los tres datos nuevos (costo, rango, GET /llaves) son todos de su capa
+Erick	Línea de tiempo y puntos de control	15 %	Es la extensión directa de su historial reversible
+Steven	Niebla de guerra, «ir a», banderas e integración	10 %	La niebla es sobre todo qué muestra la vista, y las cuatro banderas nuevas son suyas
+Sobre lo equitativo, y por qué nadie se puede quejar: en rúbrica es 20/15/15/10, no parejo. Se compensa con lo que no tiene peso propio pero sí trabajo: Steven carga las cuatro banderas nuevas de todos, la integración de --bench y el README. Vos cargás además la instalación de spec-kit y la constitución, que son del grupo. Y el 20 % del proceso se reparte igual: cada uno escribe su propia spec, su plan y sus tasks.
+
+También repartí los 23 casos del Apéndice B: siete para vos, seis para Steven, seis para Erick, cuatro para Mauricio A. Así nadie tiene que adivinar qué escenarios de aceptación le tocan.
+
+Lo que más importa no es el reparto, es el orden
+Hay dos cosas que bloquean a los otros tres:
+
+La constitución la sube una sola persona. specify init --here escribe en la raíz del repo; si la corren los cuatro, se pisan.
+Los campos nuevos del traductor. Hasta que Mauricio A. haga que se lea costo, rango y el endpoint de llaves, nadie puede probar nada. Es lo más urgente después de la constitución.
+Y una regla que no es negociable: §2.6 exige que la spec esté commiteada antes del código. Una spec escrita después se penaliza y se nota en el historial. Aunque sea corta, primero la spec.
+
+Archivos que creé
+cripta/docs/REPARTO_PROYECTO2.md — el reparto completo, el orden de arranque y el detalle por persona.
+cripta/docs/PROMPT_SDD_PARA_EL_GRUPO.md — un bloque común que copian los cuatro más un bloque personal para cada uno. Eso es lo que le pasan a su IA.
+El enunciado, que no estaba subido.
+Mensaje para mandarles ya
+Llegó el enunciado de la segunda parte y lo subí al repo, junto con el reparto: cripta/docs/REPARTO_PROYECTO2.md. Entrega el miércoles 18, o sea pasado mañana, y no hemos empezado.
+
+Lo más importante: el profe exige que la especificación esté commiteada antes del código. El proceso spec-kit vale 20 %, el rubro más pesado. Nadie escribe código antes de subir su spec.
+
+El reparto va por lo que cada uno ya domina: yo terreno y cazador, Mauricio A. resolubilidad y los campos nuevos del API, Erick la línea de tiempo, Steven la niebla de guerra y las banderas. Si a alguien le parece desbalanceado lo hablamos hoy.
+
+Mauricio A., lo tuyo es lo más urgente después de la constitución: hasta que el traductor lea costo, rango y GET /criptas/<id>/llaves, ninguno de los otros tres puede probar su parte.
+
+En cripta/docs/PROMPT_SDD_PARA_EL_GRUPO.md está el prompt que cada uno le pasa a su IA, con un bloque común y uno personal. Hagan git pull primero.
+
+Dos cosas que hay que decidir hoy: qué agente usamos los cuatro (propongo Claude Code) y qué versión de spec-kit fijamos. Y hay que preguntarle al profe: la §6.1 remite a una «§2.7» que no existe en el documento, y si ya está publicada la cripta de referencia."
+
+Las imágenes son del mensaje que envío el compañero porque al parecer no se entiende muy bien, o al menos eso fue lo que dijo.
+
+Y este es otro mensaje que envió después para especificar lo que me corresponde de mi parte para que ellos puedan continuar trabajando en el proyecto: "Ya está todo en main. Hagan git pull y NO corran specify init — ya está hecho, correrlo otra vez escribiría sobre la raíz del repo.
+
+Fijamos spec-kit v1.4.1 y Claude Code como agente. Ojo: el enunciado dice --ai, pero esa bandera es de la versión 1.1; en la 1.4.1 se llama --integration.
+
+La constitución está en .specify/memory/constitution.md. Léanla, porque el agente la aplica en cada fase y ahí está la lista de lo prohibido (heapq, set, collections, etc.).
+
+El reparto: cripta/docs/REPARTO_PROYECTO2.md. El prompt de cada uno: cripta/docs/PROMPT_SDD_PARA_EL_GRUPO.md — copian el bloque común más su bloque personal.
+
+Mauricio A @Mauricio Arguedas , arrancá por los campos nuevos del traductor (costo, rango, GET /criptas/<id>/llaves). Hasta que eso exista, los otros tres no podemos probar nada.
+
+Regla que no se puede romper: la spec se commitea antes del código."
+
+Analiza la información para empezar a trabajar en el proyecto en esta segunda parte ya que  hay poco tiempo para reallizarlo.
+```
+
+Segundo mensaje, con el contrato del API (`openapi.json`) y una captura del Swagger con la consulta de llaves:
+
+```text
+Ok, acá está el archivo JSON que me dijiste, que sale del segundo enlace y del primero tomé esa captura del que sale el archivo JSON de las llaves.
+```
+
+Tercer mensaje:
+
+```text
+(mensaje sin texto: solo el zip de la carpeta datos_offline_p2, con las criptas de la segunda parte descargadas con tools/descargar_datos_offline.py)
+```
+
+Adjuntos del primer mensaje: el zip del repositorio actualizado desde GitHub, el PDF del enunciado de la segunda parte y dos capturas del mensaje del compañero con la tabla del reparto.
+
+Uso en el proyecto: Plan de trabajo de la Persona 2 para la segunda parte, con dos especificaciones: una para los datos nuevos del servicio, que desbloquea al resto del grupo, y otra para la verificación de resolubilidad. Texto del primer `/speckit.specify` (entrada 5.31) y copia del contrato en `docs/contrato/openapi-1.1.0.json`. La revisión del contrato mostró que la versión 1.1.0 agrega solo `costo` en las salidas, `rango` y el comportamiento `cazador` en las fichas de enemigo, y la consulta de llaves; que `rango` no es obligatorio; y que el esquema de la ubicación de llaves, a diferencia de los demás, admite campos adicionales. La revisión de las criptas publicadas mostró que `cripta-01` ya no aparece en la lista, que la cripta de referencia es `cripta-06` (300 salas, 36 cazadores), que en `cripta-03`, `cripta-04` y `cripta-06` una llave la suelta un enemigo errante, y que `cripta-05` no es resoluble por un ciclo de dos llaves. Esta última conclusión se sacó ubicando las llaves a partir del contenido de las salas, porque la consulta de llaves todavía no se podía descargar con la herramienta del proyecto.
+
+Cambios realizados por el estudiante: Se guardó el contrato del API desde el Swagger y se confirmó ahí que la consulta de llaves ya está publicada. Las criptas de la segunda parte se descargaron en una carpeta aparte, sin tocar `datos_offline/`, porque varias pruebas de la primera parte dependen de `cripta-01` tal como está; esa carpeta se dejó fuera del repositorio. Se aceptó dividir la capacidad en dos especificaciones para entregar primero los datos nuevos, que bloquean al resto del grupo, y se decidió escribir la primera con el contrato 1.1.0 como referencia.
+
+### 5.31 `/speckit.specify`: especificación 001, datos nuevos del servicio
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai. El modelo ejecutó el comando `/speckit.specify` de spec-kit v1.4.1 siguiendo las instrucciones del propio repositorio (`.claude/skills/speckit-specify/SKILL.md`) y su plantilla. El script de PowerShell que resuelve la plantilla (`resolve-template.ps1`) no se pudo correr en ese entorno, que es Linux sin PowerShell; como el repositorio no tiene plantillas propias, presets ni extensiones, se usó la plantilla base `.specify/templates/spec-template.md`, que es la que el script devuelve en ese caso.
+
+Fecha: 2026-11-16
+
+Objetivo: Escribir y confirmar en Git la especificación de los datos nuevos del servicio (§4.1, §4.2, §4.3 y Apéndice A del enunciado) antes de cualquier código.
+
+Prompts utilizados:
+
+```text
+/speckit.specify Datos nuevos del servicio para la segunda parte de CRIPTA (§4.1, §4.2, §4.3 y Apéndice A de cripta/docs/SegundoProyecto-EDII-2026.md). El contrato del API ya está publicado en su versión 1.1.0 (copia en cripta/docs/contrato/openapi-1.1.0.json): agrega solo el campo costo en las salidas, el campo rango y el comportamiento cazador en las fichas de enemigo, y la consulta GET /criptas/<id>/llaves. Son la base de tres capacidades: el terreno y el cazador usan el costo de las salidas y el rango, y la verificación de resolubilidad usa la ubicación de las llaves. Esta especificación cubre solo obtener, validar y conservar esos datos; las reglas que los usan (lo que cuesta moverse, el turno del cazador y la verificación) van en sus propias especificaciones.
+
+Lo que necesito:
+1. Costo de las salidas: cada salida del esqueleto puede traer "costo", un entero mayor o igual que 1. Si no lo trae o viene en null, vale 100. Es el mismo en los dos sentidos del paso, aunque el contrato describe cada salida por separado.
+2. Cazador: una ficha de enemigo puede tener comportamiento "cazador" y un campo "rango", entero mayor o igual que 1 en unidades de costo. El contrato no obliga a que venga el rango, así que hay que definir qué pasa con un cazador sin rango. Un rango en un enemigo que no es cazador no tiene efecto. Hoy el programa detiene la partida cuando encuentra un comportamiento que no conoce; con las criptas nuevas eso no puede pasar.
+3. Ubicación de llaves: GET /criptas/<id>/llaves devuelve cada llave con la sala donde está. Si trae "enemigo", la llave está en lo que suelta esa instancia y la sala es donde el enemigo inicia. Se consulta al iniciar la partida y cuenta dentro de presupuesto_solicitudes. Se guarda en disco junto con el resto de la cripta y vale mientras coincida la versión de la cripta; si ya está guardada para esa versión no se vuelve a pedir. En modo --offline se lee de disco y no cuenta.
+4. Lo guardado por la primera parte se invalida con la validación de versión que ya existe, no borrando archivos a mano.
+5. Los campos nuevos no deben producir el aviso de "campo desconocido" que el programa da cuando el contrato del API cambia; un campo que siga sin conocerse debe seguir avisándose.
+
+Cada caso debe quedar como escenario de aceptación con requisitos numerados. Carpeta de la especificación: specs/001-datos-nuevos-servicio.
+```
+
+Respuesta a las tres preguntas que dejó el comando, sobre FR-003, FR-008 y FR-016:
+
+```text
+P1: A, P2: A, P3: A
+```
+
+Uso en el proyecto: `specs/001-datos-nuevos-servicio/spec.md`, con 4 historias de usuario, 24 requisitos (FR-001 a FR-024) y la sección Clarifications con las tres respuestas, y `specs/001-datos-nuevos-servicio/checklists/requirements.md`, la lista de verificación de calidad del comando.
+
+Cambios realizados por el estudiante: El texto del comando se armó a partir de la propuesta del análisis (entrada 5.30), actualizada con lo que mostró el contrato 1.1.0: `rango` opcional y cada salida descrita por separado. El estudiante lo envió sin cambios. En las tres preguntas eligió la opción A: el costo que declara un lado vale para los dos sentidos y, si los dos lados difieren, gana la sala de menor id con un aviso, que es la misma regla que el programa ya usaba para la llave y el cierre automático; un cazador sin rango es un dato inválido de la ficha, sin usar ningún valor en su lugar; y un paquete offline sin ubicación de llaves se informa como dato no disponible, para que los paquetes y las pruebas de la primera parte sigan sirviendo. La especificación se confirmó en Git sola, antes de cualquier cambio de código.
+
+### 5.32 `/speckit.clarify`, `/speckit.plan`, `/speckit.tasks` y `/speckit.analyze` de la especificación 001
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai. El modelo ejecutó los cuatro comandos de spec-kit v1.4.1 siguiendo las instrucciones del repositorio (`.claude/skills/speckit-clarify`, `speckit-plan`, `speckit-tasks` y `speckit-analyze`) y sus plantillas. Los scripts de PowerShell que esos comandos usan para ubicar los archivos (`check-prerequisites.ps1`, `setup-plan.ps1`, `setup-tasks.ps1`) no se pudieron correr en ese entorno, que es Linux sin PowerShell; las rutas se tomaron de `.specify/feature.json`, que apunta a `specs/001-datos-nuevos-servicio`.
+
+Fecha: 2026-11-16
+
+Objetivo: Resolver las ambigüedades que quedaban en la especificación 001, escribir el plan con sus artefactos y la lista de tareas, y revisar la consistencia entre especificación, plan y tareas antes de escribir código.
+
+Prompts utilizados:
+
+```text
+/speckit.clarify Respuestas: acepto las cinco recomendadas.
+/speckit.plan
+/speckit.tasks
+/speckit.analyze
+```
+
+Uso en el proyecto: `specs/001-datos-nuevos-servicio/spec.md` (cinco respuestas nuevas en Clarifications, requisito nuevo FR-025, escenarios US3.10 y US3.11, y SC-002 y SC-005 ajustados), `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, `contracts/ubicacion-de-llaves.md` y `tasks.md`.
+
+Cambios realizados por el estudiante: Las cinco preguntas de `/speckit.clarify` se presentaron juntas, cada una con una opción recomendada, en lugar de una por una. El estudiante aceptó las cinco recomendaciones: la ubicación de llaves se pide justo después del esqueleto y antes de cualquier contenido; se obtiene en partida nueva, `--verificar` y `--replay`, pero no al cargar una partida guardada; los avisos van a la lista de avisos de datos del reporte final; el reporte final muestra de dónde salió la ubicación de llaves; y el id de cada llave no se comprueba contra el catálogo. `/speckit.analyze` cubrió los 25 requisitos con tareas y no encontró conflictos con la constitución. Sí encontró una contradicción: SC-005 decía que todas las pruebas de la primera parte seguían pasando sin cambios, pero FR-013 agrega una solicitud a cada inicio de partida y cambia las pruebas que cuentan solicitudes exactas. Se corrigió SC-005 antes del commit de documentación. Las dependencias con otros integrantes quedaron anotadas en el plan: el nombre del cazador y de su rango en el modelo de enemigos, la llamada de carga de partida en el controlador, y el guardado binario, que hoy no guarda el costo de las puertas ni el rango de los enemigos.
+
+### 5.33 Corrección de la especificación 001, renumerada a 004, e implementación de lo pendiente
+
+Herramienta: Claude (Claude Opus 5.5), mediante la interfaz de chat de claude.ai. La corrección de la especificación se hizo a mano sobre los archivos de spec-kit. Después, el modelo ejecutó `/speckit.implement` de spec-kit v1.4.1 siguiendo las instrucciones del repositorio (`.claude/skills/speckit-implement/SKILL.md`), con las tareas de `specs/004-datos-nuevos-servicio/tasks.md`. Los scripts de PowerShell del comando no se pudieron correr en ese entorno, que es Linux sin PowerShell; la carpeta de la especificación se tomó de `.specify/feature.json`.
+
+Fecha: 2026-11-17
+
+Objetivo: Ajustar la especificación de datos nuevos a lo que ya estaba en `main` después de integrar las especificaciones 001 a 003, con la numeración acordada por el grupo, e implementar lo que quedaba pendiente.
+
+Prompts utilizados:
+
+```text
+Ajustá la spec 001: renumerala a 004-datos-nuevos-servicio, marcá como cubierto por las specs 001 y 002 de Carlos lo que ya está en main (costo, cazador y rango), alineá FR-009 con el aviso que ya da el traductor, y dejá en el plan y las tareas solo lo pendiente: la ubicación de llaves y el costo en null.
+/speckit.implement
+```
+
+Uso en el proyecto: Primer commit: la carpeta `specs/001-datos-nuevos-servicio` pasa a `specs/004-datos-nuevos-servicio`; la especificación agrega la sección «Relación con otras especificaciones» y tres respuestas fechadas el 2026-11-17 en Clarifications (FR-009, FR-011 y FR-025); el plan, la investigación, el modelo de datos y las tareas quedan solo con lo pendiente. Segundo commit: el código y las pruebas de esas tareas.
+
+Cambios realizados por el estudiante: Al traer `main` a su rama se vio que el costo de las salidas, el cazador y el rango ya estaban implementados por las especificaciones 001 y 002 de otro integrante, con las mismas reglas que había decidido en su especificación. El estudiante aceptó la numeración propuesta en el grupo (004 para esta especificación) y decidió no repetir ese trabajo: lo marcó como cubierto por esas especificaciones. Ajustó FR-009 para que coincida con el aviso que ya da el traductor cuando un enemigo que no es cazador trae rango, y conservó como pendiente el costo en null, porque el contrato 1.1.0 lo permite y la implementación de `main` lo rechazaba. La corrección de la especificación se confirmó en Git en un commit propio, antes del código.

@@ -18,6 +18,8 @@ from tests.test_fuente_offline import (
     VERSION_CATALOGO,
 )
 
+UBICACION_DE_LLAVES = {"llaves": [{"id": "itm_llave_bronce", "sala": 2}]}
+
 FICHA_ANTORCHA = {"id": "itm_antorcha", "clase": "antorcha", "nombre": "Antorcha",
                   "peso": 1, "valor": 5, "duracion": 2000}
 FICHA_RATA = {"id": "ent_rata_gigante", "clase": "enemigo", "nombre": "Rata gigante",
@@ -36,6 +38,7 @@ class PruebasDescarga(unittest.TestCase):
             RespuestaHttpFalsa(200, LISTA_CRIPTAS),
             RespuestaHttpFalsa(200, DATOS_GENERALES),
             RespuestaHttpFalsa(200, PAGINA_1),
+            RespuestaHttpFalsa(200, UBICACION_DE_LLAVES),
             RespuestaHttpFalsa(200, CONTENIDO_1_2),
             RespuestaHttpFalsa(200, {"entidades": [FICHA_ANTORCHA, FICHA_RATA, FICHA_DARDOS]}),
             RespuestaHttpFalsa(200, {"entidades": [FICHA_POCION]}),  # lo que suelta la rata
@@ -48,25 +51,28 @@ class PruebasDescarga(unittest.TestCase):
             )
             self.assertEqual(resumen.criptas_descargadas, ["cripta-01"])
             self.assertEqual(resumen.fichas_descargadas, 4)
-            self.assertEqual(resumen.solicitudes_realizadas, 7)
+            self.assertEqual(resumen.solicitudes_realizadas, 8)
             self.assertEqual(resumen.lotes_de_catalogo_fallidos, [])
 
             # Las salas se pidieron en un solo lote y las fichas en el orden descubierto.
-            self.assertEqual(sesion.solicitudes_recibidas[3]["params"], {"salas": "1,2"})
-            self.assertEqual(sesion.solicitudes_recibidas[4]["params"],
+            self.assertTrue(sesion.solicitudes_recibidas[3]["url"].endswith("/criptas/cripta-01/llaves"))
+            self.assertEqual(sesion.solicitudes_recibidas[4]["params"], {"salas": "1,2"})
+            self.assertEqual(sesion.solicitudes_recibidas[5]["params"],
                              {"ids": "itm_antorcha,ent_rata_gigante,trp_dardos"})
-            self.assertEqual(sesion.solicitudes_recibidas[5]["params"], {"ids": "itm_pocion_menor"})
+            self.assertEqual(sesion.solicitudes_recibidas[6]["params"], {"ids": "itm_pocion_menor"})
 
             # Todo lo descargado se puede leer con FuenteOffline.
             offline = FuenteOffline(carpeta)
             self.assertEqual(offline.contenido("cripta-01", [1, 2]), CONTENIDO_1_2)
             self.assertEqual(offline.catalogo(["itm_pocion_menor"])["entidades"], [FICHA_POCION])
+            self.assertEqual(offline.ubicacion_de_llaves("cripta-01"), UBICACION_DE_LLAVES)
 
     def test_un_lote_de_catalogo_fallido_no_detiene_la_descarga(self):
         sesion = SesionHttpFalsa(
             RespuestaHttpFalsa(200, LISTA_CRIPTAS),
             RespuestaHttpFalsa(200, DATOS_GENERALES),
             RespuestaHttpFalsa(200, PAGINA_1),
+            RespuestaHttpFalsa(200, UBICACION_DE_LLAVES),
             RespuestaHttpFalsa(200, CONTENIDO_1_2),
             RespuestaHttpFalsa(404, {"error": "id desconocido"}),
             RespuestaHttpFalsa(200, VERSION_CATALOGO),

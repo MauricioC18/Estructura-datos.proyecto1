@@ -72,6 +72,8 @@ def _descargar_una_cripta(fuente, guardador, id_cripta, ids_de_fichas, mostrar):
             ids_salas.append(sala["id"])
         pagina += 1
 
+    guardador.guardar_ubicacion_de_llaves(id_cripta, fuente.ubicacion_de_llaves(id_cripta))
+
     for inicio in range(0, len(ids_salas), MAXIMO_POR_LOTE):
         respuesta = fuente.contenido(id_cripta, ids_salas[inicio:inicio + MAXIMO_POR_LOTE])
         guardador.guardar_contenido(id_cripta, respuesta)
