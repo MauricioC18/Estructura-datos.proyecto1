@@ -155,6 +155,16 @@ Formato: `- [ ] Tnnn [P] [Hn] [AB] [BLOQUEADA: …] Descripción, en archivo —
 
 ---
 
+## Fase 9 — Conexión de la resolubilidad (agregada el 2026-11-18)
+
+**Objetivo**: conectar `--verificar`, `--forzar` y el reporte al iniciar con el contrato `cripta/docs/INTERFAZ_RESOLUBILIDAD.md`. Los requisitos son de `specs/006-resolubilidad/spec.md` (se citan como «006/FR-xxx»); el plan está en «Conexión de la resolubilidad» de `plan.md`.
+
+- [ ] T054 Pruebas de las banderas y del reporte al iniciar, en `cripta/tests/test_banderas_resolubilidad.py`, escritas antes del código: combinaciones de banderas rechazadas; `--verificar` con códigos 0, 1 y 2 y sin instanciar la vista ni crear el motor; caso del Apéndice B: una cripta no resoluble sin `--forzar` no inicia, muestra el reporte y no abre bitácora; con `--forzar` inicia y muestra el reporte; una cripta resoluble muestra el orden de llaves antes de la primera acción; sin ubicación de llaves, la partida inicia y el reporte dice que no se pudo verificar; una partida cargada no muestra reporte; `--replay` de una partida forzada se reproduce — 006/FR-016, 006/FR-017, 006/FR-018, 006/FR-019, 006/FR-020
+- [ ] T055 (depende de T054) `--verificar CRIPTA` y `--forzar` en `cripta/main.py`, con las combinaciones rechazadas y el código 3 para una cripta que no se puede leer — 006/FR-016, 006/FR-018, 006/FR-020
+- [ ] T056 (depende de T054) En `play` de `cripta/controller/application.py`: exigir la resolubilidad salvo `--forzar`, mostrar el reporte antes de la primera acción y no abrir bitácora si la partida no inicia — 006/FR-016, 006/FR-017, 006/FR-019, 006/FR-020
+
+---
+
 ## Dependencias
 
 ```text

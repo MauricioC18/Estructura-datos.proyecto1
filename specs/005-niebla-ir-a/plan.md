@@ -414,6 +414,24 @@ Tomada el 2026-11-17 con Python 3.12.3 en WSL, tres corridas; **no es comparable
 | FR-032 | ninguno propio: cada paso es una acción del historial | `tests/test_ir_a.py` |
 | FR-033, FR-034, FR-036 | el diseño completo | mediciones 1, 3 y 5 |
 
+## Conexión de la resolubilidad (agregada el 2026-11-18)
+
+Los requisitos de `--verificar`, `--forzar` y el reporte al iniciar **no son de esta especificación**: son FR-016 a FR-020 de `specs/006-resolubilidad/spec.md`, y esa especificación deja la conexión a esta (sus Assumptions y su plan). Esta especificación no cambia; aquí solo se planea la conexión, contra el contrato `cripta/docs/INTERFAZ_RESOLUBILIDAD.md`. No se toca `model/resolubilidad.py` ni el repositorio.
+
+| Pieza | Archivo | Qué hace | Requisito (spec 006) |
+| --- | --- | --- | --- |
+| `--verificar CRIPTA` | `cripta/main.py` | Crea solo el repositorio (con `--offline` si se da), llama a `verificar_cripta`, imprime `lineas_de_texto()` con `print` y termina con `codigo_de_salida()`. No importa ni instancia la vista, no pide nombre, no abre bitácora ni crea el motor | FR-018, FR-020 |
+| `--forzar` | `cripta/main.py` | Pasa a `play` que no se exija la resolubilidad | FR-016 |
+| Reporte al iniciar | `cripta/controller/application.py` (`play`) | Partida nueva: `iniciar_partida(id, exigir_resolubilidad=not forzar)`. Si lanza `CriptaNoResoluble`, muestra el reporte y un aviso de que la partida no inicia y de que existe `--forzar`, y no abre bitácora. Si no, muestra el reporte (si lo hay) antes de la primera acción | FR-016, FR-017, FR-020 |
+| Partida cargada | sin cambios | `load_saved_game` ya inicia con `obtener_ubicacion_de_llaves=False`: no hay reporte | FR-019 |
+| `--replay` | sin cambios | `replay` no pasa `exigir_resolubilidad` | FR-016 |
+
+**Combinaciones de banderas.** `--forzar` solo tiene sentido al empezar una partida nueva, así que se rechaza con `--replay`, `--bench`, `--cargar` y `--verificar`. `--verificar` se rechaza con `--replay`, `--bench` y `--cargar`. El rechazo es el de `argparse`, como el de `--hasta` sin `--replay`.
+
+**Si la cripta no se puede leer** (no existe, o falla la fuente) con `--verificar`, se informa el error y el código de salida es 3. FR-018 reserva 0, 1 y 2 para los tres resultados de la verificación, y un error de datos no es ninguno de ellos. Es una decisión de esta conexión, no un requisito. Ojo: `argparse` también termina con 2 cuando las banderas están mal escritas; eso no se puede evitar sin reemplazar `argparse`, y queda anotado.
+
+**Pruebas.** En `cripta/tests/test_banderas_resolubilidad.py`, cada una cita su FR de la especificación 006. Usan los paquetes `datos_offline_p2/` (que trae la ubicación de llaves) y `datos_offline/` (que no la trae), y eligen la cripta por el resultado de su verificación, sin escribir ningún id ni tamaño.
+
 ## Fases
 
 **Fase 0 — Investigación.** Hecha. Ver [research.md](./research.md).
