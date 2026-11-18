@@ -60,6 +60,8 @@ SEMILLA = 2026
 LADOS = (10, 20, 40)
 COSTO_MAXIMO = 300
 CARPETA_SIN_CONEXION = "datos_offline"
+# El ejecutor de --bench le pasa a run() la carpeta de --offline, si se dio.
+USA_PAQUETE_SIN_CONEXION = True
 REPETICIONES = 5
 
 

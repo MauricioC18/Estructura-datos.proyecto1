@@ -6,6 +6,12 @@ la cripta en memoria.
 
 Cada run() devuelve una lista de Measurement con name, seconds y detail. En
 las mediciones que cuentan solicitudes en vez de medir tiempo, seconds es None.
+
+Paquete sin conexion
+    Una suite que mide criptas reales declara USA_PAQUETE_SIN_CONEXION = True
+    y acepta la carpeta como primer argumento de run(). Si main.py recibe
+    --offline CARPETA, esas suites miden esa carpeta; si no, cada una usa su
+    carpeta por omision. Las demas suites no cambian.
 """
 import importlib
 import time
@@ -30,8 +36,13 @@ SUITES = (
 )
 
 
-def run_suite(module_name):
-    return importlib.import_module(module_name).run()
+def run_suite(module_name, carpeta_sin_conexion=None):
+    module = importlib.import_module(module_name)
+
+    if carpeta_sin_conexion is not None and getattr(module, "USA_PAQUETE_SIN_CONEXION", False):
+        return module.run(carpeta_sin_conexion)
+
+    return module.run()
 
 
 def format_measurement(measurement):
@@ -43,8 +54,11 @@ def format_measurement(measurement):
     return f"  {measurement.name:<55} {seconds:>12}  {measurement.detail}"
 
 
-def main(suites=SUITES, output=print):
+def main(suites=SUITES, output=print, carpeta_sin_conexion=None):
     output(descripcion_del_equipo())
+
+    if carpeta_sin_conexion is not None:
+        output(f"Paquete sin conexion: {carpeta_sin_conexion}")
 
     for title, module_name in suites:
         output("")
@@ -52,7 +66,7 @@ def main(suites=SUITES, output=print):
         started = time.perf_counter()
 
         try:
-            measurements = run_suite(module_name)
+            measurements = run_suite(module_name, carpeta_sin_conexion)
         except Exception as error:  # una suite rota no debe tapar las demas
             output(f"  No se pudo medir: {type(error).__name__}: {error}")
             continue

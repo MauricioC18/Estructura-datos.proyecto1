@@ -9,6 +9,8 @@ Uso, desde la carpeta cripta/:
                                             reproducir e imprimir el estado del instante T
     python main.py --checkpoint-cada K      acciones entre dos copias de la linea de tiempo
     python main.py --bench                  medir los subsistemas
+    python main.py --bench --offline CARPETA
+                                            medir con las criptas de otro paquete sin conexion
 
     python main.py --puntajes [CRIPTA]      mostrar la tabla de puntajes
 
@@ -141,10 +143,12 @@ def run_scores(arguments):
     return 0
 
 
-def run_bench():
+def run_bench(arguments):
+    """Con --offline, las mediciones de criptas reales usan esa carpeta;
+    sin la bandera, cada suite usa su carpeta por omision."""
     from benchmark.benchmark import main as bench_main
 
-    bench_main()
+    bench_main(carpeta_sin_conexion=arguments.offline)
     return 0
 
 
@@ -232,7 +236,7 @@ def main(argv=None):
         return run_scores(arguments)
 
     if arguments.bench:
-        return run_bench()
+        return run_bench(arguments)
 
     if arguments.replay:
         return run_replay(arguments)
